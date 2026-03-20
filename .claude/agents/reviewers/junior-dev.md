@@ -79,3 +79,7 @@ For each finding:
 - **Suggestion**: Defensive improvement that would help less experienced developers
 
 If no findings, say: "Code handles edge cases well. No footguns found."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

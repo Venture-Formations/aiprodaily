@@ -72,3 +72,7 @@ For each finding:
 - **Suggestion**: Index recommendation, query restructuring for clarity
 
 If no findings, say: "Database queries are well-structured. No performance concerns."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

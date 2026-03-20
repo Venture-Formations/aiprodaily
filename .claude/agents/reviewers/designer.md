@@ -63,3 +63,7 @@ For each finding:
 - **Suggestion**: Refinement opportunity (better hierarchy, tighter alignment)
 
 If no findings, say: "Visual consistency maintained. No design issues found."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

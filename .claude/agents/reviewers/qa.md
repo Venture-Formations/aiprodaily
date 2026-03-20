@@ -75,3 +75,7 @@ it('should [expected behavior] when [condition]', () => {
 - **Suggestion**: Additional edge case that would strengthen confidence
 
 If no findings, say: "Test coverage is adequate for these changes. No gaps found."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

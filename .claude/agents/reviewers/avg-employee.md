@@ -73,3 +73,7 @@ For each finding:
 - **Suggestion**: Could be more intuitive or self-explanatory
 
 If no findings, say: "Interface is intuitive for everyday use. No concerns."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

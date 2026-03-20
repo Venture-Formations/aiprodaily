@@ -67,3 +67,7 @@ For each finding:
 - **Suggestion**: Polish that would improve satisfaction (better messages, smoother transitions)
 
 If no findings, say: "User experience is solid. No usability concerns."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

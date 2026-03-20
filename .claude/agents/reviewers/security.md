@@ -75,3 +75,7 @@ For each finding:
 - **Suggestion**: Hardening opportunity (rate limiting, logging improvements, CSP headers)
 
 If no findings, say: "No security vulnerabilities found in changed files."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

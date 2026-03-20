@@ -79,3 +79,7 @@ For each finding:
 - **Suggestion**: Logging improvements, monitoring opportunities, operational ergonomics
 
 If no findings, say: "Operational posture is solid. No concerns."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

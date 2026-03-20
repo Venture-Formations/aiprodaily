@@ -65,3 +65,7 @@ For each finding:
 - **Suggestion**: Clearer wording that would reduce cognitive load
 
 If no findings, say: "Naming and terminology are clear and consistent. No issues found."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.

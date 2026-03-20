@@ -65,3 +65,7 @@ For each finding:
 - **Suggestion**: Strategic improvements that would make the system more robust
 
 If no findings at your level, say: "No architectural concerns with these changes."
+
+## Lessons Learned
+
+Before starting your review, read `.claude/agents/reviewers/lessons.md` for patterns learned from past reviews. Apply any lessons relevant to your role — reinforce patterns that caught real issues, and avoid flagging known false positives.
