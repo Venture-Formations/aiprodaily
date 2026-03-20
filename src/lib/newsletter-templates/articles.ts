@@ -22,7 +22,7 @@ export async function generateArticleModuleSection(
   if (!mod) {
     const { data } = await supabaseAdmin
       .from('article_modules')
-      .select('*')
+      .select('id, name, block_order, config, publication_id')
       .eq('id', moduleId)
       .single()
     mod = data
@@ -79,21 +79,21 @@ export async function generateArticleModuleSection(
         const tradeAlt = sanitizeAltText(article.trade_image_alt || headline)
         blocks.push(`
           <div style="margin-bottom: 12px;">
-            <img src="${tradeImage}" alt="${tradeAlt}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+            <img src="${tradeImage}" alt="${tradeAlt}" width="730" style="max-width: 100%; width: 100%; height: auto; border-radius: 8px; display: block;" />
           </div>
         `)
       } else if (blockType === 'source_image' && sourceImage) {
         const sourceAlt = sanitizeAltText(article.image_alt || rssPost?.image_alt || headline)
         blocks.push(`
           <div style="margin-bottom: 12px;">
-            <img src="${sourceImage}" alt="${sourceAlt}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+            <img src="${sourceImage}" alt="${sourceAlt}" width="730" style="max-width: 100%; width: 100%; height: auto; border-radius: 8px; display: block;" />
           </div>
         `)
       } else if (blockType === 'ai_image' && aiImage) {
         const aiAlt = sanitizeAltText(article.image_alt || headline)
         blocks.push(`
           <div style="margin-bottom: 12px;">
-            <img src="${aiImage}" alt="${aiAlt}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+            <img src="${aiImage}" alt="${aiAlt}" width="730" style="max-width: 100%; width: 100%; height: auto; border-radius: 8px; display: block;" />
           </div>
         `)
       } else if (blockType === 'title') {

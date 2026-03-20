@@ -432,7 +432,12 @@ export default function AdsManagementPage() {
                 Advertisement Management
               </h1>
               <p className="text-gray-600 mt-1">
-                {ads.length} {activeStatusTab} {ads.length === 1 ? 'advertisement' : 'advertisements'}
+                {(() => {
+                  const displayCount = activeStatusTab === 'active'
+                    ? companyGroups.reduce((sum, g) => sum + g.advertisements.length, 0)
+                    : ads.length
+                  return `${displayCount} ${activeStatusTab} ${displayCount === 1 ? 'advertisement' : 'advertisements'}`
+                })()}
               </p>
             </div>
             <div className="flex gap-3">
@@ -818,7 +823,7 @@ export default function AdsManagementPage() {
                     </div>
                   </div>
 
-                  <div className="mb-4 flex gap-4">
+                  <div className="mb-4 flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
                       <div
                         className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_ol]:list-none [&_ol]:pl-0 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
@@ -829,12 +834,12 @@ export default function AdsManagementPage() {
                       <img
                         src={ad.image_url}
                         alt={ad.title}
-                        className="w-[284px] h-40 object-cover rounded border border-gray-200 flex-shrink-0"
+                        className="sm:w-[284px] w-full h-40 object-cover rounded border border-gray-200 sm:flex-shrink-0"
                       />
                     )}
                   </div>
 
-                  <div className="grid grid-cols-4 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t text-sm">
                     <div>
                       <span className="font-medium">Company:</span>
                       <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
@@ -944,7 +949,7 @@ export default function AdsManagementPage() {
                     </div>
                   </div>
 
-                  <div className="mb-4 flex gap-4">
+                  <div className="mb-4 flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
                       <div
                         className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_ol]:list-none [&_ol]:pl-0 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
@@ -955,12 +960,12 @@ export default function AdsManagementPage() {
                       <img
                         src={ad.image_url}
                         alt={ad.title}
-                        className="w-[284px] h-40 object-cover rounded border border-gray-200 flex-shrink-0"
+                        className="sm:w-[284px] w-full h-40 object-cover rounded border border-gray-200 sm:flex-shrink-0"
                       />
                     )}
                   </div>
 
-                  <div className="grid grid-cols-4 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t text-sm">
                     <div>
                       <span className="font-medium">Company:</span>
                       <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>

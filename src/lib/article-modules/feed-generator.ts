@@ -1,11 +1,13 @@
+import { timingSafeEqual } from 'crypto'
 import { Feed } from 'feed'
 import { htmlToText } from 'html-to-text'
 import { supabaseAdmin } from '../supabase'
 import { wrapTrackingUrl } from '../url-tracking'
 
-// Module-level cache per moduleId
+// Module-level cache keyed by moduleId:publicationId
 const feedCache = new Map<string, { xml: string; cachedAt: number }>()
 const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
+const MAX_CACHE_ENTRIES = 100
 
 /**
  * Generates RSS 2.0 feeds from module articles for use with
@@ -21,21 +23,27 @@ export class ModuleFeedGenerator {
     publicationId: string,
     forceRefresh = false
   ): Promise<string> {
+    const cacheKey = `${moduleId}:${publicationId}`
+
     // Check cache
     if (!forceRefresh) {
-      const cached = feedCache.get(moduleId)
+      const cached = feedCache.get(cacheKey)
       if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
         return cached.xml
       }
     }
 
     // Get module config
-    const { data: mod } = await supabaseAdmin
+    const { data: mod, error: modError } = await supabaseAdmin
       .from('article_modules')
       .select('id, name, publication_id, config')
       .eq('id', moduleId)
       .eq('publication_id', publicationId)
       .single()
+
+    if (modError) {
+      console.error(`[ModuleFeed] Failed to fetch module ${moduleId}: ${modError.message}`)
+    }
 
     if (!mod) {
       throw new Error(`Module ${moduleId} not found for publication ${publicationId}`)
@@ -48,16 +56,20 @@ export class ModuleFeedGenerator {
     const includeFullContent = rssConfig.include_full_content !== false
 
     // Get publication info for feed metadata
-    const { data: pub } = await supabaseAdmin
+    const { data: pub, error: pubError } = await supabaseAdmin
       .from('newsletters')
       .select('name, slug')
       .eq('id', publicationId)
       .single()
 
+    if (pubError) {
+      console.error(`[ModuleFeed] Failed to fetch publication ${publicationId}: ${pubError.message}`)
+    }
+
     const pubName = pub?.name || 'Newsletter'
 
     // Find the most recent issue with articles for this module
-    const { data: recentIssue } = await supabaseAdmin
+    const { data: recentIssue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
       .select('id, date, status, mailerlite_issue_id')
       .eq('publication_id', publicationId)
@@ -66,13 +78,17 @@ export class ModuleFeedGenerator {
       .limit(1)
       .single()
 
+    if (issueError) {
+      console.error(`[ModuleFeed] Failed to fetch recent issue for publication ${publicationId}: ${issueError.message}`)
+    }
+
     if (!recentIssue) {
       // Return empty but valid RSS feed
       return ModuleFeedGenerator.buildEmptyFeed(mod.name, pubName)
     }
 
     // Get active module articles for this issue, ordered by rank
-    const { data: articles } = await supabaseAdmin
+    const { data: articles, error: articlesError } = await supabaseAdmin
       .from('module_articles')
       .select(`
         id, headline, content, rank, trade_image_url, trade_image_alt, ticker,
@@ -85,6 +101,10 @@ export class ModuleFeedGenerator {
       .eq('is_active', true)
       .order('rank', { ascending: true })
       .limit(itemsCount)
+
+    if (articlesError) {
+      console.error(`[ModuleFeed] Failed to fetch articles for issue ${recentIssue.id}, module ${moduleId}: ${articlesError.message}`)
+    }
 
     if (!articles || articles.length === 0) {
       return ModuleFeedGenerator.buildEmptyFeed(mod.name, pubName)
@@ -159,8 +179,14 @@ export class ModuleFeedGenerator {
 
     const xml = feed.rss2()
 
+    // Evict oldest entry if cache is full
+    if (feedCache.size >= MAX_CACHE_ENTRIES) {
+      const oldestKey = feedCache.keys().next().value
+      if (oldestKey) feedCache.delete(oldestKey)
+    }
+
     // Cache the result
-    feedCache.set(moduleId, { xml, cachedAt: Date.now() })
+    feedCache.set(cacheKey, { xml, cachedAt: Date.now() })
 
     return xml
   }
@@ -182,11 +208,19 @@ export class ModuleFeedGenerator {
   }
 
   /**
-   * Invalidate the cache for a specific module.
+   * Invalidate the cache for a specific module (across all publications),
+   * a specific module+publication pair, or the entire cache.
    */
-  static invalidateCache(moduleId?: string): void {
-    if (moduleId) {
-      feedCache.delete(moduleId)
+  static invalidateCache(moduleId?: string, publicationId?: string): void {
+    if (moduleId && publicationId) {
+      feedCache.delete(`${moduleId}:${publicationId}`)
+    } else if (moduleId) {
+      // Clear all entries for this module (any publication)
+      for (const key of Array.from(feedCache.keys())) {
+        if (key.startsWith(`${moduleId}:`)) {
+          feedCache.delete(key)
+        }
+      }
     } else {
       feedCache.clear()
     }
@@ -199,11 +233,15 @@ export class ModuleFeedGenerator {
     moduleId: string,
     token: string
   ): Promise<{ valid: boolean; publicationId: string | null }> {
-    const { data: mod } = await supabaseAdmin
+    const { data: mod, error: modError } = await supabaseAdmin
       .from('article_modules')
       .select('publication_id, config')
       .eq('id', moduleId)
       .single()
+
+    if (modError) {
+      console.error(`[ModuleFeed] Failed to fetch module for token validation ${moduleId}: ${modError.message}`)
+    }
 
     if (!mod) {
       return { valid: false, publicationId: null }
@@ -212,12 +250,13 @@ export class ModuleFeedGenerator {
     const config = (mod.config as Record<string, any>) || {}
     const rssConfig = config.rss_output || {}
 
-    if (!rssConfig.enabled || !rssConfig.feed_token) {
+    if (!rssConfig.enabled || !rssConfig.feed_token || rssConfig.feed_token.length < 16) {
       return { valid: false, publicationId: null }
     }
 
     return {
-      valid: rssConfig.feed_token === token,
+      valid: rssConfig.feed_token.length === token.length &&
+        timingSafeEqual(Buffer.from(rssConfig.feed_token, 'utf8'), Buffer.from(token, 'utf8')),
       publicationId: mod.publication_id
     }
   }

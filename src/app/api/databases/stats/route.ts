@@ -3,14 +3,8 @@ import { withApiHandler } from '@/lib/api-handler';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'databases-stats' },
-  async ({ request }) => {
-    const publicationId = new URL(request.url).searchParams.get('publication_id')
-
-    if (!publicationId) {
-      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
-    }
-
+  { authTier: 'authenticated', logContext: 'databases-stats', requirePublicationId: true },
+  async ({ publicationId }) => {
     // All counts filtered by publication_id
     const [
       { count: aiAppsCount, error: aiAppsError },
@@ -20,12 +14,12 @@ export const GET = withApiHandler(
       { count: manualArticlesCount, error: manualArticlesError },
       { count: articleImagesCount, error: articleImagesError },
     ] = await Promise.all([
-      supabaseAdmin.from('ai_applications').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
-      supabaseAdmin.from('prompt_ideas').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
-      supabaseAdmin.from('advertisements').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
-      supabaseAdmin.from('polls').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
-      supabaseAdmin.from('manual_articles').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
-      supabaseAdmin.from('article_images').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
+      supabaseAdmin.from('ai_applications').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId!),
+      supabaseAdmin.from('prompt_ideas').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId!),
+      supabaseAdmin.from('advertisements').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId!),
+      supabaseAdmin.from('polls').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId!),
+      supabaseAdmin.from('manual_articles').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId!),
+      supabaseAdmin.from('article_images').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId!),
     ])
 
     if (aiAppsError) console.error('[DB] Error fetching AI applications count:', aiAppsError.message)
