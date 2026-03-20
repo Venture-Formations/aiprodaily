@@ -234,35 +234,64 @@ export default function ArticleModuleGeneralTab({
             />
           </div>
 
-          {/* Candidate Multiplier */}
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Extra Candidates</label>
-              <p className="text-xs text-gray-500">
-                Extra posts to fetch beyond articles needed. Leave empty to use default ({(module.articles_count || 3) * 3} extra).
-              </p>
-            </div>
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={(module.config as Record<string, any>)?.candidate_multiplier ?? ''}
-              placeholder={`${(module.articles_count || 3) * 3}`}
-              onChange={(e) => {
-                const raw = e.target.value
-                if (raw === '') {
-                  handleCandidateMultiplierChange(null)
-                } else {
-                  const val = parseInt(raw)
-                  if (!isNaN(val) && val >= 0 && val <= 50) {
-                    handleCandidateMultiplierChange(val)
-                  }
-                }
-              }}
-              disabled={isDisabled}
-              className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+          {/* Extra Candidates Toggle */}
+          {(() => {
+            const candidateMultiplier = (module.config as Record<string, any>)?.candidate_multiplier
+            const isCustom = typeof candidateMultiplier === 'number'
+            const articlesCount = module.articles_count || 3
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Extra Candidates</label>
+                    <p className="text-xs text-gray-500">
+                      {isCustom
+                        ? `Fetches ${articlesCount} + ${candidateMultiplier} = ${articlesCount + candidateMultiplier} candidate posts`
+                        : `Default: fetches ${articlesCount} × 4 = ${articlesCount * 4} candidate posts`
+                      }
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isCustom) {
+                        handleCandidateMultiplierChange(null)
+                      } else {
+                        handleCandidateMultiplierChange(articlesCount * 3)
+                      }
+                    }}
+                    disabled={isDisabled}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      isCustom ? 'bg-emerald-500' : 'bg-gray-300'
+                    } ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isCustom ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                {isCustom && (
+                  <div className="flex items-center gap-2 pl-1">
+                    <span className="text-xs text-gray-500">Extra posts:</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={candidateMultiplier}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value)
+                        if (!isNaN(val) && val >= 0 && val <= 50) {
+                          handleCandidateMultiplierChange(val)
+                        }
+                      }}
+                      disabled={isDisabled}
+                      className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </div>
 
