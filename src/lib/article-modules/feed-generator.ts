@@ -1,4 +1,5 @@
 import { Feed } from 'feed'
+import { htmlToText } from 'html-to-text'
 import { supabaseAdmin } from '../supabase'
 import { wrapTrackingUrl } from '../url-tracking'
 
@@ -124,8 +125,8 @@ export class ModuleFeedGenerator {
       if (includeFullContent && article.content) {
         itemData.description = article.content.replace(/\n/g, '<br>')
       } else if (article.content) {
-        // Truncate to ~200 chars
-        const plain = article.content.replace(/<[^>]+>/g, '')
+        // Truncate to ~200 chars; convert HTML to plain text safely
+        const plain = htmlToText(article.content, { wordwrap: false })
         itemData.description = plain.length > 200
           ? plain.substring(0, 200) + '...'
           : plain
