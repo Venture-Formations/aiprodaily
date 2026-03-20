@@ -7,15 +7,16 @@ import { withApiHandler } from '@/lib/api-handler'
  * List companies for a module with their ads, auto-creating junction entries for any missing ones.
  */
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'ad-modules/[id]/companies' },
-  async ({ params }) => {
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]/companies', requirePublicationId: true },
+  async ({ params, publicationId }) => {
     const moduleId = params.id
 
-    // Get the module for context
+    // Get the module for context — scoped by publication_id
     const { data: adModule, error: moduleError } = await supabaseAdmin
       .from('ad_modules')
       .select('id, publication_id, next_position, selection_mode')
       .eq('id', moduleId)
+      .eq('publication_id', publicationId!)
       .single()
 
     if (moduleError || !adModule) {

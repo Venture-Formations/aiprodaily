@@ -13,8 +13,8 @@ const updateSchema = z.object({
 })
 
 export const PATCH = withApiHandler(
-  { authTier: 'authenticated', inputSchema: updateSchema, logContext: 'article-images/[id]' },
-  async ({ input, params }) => {
+  { authTier: 'authenticated', inputSchema: updateSchema, logContext: 'article-images/[id]', requirePublicationId: true },
+  async ({ input, params, publicationId }) => {
     const id = params.id
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -27,6 +27,7 @@ export const PATCH = withApiHandler(
       .from('article_images')
       .update(updateData)
       .eq('id', id)
+      .eq('publication_id', publicationId!)
       .select(COLUMNS)
       .single()
 
@@ -39,14 +40,15 @@ export const PATCH = withApiHandler(
 )
 
 export const DELETE = withApiHandler(
-  { authTier: 'authenticated', logContext: 'article-images/[id]' },
-  async ({ params }) => {
+  { authTier: 'authenticated', logContext: 'article-images/[id]', requirePublicationId: true },
+  async ({ params, publicationId }) => {
     const id = params.id
 
     const { error } = await supabaseAdmin
       .from('article_images')
       .delete()
       .eq('id', id)
+      .eq('publication_id', publicationId!)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

@@ -15,19 +15,14 @@ const createSchema = z.object({
 })
 
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'article-images' },
-  async ({ request }) => {
-    const publicationId = request.nextUrl.searchParams.get('publication_id')
+  { authTier: 'authenticated', logContext: 'article-images', requirePublicationId: true },
+  async ({ request, publicationId }) => {
     const category = request.nextUrl.searchParams.get('category')
-
-    if (!publicationId) {
-      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
-    }
 
     let query = supabaseAdmin
       .from('article_images')
       .select(COLUMNS)
-      .eq('publication_id', publicationId)
+      .eq('publication_id', publicationId!)
       .order('category')
       .order('display_name')
 
@@ -46,12 +41,12 @@ export const GET = withApiHandler(
 )
 
 export const POST = withApiHandler(
-  { authTier: 'authenticated', inputSchema: createSchema, logContext: 'article-images' },
-  async ({ input }) => {
+  { authTier: 'authenticated', inputSchema: createSchema, logContext: 'article-images', requirePublicationId: true },
+  async ({ input, publicationId }) => {
     const { data, error } = await supabaseAdmin
       .from('article_images')
       .insert({
-        publication_id: input.publication_id,
+        publication_id: publicationId!,
         category: input.category,
         lookup_key: input.lookup_key,
         display_name: input.display_name,
