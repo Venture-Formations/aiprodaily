@@ -57,8 +57,8 @@ export class ModuleArticles {
     const lookbackTimestamp = lookbackDate.toISOString()
 
     const articlesNeeded = mod.articles_count || 3
-    const candidateMultiplier = (mod.config as Record<string, any>)?.candidate_multiplier ?? 3
-    const postsToAssign = articlesNeeded + candidateMultiplier
+    const candidateMultiplier = (mod.config as Record<string, any>)?.candidate_multiplier
+    const postsToAssign = candidateMultiplier ? articlesNeeded + candidateMultiplier : articlesNeeded * 4
 
     console.log(`[Module] Querying posts: feedIds=${JSON.stringify(feedIds)}, lookback=${lookbackTimestamp}, postsToAssign=${postsToAssign}`)
 

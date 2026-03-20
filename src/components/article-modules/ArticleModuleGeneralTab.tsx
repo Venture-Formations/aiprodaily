@@ -58,6 +58,21 @@ export default function ArticleModuleGeneralTab({
     }
   }
 
+  const handleCandidateMultiplierChange = async (value: number | null) => {
+    setSaving(true)
+    try {
+      const currentConfig = (module.config as Record<string, any>) || {}
+      if (value === null) {
+        const { candidate_multiplier: _, ...rest } = currentConfig
+        await onUpdate({ config: rest } as any)
+      } else {
+        await onUpdate({ config: { ...currentConfig, candidate_multiplier: value } } as any)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleSelectionModeChange = async (mode: ArticleSelectionMode) => {
     setSaving(true)
     try {
@@ -212,6 +227,36 @@ export default function ArticleModuleGeneralTab({
                 const val = parseInt(e.target.value)
                 if (val >= 24 && val <= 168) {
                   handleLookbackHoursChange(val)
+                }
+              }}
+              disabled={isDisabled}
+              className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {/* Candidate Multiplier */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Extra Candidates</label>
+              <p className="text-xs text-gray-500">
+                Extra posts to fetch beyond articles needed. Leave empty to use default (articles x 4).
+              </p>
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={(module.config as Record<string, any>)?.candidate_multiplier ?? ''}
+              placeholder={`${(module.articles_count || 3) * 4}`}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (raw === '') {
+                  handleCandidateMultiplierChange(null)
+                } else {
+                  const val = parseInt(raw)
+                  if (!isNaN(val) && val >= 0 && val <= 50) {
+                    handleCandidateMultiplierChange(val)
+                  }
                 }
               }}
               disabled={isDisabled}
