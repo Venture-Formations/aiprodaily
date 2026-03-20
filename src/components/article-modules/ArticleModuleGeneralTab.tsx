@@ -239,7 +239,7 @@ export default function ArticleModuleGeneralTab({
             <div>
               <label className="text-sm font-medium text-gray-700">Extra Candidates</label>
               <p className="text-xs text-gray-500">
-                Extra posts to fetch beyond articles needed. Leave empty to use default (articles x 4).
+                Extra posts to fetch beyond articles needed. Leave empty to use default ({(module.articles_count || 3) * 3} extra).
               </p>
             </div>
             <input
@@ -247,7 +247,7 @@ export default function ArticleModuleGeneralTab({
               min={0}
               max={50}
               value={(module.config as Record<string, any>)?.candidate_multiplier ?? ''}
-              placeholder={`${(module.articles_count || 3) * 4}`}
+              placeholder={`${(module.articles_count || 3) * 3}`}
               onChange={(e) => {
                 const raw = e.target.value
                 if (raw === '') {
