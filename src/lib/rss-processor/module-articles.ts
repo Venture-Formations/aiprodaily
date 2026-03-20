@@ -202,7 +202,10 @@ export class ModuleArticles {
 
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
-      .select('*, post_ratings(*)')
+      .select(`
+        id, title, description, content, full_article_text, source_url, image_url, image_alt, feed_id, issue_id, article_module_id,
+        post_ratings(total_score, criteria_1_score, criteria_2_score, criteria_3_score, criteria_4_score, criteria_5_score)
+      `)
       .eq('issue_id', issueId)
       .eq('article_module_id', moduleId)
       .in('feed_id', feedIds)
@@ -344,7 +347,7 @@ export class ModuleArticles {
   /**
    * Generate bodies for articles in a module
    */
-  async generateBodiesForModule(issueId: string, moduleId: string, offset: number = 0, limit: number = 3): Promise<void> {
+  async generateBodiesForModule(issueId: string, moduleId: string, _offset: number = 0, limit: number = 3): Promise<void> {
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
     const newsletterId = await getNewsletterIdFromIssue(issueId)
 
@@ -359,7 +362,10 @@ export class ModuleArticles {
 
     const { data: articles } = await supabaseAdmin
       .from('module_articles')
-      .select('*, rss_posts(*)')
+      .select(`
+        id, headline, content, post_id,
+        rss_posts(id, title, description, content, full_article_text, source_url)
+      `)
       .eq('issue_id', issueId)
       .eq('article_module_id', moduleId)
       .eq('content', '')
@@ -496,7 +502,10 @@ export class ModuleArticles {
 
     const { data: articles } = await supabaseAdmin
       .from('module_articles')
-      .select('*, rss_posts(*)')
+      .select(`
+        id, content, fact_check_score,
+        rss_posts(id, content, description)
+      `)
       .eq('issue_id', issueId)
       .eq('article_module_id', moduleId)
       .neq('content', '')

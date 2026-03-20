@@ -255,7 +255,7 @@ export default function ArticleImagesPage() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap gap-y-3 items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Trade Images</h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -272,7 +272,7 @@ export default function ArticleImagesPage() {
 
         {/* Filters */}
         {images.length > 0 && (
-          <div className="flex gap-3 mb-6">
+          <div className="flex flex-wrap gap-3 mb-6">
             <select
               value={filterMember}
               onChange={e => setFilterMember(e.target.value)}
@@ -385,7 +385,7 @@ export default function ArticleImagesPage() {
                     autoComplete="off"
                   />
                   {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {suggestions.map((member, i) => (
                         <button
                           key={`${member.name}-${i}`}

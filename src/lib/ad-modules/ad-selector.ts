@@ -20,6 +20,16 @@ interface EligibleCompany {
 }
 
 /**
+ * Helper: extract local date string from a Date without UTC shift
+ */
+function toLocalDateStr(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
  * Helper function to get the start of a week (Sunday)
  */
 function getWeekStart(date: Date): Date {
@@ -38,7 +48,7 @@ export class ModuleAdSelector {
    * Check if an ad is within its valid date range
    */
   private static isAdInDateRange(ad: Advertisement, issueDate: Date): boolean {
-    const issueDateStr = issueDate.toISOString().split('T')[0]
+    const issueDateStr = toLocalDateStr(issueDate)
 
     if (ad.preferred_start_date && ad.preferred_start_date > issueDateStr) {
       return false
@@ -112,8 +122,20 @@ export class ModuleAdSelector {
     const { data: junctions, error: junctionError } = await supabaseAdmin
       .from('ad_module_advertisers')
       .select(`
-        *,
-        advertiser:advertisers(*)
+        id,
+        ad_module_id,
+        advertiser_id,
+        display_order,
+        next_ad_position,
+        times_used,
+        times_paid,
+        paid,
+        frequency,
+        priority,
+        last_used_date,
+        created_at,
+        updated_at,
+        advertiser:advertisers(id, publication_id, company_name, is_active, times_used, last_used_date, created_at, updated_at)
       `)
       .eq('ad_module_id', moduleId)
       .order('display_order', { ascending: true })
@@ -127,8 +149,41 @@ export class ModuleAdSelector {
     const { data: allAds, error: adsError } = await supabaseAdmin
       .from('advertisements')
       .select(`
-        *,
-        advertiser:advertisers(*)
+        id,
+        title,
+        body,
+        word_count,
+        button_text,
+        button_url,
+        image_url,
+        image_alt,
+        frequency,
+        times_paid,
+        times_used,
+        status,
+        display_order,
+        paid,
+        preferred_start_date,
+        actual_start_date,
+        last_used_date,
+        payment_intent_id,
+        payment_amount,
+        payment_status,
+        submission_date,
+        approved_by,
+        approved_at,
+        rejection_reason,
+        created_at,
+        updated_at,
+        clerk_user_id,
+        company_name,
+        ad_type,
+        preview_image_url,
+        ad_module_id,
+        advertiser_id,
+        priority,
+        cta_text,
+        advertiser:advertisers(id, publication_id, company_name, is_active, times_used, last_used_date, created_at, updated_at)
       `)
       .eq('ad_module_id', moduleId)
       .eq('publication_id', publicationId)
@@ -143,7 +198,7 @@ export class ModuleAdSelector {
     const eligibleCompanies: EligibleCompany[] = []
 
     for (const junction of junctions) {
-      const advertiser = junction.advertiser as Advertiser
+      const advertiser = (Array.isArray(junction.advertiser) ? junction.advertiser[0] : junction.advertiser) as unknown as Advertiser
       if (!advertiser) continue
 
       // Check advertiser is active
@@ -158,7 +213,7 @@ export class ModuleAdSelector {
       // Get this company's eligible ads in this mod
       const companyAds = allAds
         .filter(ad => ad.advertiser_id === junction.advertiser_id)
-        .filter(ad => this.isAdEligible(ad, issueDate)) as AdvertisementWithAdvertiser[]
+        .filter(ad => this.isAdEligible(ad as unknown as Advertisement, issueDate)) as unknown as AdvertisementWithAdvertiser[]
 
       // Company is only eligible if it has at least one eligible ad
       if (companyAds.length === 0) continue
@@ -230,8 +285,8 @@ export class ModuleAdSelector {
         return a.junction.times_used - b.junction.times_used
       }
       // Same cycle position: higher priority first
-      if (b.junction.priority !== a.junction.priority) {
-        return b.junction.priority - a.junction.priority
+      if ((b.junction.priority ?? 0) !== (a.junction.priority ?? 0)) {
+        return (b.junction.priority ?? 0) - (a.junction.priority ?? 0)
       }
       // Same priority: by display_order
       return a.junction.display_order - b.junction.display_order
@@ -356,7 +411,7 @@ export class ModuleAdSelector {
     // Get all active ad modules
     const { data: modules, error } = await supabaseAdmin
       .from('ad_modules')
-      .select('*')
+      .select('id, name, publication_id, selection_mode, next_position, display_order, is_active')
       .eq('publication_id', publicationId)
       .eq('is_active', true)
       .order('display_order', { ascending: true })
@@ -383,14 +438,17 @@ export class ModuleAdSelector {
         usedAdvertiserIds.add(result.ad.advertiser_id)
       }
 
-      // Store selection in database (using advertisement_id)
+      // Store selection in database (using advertisement_id) — idempotent upsert
       const { error: insertError } = await supabaseAdmin
         .from('issue_module_ads')
-        .insert({
+        .upsert({
           issue_id: issueId,
           ad_module_id: mod.id,
           advertisement_id: result.ad?.id || null,
           selection_mode: mod.selection_mode
+        }, {
+          onConflict: 'issue_id,ad_module_id',
+          ignoreDuplicates: true
         })
 
       if (insertError) {
@@ -409,8 +467,24 @@ export class ModuleAdSelector {
    */
   static async recordUsageSimple(
     issueId: string,
-    issueDate: Date
+    issueDate: Date,
+    publicationId?: string
   ): Promise<{ success: boolean; recorded: number }> {
+    // Verify issue belongs to publication if publicationId provided
+    if (publicationId) {
+      const { data: issue, error: issueError } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id')
+        .eq('id', issueId)
+        .eq('publication_id', publicationId)
+        .single()
+
+      if (issueError || !issue) {
+        console.error('[AdSelector] Issue does not belong to publication or not found:', issueError)
+        return { success: false, recorded: 0 }
+      }
+    }
+
     const { data: selections, error } = await supabaseAdmin
       .from('issue_module_ads')
       .select(`
@@ -440,56 +514,75 @@ export class ModuleAdSelector {
       return { success: false, recorded: 0 }
     }
 
-    const issueDateStr = issueDate.toISOString().split('T')[0]
+    const issueDateStr = toLocalDateStr(issueDate)
     let recorded = 0
 
     for (const selection of selections) {
-      if (!selection.advertisement_id || !selection.advertisement) continue
+      try {
+        if (!selection.advertisement_id || !selection.advertisement) continue
 
-      const ad = selection.advertisement as any
-      const advertiser = ad.advertiser
-      const adModule = selection.ad_module as any
+        const ad = selection.advertisement as any
+        const advertiser = ad.advertiser
+        const adModule = selection.ad_module as any
 
-      // Update ad in advertisements table
-      const newTimesUsed = (ad.times_used || 0) + 1
-      await supabaseAdmin
-        .from('advertisements')
-        .update({
-          times_used: newTimesUsed,
-          last_used_date: issueDateStr,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', ad.id)
-
-      // Update advertiser (if linked)
-      if (advertiser) {
-        await supabaseAdmin
-          .from('advertisers')
+        // Update ad in advertisements table
+        const newTimesUsed = (ad.times_used || 0) + 1
+        const { error: adUpdateError } = await supabaseAdmin
+          .from('advertisements')
           .update({
-            times_used: (advertiser.times_used || 0) + 1,
+            times_used: newTimesUsed,
             last_used_date: issueDateStr,
             updated_at: new Date().toISOString()
           })
-          .eq('id', advertiser.id)
+          .eq('id', ad.id)
+
+        if (adUpdateError) {
+          console.error(`[AdSelector] Error updating ad ${ad.id}:`, adUpdateError)
+          continue
+        }
+
+        // Update advertiser (if linked)
+        if (advertiser) {
+          const { error: advUpdateError } = await supabaseAdmin
+            .from('advertisers')
+            .update({
+              times_used: (advertiser.times_used || 0) + 1,
+              last_used_date: issueDateStr,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', advertiser.id)
+
+          if (advUpdateError) {
+            console.error(`[AdSelector] Error updating advertiser ${advertiser.id}:`, advUpdateError)
+          }
+        }
+
+        // Mark selection as used
+        const { error: markError } = await supabaseAdmin
+          .from('issue_module_ads')
+          .update({ used_at: new Date().toISOString() })
+          .eq('id', selection.id)
+
+        if (markError) {
+          console.error(`[AdSelector] Error marking selection ${selection.id} as used:`, markError)
+          continue
+        }
+
+        // Update junction table: increment times_used, advance next_ad_position, update last_used_date
+        if (ad.advertiser_id && ad.ad_module_id) {
+          await this.advanceAdPositionWithinCompany(ad.ad_module_id, ad.advertiser_id, ad.display_order, issueDateStr)
+        }
+
+        // Advance company position for sequential modules
+        if (adModule && adModule.selection_mode === 'sequential' && ad.advertiser_id) {
+          await this.advanceCompanyPosition(adModule.id, ad.advertiser_id)
+        }
+
+        recorded++
+      } catch (err) {
+        console.error(`[AdSelector] Unexpected error processing selection ${selection.id}:`, err)
+        continue
       }
-
-      // Mark selection as used
-      await supabaseAdmin
-        .from('issue_module_ads')
-        .update({ used_at: new Date().toISOString() })
-        .eq('id', selection.id)
-
-      // Update junction table: increment times_used, advance next_ad_position, update last_used_date
-      if (ad.advertiser_id && ad.ad_module_id) {
-        await this.advanceAdPositionWithinCompany(ad.ad_module_id, ad.advertiser_id, ad.display_order, issueDateStr)
-      }
-
-      // Advance company position for sequential modules
-      if (adModule && adModule.selection_mode === 'sequential' && ad.advertiser_id) {
-        await this.advanceCompanyPosition(adModule.id, ad.advertiser_id)
-      }
-
-      recorded++
     }
 
     console.log(`[AdSelector] Recorded usage for ${recorded} ad selections`)
@@ -508,13 +601,18 @@ export class ModuleAdSelector {
     issueDateStr: string
   ): Promise<void> {
     // Get all active ads for this company in this mod
-    const { data: ads } = await supabaseAdmin
+    const { data: ads, error: adsError } = await supabaseAdmin
       .from('advertisements')
       .select('display_order')
       .eq('ad_module_id', moduleId)
       .eq('advertiser_id', advertiserId)
       .eq('status', 'active')
       .order('display_order', { ascending: true })
+
+    if (adsError) {
+      console.error(`[AdSelector] Error fetching ads for position advance in mod ${moduleId}:`, adsError)
+      return
+    }
 
     if (!ads || ads.length === 0) return
 
@@ -526,17 +624,22 @@ export class ModuleAdSelector {
     }
 
     // Get current junction row
-    const { data: junction } = await supabaseAdmin
+    const { data: junction, error: junctionError } = await supabaseAdmin
       .from('ad_module_advertisers')
       .select('times_used, times_paid, paid, frequency')
       .eq('ad_module_id', moduleId)
       .eq('advertiser_id', advertiserId)
       .single()
 
+    if (junctionError) {
+      console.error(`[AdSelector] Error fetching junction for mod ${moduleId}, advertiser ${advertiserId}:`, junctionError)
+      return
+    }
+
     const newTimesUsed = (junction?.times_used || 0) + 1
 
     // Update junction: advance ad position, increment times_used, update last_used_date
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('ad_module_advertisers')
       .update({
         next_ad_position: nextAdPosition,
@@ -547,16 +650,26 @@ export class ModuleAdSelector {
       .eq('ad_module_id', moduleId)
       .eq('advertiser_id', advertiserId)
 
+    if (updateError) {
+      console.error(`[AdSelector] Error updating junction for mod ${moduleId}, advertiser ${advertiserId}:`, updateError)
+      return
+    }
+
     console.log(`[AdSelector] Company in mod ${moduleId}: ad position -> ${nextAdPosition}, times_used -> ${newTimesUsed}, last_used_date -> ${issueDateStr}`)
 
     // PAID COMPANIES: Check if junction is exhausted and mark all company ads as completed
     if (junction?.paid === true && junction?.times_paid > 0 && newTimesUsed >= junction.times_paid) {
-      await supabaseAdmin
+      const { error: completedError } = await supabaseAdmin
         .from('advertisements')
         .update({ status: 'completed' })
         .eq('ad_module_id', moduleId)
         .eq('advertiser_id', advertiserId)
         .eq('status', 'active')
+
+      if (completedError) {
+        console.error(`[AdSelector] Error marking ads as completed for mod ${moduleId}, advertiser ${advertiserId}:`, completedError)
+        return
+      }
 
       console.log(`[AdSelector] Paid company in mod ${moduleId} exhausted (${newTimesUsed}/${junction.times_paid}), all ads set to completed`)
     }
@@ -571,11 +684,16 @@ export class ModuleAdSelector {
     usedAdvertiserId: string
   ): Promise<void> {
     // Get all junction entries for this mod to find positions
-    const { data: junctions } = await supabaseAdmin
+    const { data: junctions, error: junctionsError } = await supabaseAdmin
       .from('ad_module_advertisers')
       .select('advertiser_id, display_order')
       .eq('ad_module_id', moduleId)
       .order('display_order', { ascending: true })
+
+    if (junctionsError) {
+      console.error(`[AdSelector] Error fetching junctions for company position advance in mod ${moduleId}:`, junctionsError)
+      return
+    }
 
     if (!junctions || junctions.length === 0) return
 
@@ -596,13 +714,17 @@ export class ModuleAdSelector {
     }
 
     // Update the mod's next_position (now tracks company position)
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('ad_modules')
       .update({
         next_position: nextPosition,
         updated_at: new Date().toISOString()
       })
       .eq('id', moduleId)
+
+    if (updateError) {
+      console.error(`[AdSelector] Error advancing company position for mod ${moduleId}:`, updateError)
+    }
   }
 
   /**
@@ -657,18 +779,64 @@ export class ModuleAdSelector {
   /**
    * Get selected ads for an issue (for display on issue page)
    */
-  static async getIssueAdSelections(issueId: string): Promise<IssueModuleAd[]> {
-    const { data, error } = await supabaseAdmin
+  static async getIssueAdSelections(issueId: string, publicationId?: string): Promise<IssueModuleAd[]> {
+    let query = supabaseAdmin
       .from('issue_module_ads')
       .select(`
-        *,
-        ad_module:ad_modules(*),
+        id,
+        issue_id,
+        ad_module_id,
+        advertisement_id,
+        selection_mode,
+        selected_at,
+        used_at,
+        ad_module:ad_modules(id, name, publication_id, selection_mode, block_order, config, next_position, display_order, is_active, created_at, updated_at),
         advertisement:advertisements(
-          *,
-          advertiser:advertisers(*)
+          id,
+          title,
+          body,
+          word_count,
+          button_text,
+          button_url,
+          image_url,
+          image_alt,
+          frequency,
+          times_paid,
+          times_used,
+          status,
+          display_order,
+          paid,
+          preferred_start_date,
+          actual_start_date,
+          last_used_date,
+          payment_intent_id,
+          payment_amount,
+          payment_status,
+          submission_date,
+          approved_by,
+          approved_at,
+          rejection_reason,
+          created_at,
+          updated_at,
+          clerk_user_id,
+          company_name,
+          ad_type,
+          preview_image_url,
+          ad_module_id,
+          advertiser_id,
+          priority,
+          cta_text,
+          advertiser:advertisers(id, publication_id, company_name, is_active, times_used, last_used_date, created_at, updated_at)
         )
       `)
       .eq('issue_id', issueId)
+
+    // Filter through ad_module join if publicationId provided
+    if (publicationId) {
+      query = query.eq('ad_module.publication_id', publicationId)
+    }
+
+    const { data, error } = await query
       .order('ad_module(display_order)', { ascending: true })
 
     if (error) {
@@ -685,17 +853,37 @@ export class ModuleAdSelector {
   static async manuallySelectAd(
     issueId: string,
     moduleId: string,
-    adId: string
+    adId: string,
+    publicationId?: string
   ): Promise<{ success: boolean; error?: string }> {
-    // Verify the ad belongs to this mod
-    const { data: ad } = await supabaseAdmin
+    // Verify the ad belongs to this mod (and publication if provided)
+    let adQuery = supabaseAdmin
       .from('advertisements')
       .select('id, ad_module_id')
       .eq('id', adId)
-      .single()
+
+    if (publicationId) {
+      adQuery = adQuery.eq('publication_id', publicationId)
+    }
+
+    const { data: ad } = await adQuery.single()
 
     if (!ad || ad.ad_module_id !== moduleId) {
       return { success: false, error: 'Ad does not belong to this mod' }
+    }
+
+    // Verify issue belongs to publication if publicationId provided
+    if (publicationId) {
+      const { data: issue, error: issueError } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id')
+        .eq('id', issueId)
+        .eq('publication_id', publicationId)
+        .single()
+
+      if (issueError || !issue) {
+        return { success: false, error: 'Issue does not belong to this publication' }
+      }
     }
 
     // Upsert the selection

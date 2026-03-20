@@ -175,7 +175,30 @@ function main() {
     process.exit(2);
   }
 
-  // --- Check 2: Agent gates based on changed files ---
+  // --- Check 2: Review gate (persona-based review) ---
+  const reviewGateMarkerPath = join(projectDir, '.claude', '.review-gate-approved');
+
+  let reviewGateApproved = false;
+  try {
+    const reviewGateSha = readFileSync(reviewGateMarkerPath, 'utf-8').trim();
+    reviewGateApproved = reviewGateSha === currentSha;
+  } catch {
+    // Marker doesn't exist
+  }
+
+  if (!reviewGateApproved) {
+    process.stderr.write(
+      '❌ BLOCKED: Review gate not passed.\n\n' +
+      'Before pushing, run the pre-push review gate:\n' +
+      '  /review-pre-push\n\n' +
+      'This runs security, junior-dev, dba, ops, layout, usability, and qa\n' +
+      'reviewers against your changes. Push is blocked if Critical issues are found.\n\n' +
+      'After the gate passes, the marker is created automatically.\n'
+    );
+    process.exit(2);
+  }
+
+  // --- Check 3: Agent gates based on changed files ---
   const agentBlockers = checkAgentGates(projectDir, currentSha);
 
   if (agentBlockers.length > 0) {
@@ -187,7 +210,7 @@ function main() {
     process.exit(2);
   }
 
-  // All good — approved SHA matches HEAD and all agent gates passed
+  // All good — approved SHA matches HEAD and all gates passed
   process.exit(0);
 }
 
