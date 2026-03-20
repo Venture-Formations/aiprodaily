@@ -211,7 +211,12 @@ export default function ArticleImagesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this image?')) return
     try {
-      await fetch(`/api/article-images/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/article-images/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        console.error('Delete failed:', res.status, data.error || res.statusText)
+        return
+      }
       fetchImages()
     } catch (err) {
       console.error('Delete failed:', err)

@@ -57,7 +57,7 @@ AIProDaily uses Supabase PostgreSQL with:
 
 ## Output Format
 
-```
+```markdown
 ## Database Analysis Report
 
 ### Query Issues

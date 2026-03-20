@@ -75,7 +75,9 @@ export class ModuleAdSelector {
 
     // Check if company already appeared in current period
     if (junction.last_used_date) {
-      const lastUsed = new Date(junction.last_used_date)
+      // Parse date string as local date (avoid UTC shift from new Date(string))
+      const dateParts = String(junction.last_used_date).split('T')[0].split('-')
+      const lastUsed = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]))
 
       if (frequency === 'weekly') {
         const issueWeekStart = getWeekStart(issueDate)

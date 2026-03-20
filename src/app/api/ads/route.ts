@@ -62,7 +62,7 @@ const createAdSchema = z.object({
   word_count: z.number().int().optional(),
   button_text: z.string().optional().default(''),
   button_url: z.string().min(1, 'Button URL is required'),
-  frequency: z.enum(['single', 'daily', 'weekly', 'monthly', 'recurring']).optional().default('single'),
+  frequency: z.enum(['single', 'weekly', 'monthly']).optional().default('single'),
   times_paid: z.number().int().optional().default(1),
   status: z.enum(['pending', 'approved', 'active', 'paused', 'completed', 'rejected']).optional().default('approved'),
   useInNextNewsletter: z.boolean().optional().default(false),
@@ -227,16 +227,18 @@ export const POST = withApiHandler(
       let junctionError: { message: string } | null = null
 
       if (existingJunction) {
-        // Junction exists — only update frequency/paid fields if provided
-        if (frequency && frequency !== 'single') {
+        // Junction exists — update frequency/paid fields
+        const junctionUpdate: Record<string, unknown> = {
+          updated_at: new Date().toISOString()
+        }
+        if (frequency) junctionUpdate.frequency = frequency
+        if (times_paid !== undefined) junctionUpdate.times_paid = times_paid
+        if (input.paid !== undefined) junctionUpdate.paid = input.paid
+
+        if (Object.keys(junctionUpdate).length > 1) {
           const { error } = await supabaseAdmin
             .from('ad_module_advertisers')
-            .update({
-              frequency,
-              times_paid: times_paid || 0,
-              paid: input.paid !== undefined ? input.paid : true,
-              updated_at: new Date().toISOString()
-            })
+            .update(junctionUpdate)
             .eq('id', existingJunction.id)
           junctionError = error
         }
@@ -248,13 +250,10 @@ export const POST = withApiHandler(
           display_order: nextOrder,
           next_ad_position: 1,
           times_used: 0,
-          priority: 0
-        }
-
-        if (frequency && frequency !== 'single') {
-          junctionData.frequency = frequency
-          junctionData.times_paid = times_paid || 0
-          junctionData.paid = input.paid !== undefined ? input.paid : true
+          priority: 0,
+          frequency: frequency || 'single',
+          times_paid: times_paid || 0,
+          paid: input.paid !== undefined ? input.paid : true
         }
 
         const { error } = await supabaseAdmin

@@ -68,7 +68,7 @@ AIProDaily is a multi-tenant newsletter platform with:
 
 ## Output Format
 
-```
+```markdown
 ## Security Audit Report
 
 ### Summary

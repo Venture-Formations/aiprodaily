@@ -79,7 +79,7 @@ Perform deep, focused code review on your assigned dimension. Produce findings i
 
 For each finding, use this structure:
 
-```
+```markdown
 ### [SEVERITY] Finding Title
 
 **Location**: `path/to/file.ts:42`
