@@ -34,7 +34,7 @@ AIProDaily is a Next.js 15 newsletter platform. Key directories for ownership as
 - Consider model tier for cost optimization
 
 ### Task Assignment Format
-```
+```text
 ## Task for [agent-name]
 
 **Objective**: What to accomplish

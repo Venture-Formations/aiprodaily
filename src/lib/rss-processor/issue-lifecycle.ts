@@ -408,9 +408,16 @@ export class IssueLifecycle {
       .select('post_id')
       .eq('issue_id', issueId)
 
+    const { data: moduleArticlesUsed } = await supabaseAdmin
+      .from('module_articles')
+      .select('post_id')
+      .eq('issue_id', issueId)
+      .eq('is_active', true)
+
     const usedPostIds = [
       ...(primaryArticles?.map(a => a.post_id) || []),
-      ...(secondaryArticles?.map(a => a.post_id) || [])
+      ...(secondaryArticles?.map(a => a.post_id) || []),
+      ...(moduleArticlesUsed?.map(a => a.post_id).filter(Boolean) || [])
     ]
 
     const unusedPostIds = assignedPostIds.filter(id => !usedPostIds.includes(id))

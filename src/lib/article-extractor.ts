@@ -162,16 +162,19 @@ export class ArticleExtractor {
     let lastError: string | undefined
     let detectedStatus: ExtractionStatus = 'failed'
 
-    // Google News URLs use JS redirects — skip Readability, go straight to Jina
+    // Google News URLs use JS-based protobuf redirects. Resolve to the real
+    // article URL first, then extract normally.
     if (this.isGoogleNewsUrl(url)) {
-      console.log(`[Extract] Google News URL detected, using Jina directly`)
-      try {
-        const jinaResult = await this.extractWithJina(url)
-        if (jinaResult.success) return jinaResult
-        return { success: false, status: jinaResult.status, error: `Jina failed for Google News URL: ${jinaResult.error}` }
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error'
-        return { success: false, status: 'failed', error: `Jina error for Google News URL: ${msg}` }
+      const resolved = await this.resolveGoogleNewsUrl(url)
+      if (resolved) {
+        console.log(`[Extract] Resolved Google News URL to: ${resolved.substring(0, 80)}...`)
+        url = resolved
+      } else {
+        return {
+          success: false,
+          status: 'failed',
+          error: 'Could not resolve Google News redirect URL'
+        }
       }
     }
 
@@ -236,12 +239,30 @@ export class ArticleExtractor {
 
   /**
    * Check if a URL is a Google News redirect URL.
-   * These can't be resolved via simple fetch — they use JS-based redirects
-   * with protobuf-encoded article IDs. Jina AI handles them via browser rendering.
-   * We skip the direct Readability extraction for these and go straight to Jina.
    */
   private isGoogleNewsUrl(url: string): boolean {
     return url.includes('news.google.com/rss/articles/')
+  }
+
+  /**
+   * Resolve a Google News redirect URL to the actual article URL.
+   * Uses google-news-decoder which calls Google's internal endpoint
+   * to decode the protobuf-encoded article ID.
+   */
+  private async resolveGoogleNewsUrl(url: string): Promise<string | null> {
+    try {
+      // @ts-ignore — no type declarations for google-news-decoder
+      const GoogleNewsDecoder = (await import('google-news-decoder')).default
+      const decoder = new GoogleNewsDecoder()
+      const result = await decoder.decodeGoogleNewsUrl(url)
+      if (result?.status && result.decodedUrl) {
+        return result.decodedUrl
+      }
+      return null
+    } catch (error) {
+      console.error(`[Extract] Google News decode failed:`, error instanceof Error ? error.message : 'Unknown')
+      return null
+    }
   }
 
   /**

@@ -63,6 +63,7 @@ export async function generateArticleModuleSection(
     const sourceUrl = rssPost?.source_url || '#'
     const sourceImage = rssPost?.image_url || null
     const aiImage = article.ai_image_url || null
+    const tradeImage = article.trade_image_url || null
     const emoji = getArticleEmoji(headline, content)
 
     // Wrap URL with tracking
@@ -74,7 +75,14 @@ export async function generateArticleModuleSection(
     // Build blocks based on block_order
     const blocks: string[] = []
     for (const blockType of blockOrder) {
-      if (blockType === 'source_image' && sourceImage) {
+      if (blockType === 'trade_image' && tradeImage) {
+        const tradeAlt = sanitizeAltText(article.trade_image_alt || headline)
+        blocks.push(`
+          <div style="margin-bottom: 12px;">
+            <img src="${tradeImage}" alt="${tradeAlt}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+          </div>
+        `)
+      } else if (blockType === 'source_image' && sourceImage) {
         const sourceAlt = sanitizeAltText(article.image_alt || rssPost?.image_alt || headline)
         blocks.push(`
           <div style="margin-bottom: 12px;">

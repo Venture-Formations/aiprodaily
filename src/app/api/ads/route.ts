@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
+import { z } from 'zod'
+
+const AD_COLUMNS = `
+  id, publication_id, title, body, word_count, button_text, button_url,
+  frequency, times_paid, times_used, status, display_order, payment_status,
+  paid, image_url, image_alt, submission_date, ad_module_id, advertiser_id,
+  priority, ad_type, company_name, cta_text, last_used_date, created_at, updated_at
+`
 
 // GET all ads with optional status and ad_module_id filters
 export const GET = withApiHandler(
@@ -13,7 +21,7 @@ export const GET = withApiHandler(
     let query = supabaseAdmin
       .from('advertisements')
       .select(`
-        *,
+        ${AD_COLUMNS},
         ad_module:ad_modules(id, name),
         advertiser:advertisers(id, company_name, logo_url)
       `)
@@ -48,11 +56,32 @@ export const GET = withApiHandler(
   }
 )
 
+const createAdSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  body: z.string().min(1, 'Body is required'),
+  word_count: z.number().int().optional(),
+  button_text: z.string().optional().default(''),
+  button_url: z.string().min(1, 'Button URL is required'),
+  frequency: z.enum(['single', 'weekly', 'monthly']).optional().default('single'),
+  times_paid: z.number().int().optional().default(1),
+  status: z.enum(['pending', 'approved', 'active', 'paused', 'completed', 'rejected']).optional().default('approved'),
+  useInNextNewsletter: z.boolean().optional().default(false),
+  payment_status: z.enum(['paid', 'pending', 'free']).optional().default('paid'),
+  paid: z.boolean().optional().default(true),
+  image_url: z.string().url().nullable().optional(),
+  image_alt: z.string().nullable().optional(),
+  ad_module_id: z.string().uuid().nullable().optional(),
+  advertiser_id: z.string().uuid().nullable().optional(),
+  priority: z.number().int().optional().default(0),
+  ad_type: z.string().nullable().optional(),
+  company_name: z.string().nullable().optional(),
+  cta_text: z.string().nullable().optional(),
+})
+
 // POST - Create new ad (admin only)
 export const POST = withApiHandler(
-  { authTier: 'admin', logContext: 'ads', requirePublicationId: true },
-  async ({ request, publicationId, logger }) => {
-    const body = await request.json()
+  { authTier: 'admin', logContext: 'ads', requirePublicationId: true, inputSchema: createAdSchema },
+  async ({ input, publicationId, logger }) => {
     const {
       title,
       body: adBody,
@@ -61,12 +90,7 @@ export const POST = withApiHandler(
       button_url,
       frequency,
       times_paid
-    } = body
-
-    // Validation
-    if (!title || !adBody || !button_url) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
+    } = input
 
     // Normalize URL: ensure https:// prefix
     let normalizedUrl = button_url.trim()
@@ -76,8 +100,8 @@ export const POST = withApiHandler(
 
     // Determine display_order if status is active
     let display_order = null
-    const requestedStatus = body.status || 'approved'
-    const useInNextNewsletter = body.useInNextNewsletter || false
+    const requestedStatus = input.status || 'approved'
+    const useInNextNewsletter = input.useInNextNewsletter || false
 
     if (requestedStatus === 'active') {
       if (useInNextNewsletter) {
@@ -154,20 +178,20 @@ export const POST = withApiHandler(
         times_used: 0,
         status: requestedStatus,
         display_order: display_order,
-        payment_status: body.payment_status || 'paid',
-        paid: body.paid !== undefined ? body.paid : true,
-        image_url: body.image_url || null,
-        image_alt: body.image_alt || null,
+        payment_status: input.payment_status || 'paid',
+        paid: input.paid !== undefined ? input.paid : true,
+        image_url: input.image_url || null,
+        image_alt: input.image_alt || null,
         submission_date: new Date().toISOString(),
         publication_id: publicationId,
-        ad_module_id: body.ad_module_id || null, // Optional ad module assignment
-        advertiser_id: body.advertiser_id || null, // Optional advertiser assignment
-        priority: body.priority || 0, // Priority for selection mode
-        ad_type: body.ad_type || null, // Section type label
-        company_name: body.company_name || null, // Company name
-        cta_text: body.cta_text || null // Optional CTA text
+        ad_module_id: input.ad_module_id || null,
+        advertiser_id: input.advertiser_id || null,
+        priority: input.priority || 0,
+        ad_type: input.ad_type || null,
+        company_name: input.company_name || null,
+        cta_text: input.cta_text || null
       })
-      .select()
+      .select(AD_COLUMNS)
       .single()
 
     if (error) {
@@ -203,16 +227,18 @@ export const POST = withApiHandler(
       let junctionError: { message: string } | null = null
 
       if (existingJunction) {
-        // Junction exists — only update frequency/paid fields if provided
-        if (frequency && frequency !== 'single') {
+        // Junction exists — update frequency/paid fields
+        const junctionUpdate: Record<string, unknown> = {
+          updated_at: new Date().toISOString()
+        }
+        if (frequency) junctionUpdate.frequency = frequency
+        if (times_paid !== undefined) junctionUpdate.times_paid = times_paid
+        if (input.paid !== undefined) junctionUpdate.paid = input.paid
+
+        if (Object.keys(junctionUpdate).length > 1) {
           const { error } = await supabaseAdmin
             .from('ad_module_advertisers')
-            .update({
-              frequency,
-              times_paid: times_paid || 0,
-              paid: body.paid !== undefined ? body.paid : true,
-              updated_at: new Date().toISOString()
-            })
+            .update(junctionUpdate)
             .eq('id', existingJunction.id)
           junctionError = error
         }
@@ -224,13 +250,10 @@ export const POST = withApiHandler(
           display_order: nextOrder,
           next_ad_position: 1,
           times_used: 0,
-          priority: 0
-        }
-
-        if (frequency && frequency !== 'single') {
-          junctionData.frequency = frequency
-          junctionData.times_paid = times_paid || 0
-          junctionData.paid = body.paid !== undefined ? body.paid : true
+          priority: 0,
+          frequency: frequency || 'single',
+          times_paid: times_paid || 0,
+          paid: input.paid !== undefined ? input.paid : true
         }
 
         const { error } = await supabaseAdmin

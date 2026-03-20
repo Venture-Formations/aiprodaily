@@ -56,7 +56,7 @@ Rate your confidence in the hypothesis:
 
 ### Step 7: Report Findings
 
-```
+```text
 ## Hypothesis: [Statement]
 
 **Confidence**: High | Medium | Low (X%)

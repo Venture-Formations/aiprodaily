@@ -57,12 +57,18 @@ export class ModuleArticles {
     const lookbackTimestamp = lookbackDate.toISOString()
 
     const articlesNeeded = mod.articles_count || 3
-    const postsToAssign = articlesNeeded * 4
+    const candidateMultiplier = (mod.config as Record<string, any>)?.candidate_multiplier
+    const postsToAssign = typeof candidateMultiplier === 'number'
+      ? articlesNeeded + candidateMultiplier
+      : articlesNeeded * 4
 
-    const { data: topPosts } = await supabaseAdmin
+    console.log(`[Module] Querying posts: feedIds=${JSON.stringify(feedIds)}, lookback=${lookbackTimestamp}, postsToAssign=${postsToAssign}`)
+
+    const { data: topPosts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select(`
         id,
+        ticker,
         post_ratings(
           total_score,
           criteria_1_score,
@@ -77,8 +83,21 @@ export class ModuleArticles {
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
 
+    if (postsError) {
+      console.error(`[Module] Query error for mod ${mod.name}:`, postsError.message)
+      return { assigned: 0 }
+    }
+
     if (!topPosts || topPosts.length === 0) {
-      console.log(`[Module] No available posts for mod ${mod.name}`)
+      // Debug: check without the post_ratings filter
+      const { data: unfilteredPosts, error: unfilteredError } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id')
+        .in('feed_id', feedIds)
+        .is('issue_id', null)
+        .gte('processed_at', lookbackTimestamp)
+
+      console.log(`[Module] No available posts for mod ${mod.name} (unfiltered count: ${unfilteredPosts?.length || 0}, error: ${unfilteredError?.message || 'none'})`)
       return { assigned: 0 }
     }
 
@@ -120,26 +139,46 @@ export class ModuleArticles {
       return { assigned: 0, filtered: filteredCount }
     }
 
+    // Sort by total score descending
     const sortedPosts = eligiblePosts
       .sort((a: any, b: any) => {
         const scoreA = a.post_ratings?.[0]?.total_score || 0
         const scoreB = b.post_ratings?.[0]?.total_score || 0
         return scoreB - scoreA
       })
-      .slice(0, postsToAssign)
 
-    if (sortedPosts.length > 0) {
+    // Select top posts: 1 per ticker (company), then fill remaining slots
+    const selectedPosts: any[] = []
+    const seenTickers = new Set<string>()
+
+    for (const post of sortedPosts) {
+      if (selectedPosts.length >= postsToAssign) break
+
+      const ticker = (post as any).ticker?.toUpperCase()
+      if (ticker && seenTickers.has(ticker)) {
+        continue // Skip: already have a post for this company
+      }
+
+      selectedPosts.push(post)
+      if (ticker) seenTickers.add(ticker)
+    }
+
+    if (seenTickers.size > 0) {
+      console.log(`[Module] Ticker dedup: ${sortedPosts.length} candidates → ${selectedPosts.length} selected (${seenTickers.size} unique companies)`)
+    }
+
+    if (selectedPosts.length > 0) {
       await supabaseAdmin
         .from('rss_posts')
         .update({
           issue_id: issueId,
           article_module_id: moduleId
         })
-        .in('id', sortedPosts.map((p: any) => p.id))
+        .in('id', selectedPosts.map((p: any) => p.id))
     }
 
-    console.log(`[Module] Assigned ${sortedPosts.length} posts to mod ${mod.name}${filteredCount > 0 ? ` (${filteredCount} filtered by minimum scores)` : ''}`)
-    return { assigned: sortedPosts.length, filtered: filteredCount }
+    console.log(`[Module] Assigned ${selectedPosts.length} posts to mod ${mod.name}${filteredCount > 0 ? ` (${filteredCount} filtered by minimum scores)` : ''}`)
+    return { assigned: selectedPosts.length, filtered: filteredCount }
   }
 
   /**
