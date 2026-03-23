@@ -1,27 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { runIngestion } from '@/lib/rss-combiner'
 
-export const maxDuration = 300
+/**
+ * Congress Feed Ingestion Cron (runs every 3 hours)
+ * Fetches Google News articles for top congressional trades, filters by approved sources.
+ *
+ * Both GET (Vercel cron) and POST (manual with Bearer token) are secured via system auth tier.
+ */
+const handler = withApiHandler(
+  { authTier: 'system', logContext: 'ingest-congress-feeds' },
+  async ({ logger }) => {
+    logger.info('Starting congress feed ingestion')
 
-export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
-
-  if (!cronSecret || token !== cronSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
     const result = await runIngestion()
-    return NextResponse.json({ success: true, ...result })
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[CRON] Congress feed ingestion failed:', error)
-    return NextResponse.json(
-      { error: 'Ingestion failed', message },
-      { status: 500 }
+
+    logger.info(
+      {
+        feedsFetched: result.feedsFetched,
+        articlesStored: result.articlesStored,
+        articlesFiltered: result.articlesFiltered,
+      },
+      'Congress feed ingestion complete'
     )
+
+    return NextResponse.json({
+      success: true,
+      ...result,
+      timestamp: new Date().toISOString(),
+    })
   }
-}
+)
+
+export const POST = handler
+export const GET = handler
+
+export const maxDuration = 300 // 5 minutes
