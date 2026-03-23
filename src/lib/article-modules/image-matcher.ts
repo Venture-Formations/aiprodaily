@@ -1,23 +1,13 @@
 import { supabaseAdmin } from '../supabase'
 
-interface ArticleImage {
-  id: string
-  category: string
-  lookup_key: string
-  display_name: string
-  image_url: string
-}
-
 /**
- * Matches articles to trade images from the article_images table.
- * Each image represents a specific member + transaction type combo
- * (e.g., "Nancy Pelosi - Purchase", "Nancy Pelosi - Sale").
- *
- * Looks up member/transaction from congress_trades via the article's ticker.
+ * Matches module_articles to trade images from the article_images table.
+ * Uses member_name + transaction_type stored directly on module_articles
+ * to look up the corresponding image.
  */
 export class ImageMatcher {
   /**
-   * Normalize a name or label into a URL-safe lookup key.
+   * Normalize a name into a URL-safe lookup key.
    * "Nancy Pelosi Purchase" → "nancy-pelosi-purchase"
    */
   static normalizeLookupKey(name: string): string {
@@ -28,18 +18,38 @@ export class ImageMatcher {
       .replace(/^-+|-+$/g, '')
   }
 
-  /**
-   * Build the combo lookup key from member name + transaction type.
-   */
   static buildLookupKey(member: string, transaction: string): string {
     return ImageMatcher.normalizeLookupKey(`${member} ${transaction}`)
   }
 
   /**
-   * Attach trade images to all active module_articles for an issue/module.
-   * Looks up member + transaction from congress_trades via ticker,
-   * matches against article_images, and updates trade_image_url/trade_image_alt.
+   * Look up the trade image URL for an article based on its member_name + transaction_type.
+   * Returns the image URL or null.
+   */
+  static async getImageForArticle(
+    memberName: string,
+    transactionType: string,
+    publicationId: string
+  ): Promise<{ image_url: string; display_name: string } | null> {
+    const lookupKey = ImageMatcher.buildLookupKey(memberName, transactionType)
+
+    const { data } = await supabaseAdmin
+      .from('article_images')
+      .select('image_url, display_name')
+      .eq('publication_id', publicationId)
+      .eq('category', 'trade')
+      .eq('lookup_key', lookupKey)
+      .maybeSingle()
+
+    return data || null
+  }
+
+  /**
+   * Batch-attach trade images to all active module_articles for an issue/module.
+   * Reads member_name + transaction_type from module_articles, matches against
+   * article_images, and updates trade_image_url + trade_image_alt.
    *
+   * Also re-populates member_name/transaction_type from congress_trades if missing.
    * Safe no-op if no trade images are configured for the publication.
    */
   static async attachTradeImages(
@@ -47,10 +57,10 @@ export class ImageMatcher {
     moduleId: string,
     publicationId: string
   ): Promise<{ matched: number; unmatched: number }> {
-    // Load all trade images for this publication first — early exit if none
+    // Load all trade images for this publication — early exit if none
     const { data: images } = await supabaseAdmin
       .from('article_images')
-      .select('id, category, lookup_key, display_name, image_url')
+      .select('lookup_key, image_url, display_name')
       .eq('publication_id', publicationId)
       .eq('category', 'trade')
 
@@ -58,13 +68,12 @@ export class ImageMatcher {
       return { matched: 0, unmatched: 0 }
     }
 
-    // Get active articles with their ticker (from module_articles or rss_post)
+    const imageMap = new Map(images.map(img => [img.lookup_key, img]))
+
+    // Get active articles
     const { data: articles } = await supabaseAdmin
       .from('module_articles')
-      .select(`
-        id, ticker, headline,
-        rss_post:rss_posts(ticker)
-      `)
+      .select('id, ticker, member_name, transaction_type')
       .eq('issue_id', issueId)
       .eq('article_module_id', moduleId)
       .eq('is_active', true)
@@ -73,85 +82,64 @@ export class ImageMatcher {
       return { matched: 0, unmatched: 0 }
     }
 
-    // Collect all tickers we need to look up
-    const tickers = new Set<string>()
-    for (const article of articles) {
-      const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
-      const ticker = article.ticker || rssPost?.ticker
-      if (ticker) tickers.add(ticker)
-    }
+    // Re-populate missing member/transaction from congress_trades
+    const needsLookup = articles.filter(a => a.ticker && (!a.member_name || !a.transaction_type))
+    if (needsLookup.length > 0) {
+      const tickers = Array.from(new Set(needsLookup.map(a => a.ticker!)))
+      const { data: trades } = await supabaseAdmin
+        .from('congress_trades')
+        .select('ticker, name, transaction')
+        .in('ticker', tickers)
+        .order('trade_size_parsed', { ascending: false })
 
-    if (tickers.size === 0) {
-      return { matched: 0, unmatched: articles.length }
-    }
+      if (trades) {
+        const tradeMap = new Map<string, { name: string; transaction: string }>()
+        for (const t of trades) {
+          if (t.name && t.transaction && !tradeMap.has(t.ticker)) {
+            tradeMap.set(t.ticker, { name: t.name, transaction: t.transaction })
+          }
+        }
 
-    // Look up member + transaction from congress_trades for these tickers
-    const { data: trades } = await supabaseAdmin
-      .from('congress_trades')
-      .select('ticker, name, transaction')
-      .in('ticker', Array.from(tickers))
-      .order('trade_size_parsed', { ascending: false })
-
-    // Build ticker → { member, transaction } map (largest trade wins per ticker)
-    const tickerTradeMap = new Map<string, { member: string; transaction: string }>()
-    if (trades) {
-      for (const trade of trades) {
-        if (trade.name && trade.transaction && !tickerTradeMap.has(trade.ticker)) {
-          tickerTradeMap.set(trade.ticker, {
-            member: trade.name,
-            transaction: trade.transaction
-          })
+        for (const article of needsLookup) {
+          const trade = tradeMap.get(article.ticker!)
+          if (trade) {
+            article.member_name = trade.name
+            article.transaction_type = trade.transaction
+            await supabaseAdmin
+              .from('module_articles')
+              .update({ member_name: trade.name, transaction_type: trade.transaction, ticker: article.ticker })
+              .eq('id', article.id)
+          }
         }
       }
-    }
-
-    // Build image lookup map: "nancy-pelosi-purchase" → image
-    const tradeImages = new Map<string, ArticleImage>()
-    for (const img of images) {
-      tradeImages.set(img.lookup_key, img as ArticleImage)
     }
 
     let matched = 0
     let unmatched = 0
 
     for (const article of articles) {
-      const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
-      const ticker = article.ticker || rssPost?.ticker
-
-      if (!ticker) {
+      if (!article.member_name || !article.transaction_type) {
         unmatched++
         continue
       }
 
-      const tradeInfo = tickerTradeMap.get(ticker)
-      let tradeImage: ArticleImage | undefined
+      const key = ImageMatcher.buildLookupKey(article.member_name, article.transaction_type)
+      const image = imageMap.get(key)
 
-      if (tradeInfo) {
-        const comboKey = ImageMatcher.buildLookupKey(tradeInfo.member, tradeInfo.transaction)
-        tradeImage = tradeImages.get(comboKey)
-      }
-
-      const tradeImageUrl = tradeImage?.image_url || null
-      const tradeImageAlt = tradeImage?.display_name || null
-
-      if (tradeImageUrl) {
-        matched++
-      } else {
-        unmatched++
-        if (tradeInfo) {
-          console.log(`[ImageMatcher] No image for "${tradeInfo.member} - ${tradeInfo.transaction}" (${ticker})`)
-        }
-      }
-
-      // Update module_article with trade image info and ticker
       await supabaseAdmin
         .from('module_articles')
         .update({
-          trade_image_url: tradeImageUrl,
-          trade_image_alt: tradeImageAlt,
-          ticker: ticker
+          trade_image_url: image?.image_url || null,
+          trade_image_alt: image?.display_name || null
         })
         .eq('id', article.id)
+
+      if (image) {
+        matched++
+      } else {
+        unmatched++
+        console.log(`[ImageMatcher] No image for "${article.member_name} - ${article.transaction_type}"`)
+      }
     }
 
     console.log(`[ImageMatcher] Matched ${matched}/${matched + unmatched} articles with trade images`)
