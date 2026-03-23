@@ -101,7 +101,14 @@ export async function getPromptJSON(key: string, newsletterId: string, fallbackT
       if (promptJSON.input && !promptJSON.messages) {
         promptJSON.messages = promptJSON.input
       }
-      promptJSON._provider = 'openai'
+      // Auto-detect provider from model name (same logic as publication_settings path)
+      const fallbackModelName = (promptJSON.model || '').toLowerCase()
+      if (fallbackModelName.includes('claude') || fallbackModelName.includes('sonnet') || fallbackModelName.includes('opus') || fallbackModelName.includes('haiku')) {
+        promptJSON._provider = 'claude'
+        console.log(`[AI] Auto-detected Claude provider from model: ${promptJSON.model} (app_settings fallback)`)
+      } else {
+        promptJSON._provider = 'openai'
+      }
       return promptJSON
     }
 
@@ -301,6 +308,21 @@ export async function callWithStructuredPrompt(
       if (processedRequest.messages) {
         processedRequest.input = processedRequest.messages
         delete processedRequest.messages
+      }
+
+      // Translate max_tokens → max_output_tokens for OpenAI Responses API
+      if ('max_tokens' in processedRequest) {
+        processedRequest.max_output_tokens = processedRequest.max_tokens
+        delete processedRequest.max_tokens
+      }
+
+      // Remove 'system' field — Responses API uses system messages in the input array
+      if ('system' in processedRequest && processedRequest.input) {
+        processedRequest.input = [
+          { role: 'system', content: processedRequest.system },
+          ...processedRequest.input
+        ]
+        delete processedRequest.system
       }
 
       const response = await (openai as any).responses.create(processedRequest, {
