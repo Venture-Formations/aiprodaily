@@ -51,7 +51,6 @@ export class ModuleFeedGenerator {
 
     const config = (mod.config as Record<string, any>) || {}
     const rssConfig = config.rss_output || {}
-    const itemsCount = rssConfig.items_count || 5
     const includeImages = rssConfig.include_images !== false
     const includeFullContent = rssConfig.include_full_content !== false
 
@@ -73,7 +72,7 @@ export class ModuleFeedGenerator {
       .from('publication_issues')
       .select('id, date, status, mailerlite_issue_id')
       .eq('publication_id', publicationId)
-      .in('status', ['draft', 'in_review', 'approved', 'sent'])
+      .in('status', ['draft', 'in_review', 'approved'])
       .order('date', { ascending: false })
       .limit(1)
       .single()
@@ -100,7 +99,6 @@ export class ModuleFeedGenerator {
       .eq('article_module_id', moduleId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
-      .limit(itemsCount)
 
     if (articlesError) {
       console.error(`[ModuleFeed] Failed to fetch articles for issue ${recentIssue.id}, module ${moduleId}: ${articlesError.message}`)

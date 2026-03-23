@@ -345,7 +345,6 @@ function RssOutputSection({ module, onUpdate, disabled, saving, setSaving }: Rss
   const rssConfig = config.rss_output || {}
   const enabled = !!rssConfig.enabled
   const feedToken = rssConfig.feed_token || ''
-  const itemsCount = rssConfig.items_count || 5
 
   const feedUrl = feedToken
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/module/${module.id}?token=${feedToken}`
@@ -372,8 +371,7 @@ function RssOutputSection({ module, onUpdate, disabled, saving, setSaving }: Rss
       // Enable with a new token if none exists
       await updateRssConfig({
         enabled: true,
-        feed_token: feedToken || generateToken(),
-        items_count: itemsCount
+        feed_token: feedToken || generateToken()
       })
     } else {
       await updateRssConfig({ enabled: false })
@@ -457,28 +455,6 @@ function RssOutputSection({ module, onUpdate, disabled, saving, setSaving }: Rss
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
-              </div>
-
-              {/* Items count */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Items in Feed</label>
-                  <p className="text-xs text-gray-500">Number of articles in the RSS output</p>
-                </div>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={itemsCount}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value)
-                    if (val >= 1 && val <= 20) {
-                      updateRssConfig({ items_count: val })
-                    }
-                  }}
-                  disabled={disabled || saving}
-                  className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
               </div>
 
               {/* Regenerate token */}
