@@ -129,7 +129,7 @@ export class ModuleFeedGenerator {
 
       // Wrap source URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, mod.name, recentIssue.date, recentIssue.mailerlite_issue_id, recentIssue.id)
+        ? wrapTrackingUrl(sourceUrl, mod.name, recentIssue.date, undefined, recentIssue.id)
         : '#'
 
       const itemData: any = {
