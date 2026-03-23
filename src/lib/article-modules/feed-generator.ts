@@ -70,7 +70,7 @@ export class ModuleFeedGenerator {
     // Find the most recent issue with articles for this module
     const { data: recentIssue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, status, mailerlite_issue_id')
+      .select('id, date, status')
       .eq('publication_id', publicationId)
       .in('status', ['draft', 'in_review', 'approved'])
       .order('date', { ascending: false })
