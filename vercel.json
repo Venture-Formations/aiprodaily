@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/sync-sparkloop",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/ingest-congress-feeds",
+      "schedule": "0 */3 * * *"
     }
   ],
   "functions": {
@@ -127,6 +131,9 @@
     },
     "app/api/cron/post-to-facebook/route.ts": {
       "maxDuration": 120
+    },
+    "app/api/cron/ingest-congress-feeds/route.ts": {
+      "maxDuration": 300
     }
   }
 }

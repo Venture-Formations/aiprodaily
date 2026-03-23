@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Layout from '@/components/Layout'
 import * as XLSX from 'xlsx'
 
-type Tab = 'trades' | 'ticker-db' | 'excluded-companies' | 'approved-sources' | 'excluded-sources' | 'excluded-keywords' | 'settings'
+type Tab = 'trades' | 'ticker-db' | 'excluded-companies' | 'approved-sources' | 'excluded-keywords' | 'settings'
 
 interface TradeRow {
   id: string
@@ -41,12 +41,6 @@ interface ExcludedCompany {
   created_at: string
 }
 
-interface ExcludedSource {
-  id: string
-  source_name: string
-  created_at: string
-}
-
 interface ExcludedKeyword {
   id: string
   keyword: string
@@ -78,7 +72,6 @@ interface FeedSettings {
   sale_url_template: string | null
   purchase_url_template: string | null
   max_trades: number
-  max_articles_per_trade: number
   last_ingestion_at: string | null
   updated_at: string
 }
@@ -130,7 +123,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'ticker-db', label: 'Ticker Database' },
   { key: 'excluded-companies', label: 'Excluded Companies' },
   { key: 'approved-sources', label: 'Approved Sources' },
-  { key: 'excluded-sources', label: 'Excluded Sources' },
   { key: 'excluded-keywords', label: 'Excluded Keywords' },
   { key: 'settings', label: 'Settings' },
 ]
@@ -155,7 +147,6 @@ export default function RSSCombinerPage() {
     sale_url_template: '',
     purchase_url_template: '',
     max_trades: 21,
-    max_articles_per_trade: 5,
   })
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -178,15 +169,6 @@ export default function RSSCombinerPage() {
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null)
   const [editCompanyTicker, setEditCompanyTicker] = useState('')
   const [editCompanyName, setEditCompanyName] = useState('')
-
-  // Excluded sources state
-  const [excludedSources, setExcludedSources] = useState<ExcludedSource[]>([])
-  const [newExcludedSource, setNewExcludedSource] = useState('')
-  const [knownSources, setKnownSources] = useState<string[]>([])
-  const [loadingKnownSources, setLoadingKnownSources] = useState(false)
-  const [showSourceDropdown, setShowSourceDropdown] = useState(false)
-  const sourceInputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Approved sources state
   const [approvedSources, setApprovedSources] = useState<ApprovedSource[]>([])
@@ -228,7 +210,6 @@ export default function RSSCombinerPage() {
           sale_url_template: s.sale_url_template || '',
           purchase_url_template: s.purchase_url_template || '',
           max_trades: s.max_trades,
-          max_articles_per_trade: s.max_articles_per_trade ?? 5,
         })
       }
     }
@@ -250,14 +231,6 @@ export default function RSSCombinerPage() {
     }
   }, [])
 
-  const fetchExcludedSources = useCallback(async () => {
-    const res = await fetch('/api/admin/rss-combiner/excluded-sources')
-    if (res.ok) {
-      const data = await res.json()
-      setExcludedSources(data.excludedSources || [])
-    }
-  }, [])
-
   const fetchApprovedSources = useCallback(async () => {
     const res = await fetch('/api/admin/rss-combiner/approved-sources')
     if (res.ok) {
@@ -271,19 +244,6 @@ export default function RSSCombinerPage() {
     if (res.ok) {
       const data = await res.json()
       setExcludedKeywords(data.keywords || [])
-    }
-  }, [])
-
-  const fetchKnownSources = useCallback(async () => {
-    setLoadingKnownSources(true)
-    try {
-      const res = await fetch('/api/admin/rss-combiner/known-sources')
-      if (res.ok) {
-        const data = await res.json()
-        setKnownSources(data.sources || [])
-      }
-    } finally {
-      setLoadingKnownSources(false)
     }
   }, [])
 
@@ -316,9 +276,6 @@ export default function RSSCombinerPage() {
           case 'approved-sources':
             promises.push(fetchApprovedSources())
             break
-          case 'excluded-sources':
-            promises.push(fetchExcludedSources(), fetchKnownSources())
-            break
           case 'excluded-keywords':
             promises.push(fetchExcludedKeywords())
             break
@@ -332,23 +289,7 @@ export default function RSSCombinerPage() {
       }
     }
     loadTabData()
-  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedSources, fetchExcludedKeywords, fetchKnownSources])
-
-  // Close source dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        sourceInputRef.current &&
-        !sourceInputRef.current.contains(e.target as Node)
-      ) {
-        setShowSourceDropdown(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedKeywords])
 
   // --- Upload Handlers ---
 
@@ -572,31 +513,6 @@ export default function RSSCombinerPage() {
     if (res.ok) setExcludedCompanies((prev) => prev.filter((c) => c.id !== id))
   }
 
-  const handleAddExcludedSource = async (sourceName?: string) => {
-    const name = (sourceName || newExcludedSource).trim()
-    if (!name) return
-    const res = await fetch('/api/admin/rss-combiner/excluded-sources', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source_name: name }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      setExcludedSources((prev) => [...prev, data.excludedSource])
-      setNewExcludedSource('')
-      setShowSourceDropdown(false)
-    }
-  }
-
-  const handleRemoveExcludedSource = async (id: string) => {
-    const res = await fetch('/api/admin/rss-combiner/excluded-sources', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    })
-    if (res.ok) setExcludedSources((prev) => prev.filter((s) => s.id !== id))
-  }
-
   const handleAddKeyword = async () => {
     const kw = newKeyword.trim()
     if (!kw) return
@@ -719,14 +635,6 @@ export default function RSSCombinerPage() {
     tickerPage * TICKERS_PER_PAGE,
     (tickerPage + 1) * TICKERS_PER_PAGE
   )
-
-  // Filtered known sources for dropdown (exclude already-excluded ones)
-  const excludedSourceNames = new Set(excludedSources.map((s) => s.source_name.toLowerCase()))
-  const filteredKnownSources = knownSources
-    .filter((s) => !excludedSourceNames.has(s.toLowerCase()))
-    .filter((s) =>
-      newExcludedSource ? s.toLowerCase().includes(newExcludedSource.toLowerCase()) : true
-    )
 
   if (loading) {
     return (
@@ -915,17 +823,6 @@ export default function RSSCombinerPage() {
                       onChange={(e) => setEditSettings({ ...editSettings, max_trades: parseInt(e.target.value) || 1 })}
                       min={1}
                       max={200}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Max Articles per Trade</label>
-                    <input
-                      type="number"
-                      value={editSettings.max_articles_per_trade}
-                      onChange={(e) => setEditSettings({ ...editSettings, max_articles_per_trade: parseInt(e.target.value) || 1 })}
-                      min={1}
-                      max={100}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
                     />
                   </div>
@@ -1394,88 +1291,6 @@ export default function RSSCombinerPage() {
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Tab: Excluded Sources with Autocomplete */}
-        {activeTab === 'excluded-sources' && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200">
-              <h2 className="text-sm font-medium text-gray-700">Excluded Publishers ({excludedSources.length})</h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Articles from these publishers will be filtered out. Source names come from the RSS &lt;source&gt; element.
-              </p>
-            </div>
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex-1 relative">
-                  <input
-                    ref={sourceInputRef}
-                    type="text"
-                    value={newExcludedSource}
-                    onChange={(e) => {
-                      setNewExcludedSource(e.target.value)
-                      setShowSourceDropdown(true)
-                    }}
-                    onFocus={() => setShowSourceDropdown(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddExcludedSource()
-                        setShowSourceDropdown(false)
-                      }
-                      if (e.key === 'Escape') setShowSourceDropdown(false)
-                    }}
-                    placeholder={loadingKnownSources ? 'Loading sources...' : 'Type to search or add publisher...'}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
-                  />
-                  {showSourceDropdown && filteredKnownSources.length > 0 && (
-                    <div
-                      ref={dropdownRef}
-                      className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto"
-                    >
-                      {filteredKnownSources.map((source) => (
-                        <button
-                          key={source}
-                          onClick={() => handleAddExcludedSource(source)}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-gray-700"
-                        >
-                          {source}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleAddExcludedSource()}
-                  disabled={!newExcludedSource.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
-                >
-                  Exclude
-                </button>
-              </div>
-              {excludedSources.length === 0 ? (
-                <div className="text-sm text-gray-500 py-2">No publishers excluded yet.</div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {excludedSources.map((es) => (
-                    <span
-                      key={es.id}
-                      className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-50 text-red-700 rounded-full border border-red-200"
-                    >
-                      {es.source_name}
-                      <button
-                        onClick={() => handleRemoveExcludedSource(es.id)}
-                        className="ml-1 text-red-400 hover:text-red-600"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
-                </div>
               )}
             </div>
           </div>
