@@ -56,7 +56,7 @@ export class ModuleFeedGenerator {
 
     // Get publication info for feed metadata
     const { data: pub, error: pubError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('name, slug')
       .eq('id', publicationId)
       .single()
@@ -92,7 +92,7 @@ export class ModuleFeedGenerator {
       .select(`
         id, headline, content, rank, trade_image_url, trade_image_alt, ticker,
         rss_post:rss_posts(
-          source_url, title, metadata
+          source_url, title
         )
       `)
       .eq('issue_id', recentIssue.id)
@@ -125,7 +125,6 @@ export class ModuleFeedGenerator {
         : article.rss_post
 
       const sourceUrl = rssPost?.source_url || '#'
-      const tradeMeta = (rssPost?.metadata as Record<string, any>) || {}
 
       // Wrap source URL with tracking
       const trackedUrl = sourceUrl !== '#'
@@ -150,16 +149,8 @@ export class ModuleFeedGenerator {
           : plain
       }
 
-      // Author: congress member name from trade metadata
-      if (tradeMeta.member) {
-        itemData.author = [{ name: tradeMeta.member }]
-      }
-
-      // Category: transaction type
+      // Category: ticker
       const categories: { name: string }[] = []
-      if (tradeMeta.transaction) {
-        categories.push({ name: tradeMeta.transaction })
-      }
       if (article.ticker) {
         categories.push({ name: article.ticker })
       }
