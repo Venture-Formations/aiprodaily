@@ -441,6 +441,26 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
       }
       console.log(`[Workflow Step ${stepNum}] Selected ${totalSelected} total articles across ${moduleIds.length} modules`)
 
+      // Attach trade images to active articles (safe no-op if no trade images configured)
+      try {
+        const { ImageMatcher } = await import('@/lib/article-modules')
+        const { data: issueForPub } = await supabaseAdmin
+          .from('publication_issues')
+          .select('publication_id')
+          .eq('id', issueId)
+          .single()
+        if (issueForPub) {
+          for (const moduleId of moduleIds) {
+            const imgResult = await ImageMatcher.attachTradeImages(issueId, moduleId, issueForPub.publication_id)
+            if (imgResult.matched > 0) {
+              console.log(`[Workflow Step ${stepNum}] Matched ${imgResult.matched} trade images for module ${moduleId}`)
+            }
+          }
+        }
+      } catch (imgError) {
+        console.log(`[Workflow Step ${stepNum}] Trade image matching skipped:`, imgError)
+      }
+
       // Get active article counts per mod for logging
       const moduleCounts: string[] = []
       for (const moduleId of moduleIds) {
