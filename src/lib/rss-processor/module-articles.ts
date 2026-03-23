@@ -203,7 +203,7 @@ export class ModuleArticles {
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
       .select(`
-        id, title, description, content, full_article_text, source_url, image_url, image_alt, feed_id, issue_id, article_module_id, ticker,
+        id, title, description, content, full_article_text, source_url, image_url, image_alt, feed_id, issue_id, article_module_id, ticker, member_name, transaction_type,
         post_ratings(total_score, criteria_1_score, criteria_2_score, criteria_3_score, criteria_4_score, criteria_5_score)
       `)
       .eq('issue_id', issueId)
@@ -250,24 +250,6 @@ export class ModuleArticles {
       .slice(0, limit)
 
     console.log(`[Module Titles] Generating ${postsWithRatings.length} titles for ${mod.name}...`)
-
-    // Pre-load trade info (member + transaction) for posts with tickers
-    const tickerSet = new Set(postsWithRatings.map(p => (p as any).ticker).filter(Boolean) as string[])
-    const tradeInfoMap = new Map<string, { member: string; transaction: string }>()
-    if (tickerSet.size > 0) {
-      const { data: trades } = await supabaseAdmin
-        .from('congress_trades')
-        .select('ticker, name, transaction')
-        .in('ticker', Array.from(tickerSet))
-        .order('trade_size_parsed', { ascending: false })
-      if (trades) {
-        for (const t of trades) {
-          if (t.name && t.transaction && !tradeInfoMap.has(t.ticker)) {
-            tradeInfoMap.set(t.ticker, { member: t.name, transaction: t.transaction })
-          }
-        }
-      }
-    }
 
     const BATCH_SIZE = 3
     for (let i = 0; i < postsWithRatings.length; i += BATCH_SIZE) {
@@ -327,9 +309,6 @@ export class ModuleArticles {
             return
           }
 
-          const postTicker = (post as any).ticker as string | null
-          const tradeInfo = postTicker ? tradeInfoMap.get(postTicker) : undefined
-
           const { error: insertError } = await supabaseAdmin
             .from('module_articles')
             .insert([{
@@ -344,9 +323,9 @@ export class ModuleArticles {
               fact_check_score: null,
               fact_check_details: null,
               word_count: 0,
-              ticker: postTicker || null,
-              member_name: tradeInfo?.member || null,
-              transaction_type: tradeInfo?.transaction || null
+              ticker: (post as any).ticker || null,
+              member_name: (post as any).member_name || null,
+              transaction_type: (post as any).transaction_type || null
             }])
 
           if (insertError && insertError.code !== '23505') {

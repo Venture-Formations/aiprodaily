@@ -158,11 +158,15 @@ export class FeedIngestion {
 
         console.log(`[Ingest] Inserting post from feed ${feed.name} (${feed.id}), article_module_id: ${feed.article_module_id || 'NULL'}`)
 
-        // Extract ticker from custom RSS field (combined feed includes trade metadata)
+        // Extract trade metadata from custom RSS fields (combined feed includes these)
         // The feed package outputs extensions as { _text: 'QCOM' } or plain string
-        const rawTicker = (item as any).ticker
-        const ticker = typeof rawTicker === 'string' ? rawTicker
-          : rawTicker?._text || rawTicker?.['#text'] || null
+        const extractField = (raw: any): string | null => {
+          if (typeof raw === 'string') return raw
+          return raw?._text || raw?.['#text'] || null
+        }
+        const ticker = extractField((item as any).ticker)
+        const memberName = extractField((item as any).member)
+        const transactionType = extractField((item as any).transaction)
 
         const { data: newPost, error: insertError } = await supabaseAdmin
           .from('rss_posts')
@@ -179,6 +183,8 @@ export class FeedIngestion {
             source_url: item.link,
             image_url: imageUrl,
             ticker,
+            member_name: memberName,
+            transaction_type: transactionType,
           }])
           .select('id, source_url')
           .single()
