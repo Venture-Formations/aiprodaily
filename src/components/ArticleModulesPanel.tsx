@@ -81,6 +81,32 @@ export default function ArticleModulesPanel({ issueId, issueStatus }: ArticleMod
   const [saving, setSaving] = useState<string | null>(null)
   const [allArticlesMap, setAllArticlesMap] = useState<Record<string, ArticleWithRssPost[]>>({})
   const [loadingModules, setLoadingModules] = useState<Record<string, boolean>>({})
+  const [recheckingImages, setRecheckingImages] = useState(false)
+  const [recheckResult, setRecheckResult] = useState<string | null>(null)
+
+  const handleRecheckImages = async () => {
+    setRecheckingImages(true)
+    setRecheckResult(null)
+    try {
+      const res = await fetch(`/api/campaigns/${issueId}/article-modules/recheck-images`, {
+        method: 'POST'
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const total = data.results?.reduce((sum: number, r: any) => sum + r.matched, 0) || 0
+        setRecheckResult(`${total} image${total !== 1 ? 's' : ''} matched`)
+        // Refresh article data to show updated images
+        await fetchArticleModules()
+      } else {
+        setRecheckResult('Failed')
+      }
+    } catch {
+      setRecheckResult('Error')
+    } finally {
+      setRecheckingImages(false)
+      setTimeout(() => setRecheckResult(null), 3000)
+    }
+  }
 
   const fetchArticleModules = useCallback(async () => {
     try {
@@ -248,11 +274,25 @@ export default function ArticleModulesPanel({ issueId, issueStatus }: ArticleMod
 
   return (
     <div className="bg-white shadow rounded-lg mt-8">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-medium text-gray-900">Article Sections</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Dynamic article sections configured in Settings
-        </p>
+      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-medium text-gray-900">Article Sections</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Dynamic article sections configured in Settings
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {recheckResult && (
+            <span className="text-xs text-gray-500">{recheckResult}</span>
+          )}
+          <button
+            onClick={handleRecheckImages}
+            disabled={recheckingImages}
+            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+          >
+            {recheckingImages ? 'Checking...' : 'Refresh Images'}
+          </button>
+        </div>
       </div>
 
       <div className="divide-y divide-gray-200">
