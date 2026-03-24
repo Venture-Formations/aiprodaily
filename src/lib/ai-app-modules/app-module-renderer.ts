@@ -323,18 +323,21 @@ export class AppModuleRenderer {
   private static wrapInSection(
     sectionName: string,
     content: string,
-    styles: BlockStyleOptions
+    styles: BlockStyleOptions,
+    showHeader: boolean = true
   ): string {
+    const headerRow = showHeader ? `
+        <tr>
+          <td style="padding: 8px; background-color: ${styles.primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${styles.headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
+          </td>
+        </tr>` : ''
     return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
     <td style="padding:0 10px;">
       <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
-        <tr>
-          <td style="padding: 8px; background-color: ${styles.primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${styles.headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
-          </td>
-        </tr>
+        ${headerRow}
         <tr>
           <td style="padding: 0 10px 10px 10px;">
             ${content}
@@ -418,7 +421,7 @@ export class AppModuleRenderer {
     })
 
     // Wrap in section container
-    const html = this.wrapInSection(mod.name, appsHtml, styles)
+    const html = this.wrapInSection(mod.name, appsHtml, styles, mod.show_name !== false)
 
     return {
       html,
@@ -515,7 +518,7 @@ export class AppModuleRenderer {
       appsHtml += this.renderAppItem(app, blockOrder, linkUrl, styles, index)
     })
 
-    return this.wrapInSection(mod.name, appsHtml, styles)
+    return this.wrapInSection(mod.name, appsHtml, styles, mod.show_name !== false)
   }
 
   /**

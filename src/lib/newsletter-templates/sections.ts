@@ -610,8 +610,9 @@ export async function generateSparkLoopRecModuleSection(
     const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue.publication_id)
 
     // Render cards
+    const sparkMod = sel.sparkloop_rec_module as any
     const html = SparkLoopRecModuleRenderer.renderSection(
-      (sel.sparkloop_rec_module as any)?.name || 'Recommended Newsletters',
+      sparkMod?.name || 'Recommended Newsletters',
       sel.recommendations.map((r: any) => ({
         ref_code: r.ref_code,
         publication_name: r.publication_name,
@@ -621,7 +622,8 @@ export async function generateSparkLoopRecModuleSection(
       issue.id,
       primaryColor,
       headingFont,
-      bodyFont
+      bodyFont,
+      sparkMod?.show_name !== false
     )
 
     return html

@@ -56,6 +56,7 @@ export const PATCH = withApiHandler(
       console.log(`[AdModules] Saving block_order:`, body.block_order)
     }
     if (body.config !== undefined) updates.config = body.config
+    if (body.show_name !== undefined) updates.show_name = Boolean(body.show_name)
     if (body.next_position !== undefined) {
       updates.next_position = Math.max(1, body.next_position) // Ensure at least 1
       console.log(`[AdModules] Setting next_position:`, body.next_position)

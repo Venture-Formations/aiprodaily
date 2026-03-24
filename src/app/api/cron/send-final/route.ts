@@ -50,10 +50,9 @@ async function logFinalArticlePositions(issueId: string, log: Logger) {
   // MANUAL ARTICLES - Query fresh data
   const { data: manualArticles, error: manualError } = await supabaseAdmin
     .from('manual_articles')
-    .select('id, title, rank, is_active')
-    .eq('issue_id', issueId)
-    .eq('is_active', true)
-    .order('rank', { ascending: true, nullsFirst: false })
+    .select('id, title, status')
+    .eq('used_in_issue_id', issueId)
+    .eq('status', 'published')
     .limit(5)
 
   if (manualError) {
@@ -61,22 +60,7 @@ async function logFinalArticlePositions(issueId: string, log: Logger) {
   }
 
   const finalActiveManualArticles = manualArticles || []
-  log.info({ articles: finalActiveManualArticles.map((a: any) => `${a.rank}:${a.title}`) }, 'Final active manual articles')
-
-  // Update final positions for manual articles
-  for (let i = 0; i < finalActiveManualArticles.length; i++) {
-    const position = i + 1
-    const { error: updateError } = await supabaseAdmin
-      .from('manual_articles')
-      .update({ final_position: position })
-      .eq('id', finalActiveManualArticles[i].id)
-
-    if (updateError) {
-      log.error({ articleId: finalActiveManualArticles[i].id, err: updateError }, 'Failed to update final position for manual article')
-    } else {
-      log.info({ position, title: finalActiveManualArticles[i].title }, 'Manual article position set')
-    }
-  }
+  log.info({ articles: finalActiveManualArticles.map((a: any) => a.title) }, 'Final active manual articles')
 
   log.info('=== FINAL ARTICLE POSITION LOGGING COMPLETE ===')
 }
@@ -188,8 +172,7 @@ async function processFinalSendForPub(pub: { id: string; slug: string }, log: Lo
           rss_feed:rss_feeds(*)
         ),
         article_module:article_modules(name, display_order)
-      ),
-      manual_articles:manual_articles(*)
+      )
     `)
     .eq('publication_id', pub.id)
     .in('status', ['in_review', 'changes_made'])

@@ -56,6 +56,7 @@ export const PATCH = withApiHandler(
       console.log(`[PromptModules] Saving block_order:`, body.block_order)
     }
     if (body.config !== undefined) updates.config = body.config
+    if (body.show_name !== undefined) updates.show_name = Boolean(body.show_name)
     if (body.next_position !== undefined) updates.next_position = body.next_position
 
     const { data: module, error } = await supabaseAdmin

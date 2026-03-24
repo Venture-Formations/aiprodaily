@@ -55,6 +55,7 @@ export const PATCH = withApiHandler(
       console.log(`[PollModules] Saving block_order:`, body.block_order)
     }
     if (body.config !== undefined) updates.config = body.config
+    if (body.show_name !== undefined) updates.show_name = Boolean(body.show_name)
 
     const { data: module, error } = await supabaseAdmin
       .from('poll_modules')

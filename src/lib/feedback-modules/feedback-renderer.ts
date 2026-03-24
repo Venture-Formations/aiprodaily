@@ -221,8 +221,8 @@ export class FeedbackModuleRenderer {
       .map(block => this.renderBlock(block, mod.id, issueId, styles, baseUrl))
       .join('')
 
-    // Wrap in section container (no header shown for feedback)
-    const html = this.wrapInSection(mod.name, blocksHtml, styles, false)
+    // Wrap in section container (respect show_name setting)
+    const html = this.wrapInSection(mod.name, blocksHtml, styles, mod.show_name === true)
 
     return {
       html,
@@ -299,7 +299,7 @@ export class FeedbackModuleRenderer {
       }
     }
 
-    return this.wrapInSection(mod.name, blocksHtml, styles, false)
+    return this.wrapInSection(mod.name, blocksHtml, styles, mod.show_name === true)
   }
 
   /**

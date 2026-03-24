@@ -21,6 +21,7 @@ export const PATCH = withApiHandler(
     if (body.selection_mode !== undefined) updates.selection_mode = body.selection_mode
     if (body.block_order !== undefined) updates.block_order = body.block_order
     if (body.config !== undefined) updates.config = body.config
+    if (body.show_name !== undefined) updates.show_name = Boolean(body.show_name)
     if (body.recs_count !== undefined) updates.recs_count = Math.max(1, body.recs_count)
     if (body.next_position !== undefined) updates.next_position = Math.max(1, body.next_position)
 

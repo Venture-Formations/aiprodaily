@@ -40,10 +40,12 @@ export default function AIAppModuleSettings({
   const [deleteText, setDeleteText] = useState('')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [activeTab, setActiveTab] = useState<'general' | 'blocks'>('general')
+  const [showName, setShowName] = useState(module.show_name ?? true)
 
   // Update local state when module prop changes
   useEffect(() => {
     setLocalModule(module)
+    setShowName(module.show_name ?? true)
     setDeleteConfirm(false)
     setDeleteText('')
   }, [module.id])
@@ -119,6 +121,17 @@ export default function AIAppModuleSettings({
       setLocalModule(prev => ({ ...prev, is_active: !prev.is_active }))
     } catch (error) {
       console.error('Failed to update active status:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleShowNameToggle = async () => {
+    const newValue = !showName
+    setShowName(newValue)
+    setSaving(true)
+    try {
+      await onUpdate({ show_name: newValue })
     } finally {
       setSaving(false)
     }
@@ -316,6 +329,29 @@ export default function AIAppModuleSettings({
       {/* Tab Content */}
       {activeTab === 'general' && (
         <div className="space-y-6">
+          {/* Show Section Name Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <div className="font-medium text-gray-900">Show Section Name</div>
+              <div className="text-sm text-gray-500">
+                Display the section header in the newsletter.
+              </div>
+            </div>
+            <button
+              onClick={handleShowNameToggle}
+              disabled={saving}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                showName ? 'bg-cyan-600' : 'bg-gray-200'
+              } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  showName ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
           <AIAppSelectionModeEditor
             value={localModule.selection_mode as AIAppSelectionMode}
             onChange={handleSelectionModeChange}
