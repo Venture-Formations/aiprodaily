@@ -12,9 +12,31 @@ import type { Legacy } from './legacy'
 export class StepWorkflow {
   private articleGenerator: ArticleGenerator
   private legacyRef: { processFeed: Legacy['processFeed'] } | null = null
+  /** Tracks AI refusals in the current workflow run for remediation */
+  private refusalCount = 0
 
   constructor(articleGenerator: ArticleGenerator) {
     this.articleGenerator = articleGenerator
+  }
+
+  /** Increment refusal counter and trigger remediation if threshold reached */
+  private async trackRefusal(issueId: string): Promise<void> {
+    this.refusalCount++
+    if (this.refusalCount === 3) {
+      try {
+        const { PlaybookRunner } = await import('../remediation')
+        const { getNewsletterIdFromIssue } = await import('./shared-context')
+        const publicationId = await getNewsletterIdFromIssue(issueId)
+        if (publicationId) {
+          const { createLogger } = await import('../logger')
+          const logger = createLogger({ issueId })
+          const runner = new PlaybookRunner(publicationId, logger)
+          await runner.runAIRefusalSpike(issueId, this.refusalCount)
+        }
+      } catch (err) {
+        console.error('[StepWorkflow] Failed to trigger refusal spike playbook:', err)
+      }
+    }
   }
 
   /**
@@ -151,6 +173,7 @@ export class StepWorkflow {
           const titleRefusal = detectAIRefusal(headline)
           if (titleRefusal) {
             console.error(`[Titles] AI returned refusal for post ${post.id} (matched: "${titleRefusal}"): ${headline.substring(0, 200)}`)
+            await this.trackRefusal(issueId)
             return
           }
 
@@ -273,6 +296,7 @@ export class StepWorkflow {
           const refusalMatch = detectAIRefusal(bodyResult.content)
           if (refusalMatch) {
             console.error(`[Bodies] AI returned refusal for article ${article.id} (matched: "${refusalMatch}"): ${bodyResult.content.substring(0, 200)}`)
+            await this.trackRefusal(issueId)
             return
           }
 

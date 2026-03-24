@@ -11,6 +11,7 @@ import BlockedDomainsSettings from '@/components/settings/BlockedDomainsSettings
 import IPExclusionSettings from '@/components/settings/IPExclusionSettings'
 import Notifications from '@/components/settings/Notifications'
 import FacebookSettings from '@/components/settings/FacebookSettings'
+import FeedHealthRules from '@/components/settings/FeedHealthRules'
 import Users from '@/components/settings/Users'
 import DangerZone from '@/components/settings/DangerZone'
 
@@ -50,6 +51,7 @@ export default function SettingsPage() {
                 { id: 'blocked-domains', name: 'Blocked Domains' },
                 { id: 'ip-exclusion', name: 'IP Exclusion' },
                 { id: 'notifications', name: 'Notifications' },
+                { id: 'feed-health', name: 'Feed Health' },
                 { id: 'facebook', name: 'Facebook' },
                 { id: 'users', name: 'Users' },
                 { id: 'danger', name: 'Danger Zone' },
@@ -81,6 +83,7 @@ export default function SettingsPage() {
           {activeTab === 'blocked-domains' && publicationId && <BlockedDomainsSettings publicationId={publicationId} />}
           {activeTab === 'ip-exclusion' && <IPExclusionSettings />}
           {activeTab === 'notifications' && publicationId && <Notifications publicationId={publicationId} />}
+          {activeTab === 'feed-health' && <FeedHealthRules />}
           {activeTab === 'facebook' && publicationId && <FacebookSettings publicationId={publicationId} />}
           {activeTab === 'users' && <Users />}
           {activeTab === 'danger' && publicationId && slug && (

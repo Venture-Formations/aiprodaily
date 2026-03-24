@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { supabaseAdmin } from './supabase'
+import { triageAlert, isTriageEnabled } from './monitoring/alert-triage'
 
 export class SlackNotificationService {
   private webhookUrl: string
@@ -91,15 +92,47 @@ export class SlackNotificationService {
       return
     }
 
+    // AI triage: classify alert before sending (opt-in, fail-open)
+    let finalMessage = message
+    let finalLevel = level
+    try {
+      if (await isTriageEnabled()) {
+        const triageResult = await triageAlert(message, level, notificationType)
+        if (triageResult) {
+          if (triageResult.classification === 'auto_resolve') {
+            // Log but don't send to Slack
+            console.log(`[AlertTriage] Auto-resolved: ${triageResult.reasoning}`)
+            await supabaseAdmin
+              .from('system_logs')
+              .insert([{
+                level: 'info',
+                message: 'Alert auto-resolved by triage',
+                context: { originalMessage: message, level, notificationType, reasoning: triageResult.reasoning },
+                source: 'alert_triage'
+              }])
+            return
+          }
+          if (triageResult.classification === 'investigate') {
+            finalMessage = `[Low Priority] ${message}`
+          }
+          // 'critical' — send as-is
+        }
+        // null result (timeout/error) — send as-is (fail-open)
+      }
+    } catch (triageError) {
+      // Triage failure must never block alerts
+      console.error('[AlertTriage] Triage error, sending alert normally:', triageError)
+    }
+
     try {
       const emoji = {
         info: ':information_source:',
         warn: ':warning:',
         error: ':rotating_light:'
-      }[level]
+      }[finalLevel]
 
       const payload = {
-        text: `${emoji} ${message}`
+        text: `${emoji} ${finalMessage}`
       }
 
       await axios.post(webhookUrl, payload)
@@ -258,6 +291,40 @@ export class SlackNotificationService {
     if (lowCountWarning) {
       await this.sendLowArticleCountAlert(issueId, articleCount, issueDate)
     }
+  }
+
+  /**
+   * Send a daily system health digest from log analysis.
+   */
+  async sendDailyDigestAlert(report: {
+    reportDate: string
+    summary: string
+    anomalies: Array<{ description: string; severity: string; source: string; count: number }>
+    recommendations: Array<{ action: string; priority: string; reasoning: string }>
+  }) {
+    const anomalyLines = report.anomalies.length > 0
+      ? report.anomalies.map(a => `• [${a.severity.toUpperCase()}] ${a.description} (${a.source}, ${a.count}x)`).join('\n')
+      : '• No anomalies detected'
+
+    const recLines = report.recommendations.length > 0
+      ? report.recommendations.map(r => `• [${r.priority.toUpperCase()}] ${r.action}`).join('\n')
+      : '• No recommendations'
+
+    const hasIssues = report.anomalies.some(a => a.severity === 'high')
+
+    const message = [
+      `${hasIssues ? '⚠️' : '📊'} Daily System Health Digest — ${report.reportDate}`,
+      '',
+      report.summary,
+      '',
+      '*Anomalies:*',
+      anomalyLines,
+      '',
+      '*Recommendations:*',
+      recLines,
+    ].join('\n')
+
+    await this.sendAlert(message, hasIssues ? 'warn' : 'info', 'system_errors')
   }
 }
 

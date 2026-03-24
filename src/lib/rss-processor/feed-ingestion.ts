@@ -83,6 +83,7 @@ export class FeedIngestion {
    * Ingest posts from a single feed
    */
   private async ingestFeedPosts(feed: any, newsletterId: string, publicationFeedIds: string[]): Promise<{ fetched: number; scored: number }> {
+    const feedStartMs = Date.now()
     try {
       const rssFeed = await parser.parseURL(feed.url)
 
@@ -269,6 +270,13 @@ export class FeedIngestion {
           last_error: null
         })
         .eq('id', feed.id)
+
+      // Record feed fetch duration metric (non-blocking)
+      try {
+        const { MetricsRecorder } = await import('@/lib/monitoring/metrics-recorder')
+        const metrics = new MetricsRecorder(newsletterId)
+        await metrics.recordTiming('rss_feed_fetch_duration_ms', feedStartMs, { feed_id: feed.id, feed_name: feed.name })
+      } catch { /* metrics should never break ingestion */ }
 
       return { fetched: newPosts.length, scored: scoredCount }
 

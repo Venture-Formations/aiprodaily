@@ -49,6 +49,27 @@ export const GET = withApiHandler(
     // Send alerts for each failed issue
     for (const issue of failedIssues) {
       try {
+        // Skip alert if remediation recently handled this issue
+        const { data: recentRemediation } = await supabaseAdmin
+          .from('remediation_log')
+          .select('id, playbook_name, result')
+          .eq('issue_id', issue.id)
+          .eq('result', 'success')
+          .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // last 10 min
+          .limit(1)
+
+        if (recentRemediation && recentRemediation.length > 0) {
+          logger.info({ issueId: issue.id, playbook: recentRemediation[0].playbook_name },
+            'Skipping alert — remediation recently succeeded')
+          // Mark as alerted so we don't re-check
+          await supabaseAdmin
+            .from('publication_issues')
+            .update({ failure_alerted_at: new Date().toISOString() })
+            .eq('id', issue.id)
+          alertedIssues.push(issue.id)
+          continue
+        }
+
         // Get newsletter name for context
         const { data: newsletter } = await supabaseAdmin
           .from('publications')
