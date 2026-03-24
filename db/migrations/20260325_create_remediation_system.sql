@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS remediation_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   publication_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
-  issue_id UUID REFERENCES publication_issues(id) ON DELETE SET NULL,
+  issue_id TEXT,
   playbook_name TEXT NOT NULL,
   trigger_condition TEXT NOT NULL,
   action_taken TEXT NOT NULL,

@@ -18,21 +18,25 @@ CREATE INDEX idx_alert_triage_result ON alert_triage_log(triage_result, created_
 CREATE INDEX idx_alert_triage_created ON alert_triage_log(created_at DESC);
 
 -- Seed triage settings (disabled by default — opt-in)
-INSERT INTO app_settings (key, value, description, updated_at)
+-- NOTE: app_settings requires publication_id (NOT NULL) and value is JSONB
+-- Replace the publication_id below with your actual publication UUID
+INSERT INTO app_settings (publication_id, key, value, description, updated_at)
 VALUES (
+  'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf',
   'ai_triage_enabled',
-  'false',
+  '"false"'::jsonb,
   'Enable AI-powered alert triage before sending to Slack. Set to true to activate.',
   NOW()
 )
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (publication_id, key) DO NOTHING;
 
--- Seed the triage prompt (global default, can be overridden per-publication)
-INSERT INTO app_settings (key, value, description, updated_at)
+-- Seed the triage prompt
+INSERT INTO app_settings (publication_id, key, value, description, updated_at)
 VALUES (
+  'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf',
   'ai_triage_alert',
-  '{"model":"gpt-4o-mini","messages":[{"role":"system","content":"You are an ops triage agent for a newsletter automation platform. Classify alerts as one of: auto_resolve (transient, self-healing, or already remediated), investigate (needs human attention but not urgent), or critical (immediate action needed). Respond with JSON only: {\"classification\":\"...\",\"reasoning\":\"...\",\"suggested_action\":\"...\"}"},{"role":"user","content":"Alert: {{alert_message}}\nLevel: {{alert_level}}\nType: {{notification_type}}\n\nRecent logs from same source (last 10):\n{{recent_logs}}\n\nClassify this alert."}],"temperature":0.2,"max_tokens":200}',
+  '{"model":"gpt-4o-mini","messages":[{"role":"system","content":"You are an ops triage agent for a newsletter automation platform. Classify alerts as one of: auto_resolve (transient, self-healing, or already remediated), investigate (needs human attention but not urgent), or critical (immediate action needed). Respond with JSON only: {\"classification\":\"...\",\"reasoning\":\"...\",\"suggested_action\":\"...\"}"},{"role":"user","content":"Alert: {{alert_message}}\nLevel: {{alert_level}}\nType: {{notification_type}}\n\nRecent logs from same source (last 10):\n{{recent_logs}}\n\nClassify this alert."}],"temperature":0.2,"max_tokens":200}'::jsonb,
   'AI prompt for alert triage classification (auto_resolve/investigate/critical)',
   NOW()
 )
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (publication_id, key) DO NOTHING;
