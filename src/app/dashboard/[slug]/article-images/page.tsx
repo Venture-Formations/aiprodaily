@@ -165,7 +165,7 @@ export default function ArticleImagesPage() {
       const metadata: Record<string, string> = { member: memberName, transaction: transactionType }
 
       if (editingImage) {
-        const res = await fetch(`/api/article-images/${editingImage.id}`, {
+        const res = await fetch(`/api/article-images/${editingImage.id}?publication_id=${publicationId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -211,7 +211,7 @@ export default function ArticleImagesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this image?')) return
     try {
-      const res = await fetch(`/api/article-images/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/article-images/${id}?publication_id=${publicationId}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         console.error('Delete failed:', res.status, data.error || res.statusText)

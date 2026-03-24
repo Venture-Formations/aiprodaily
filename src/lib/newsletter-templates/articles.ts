@@ -22,7 +22,7 @@ export async function generateArticleModuleSection(
   if (!mod) {
     const { data } = await supabaseAdmin
       .from('article_modules')
-      .select('id, name, block_order, config, publication_id')
+      .select('id, name, block_order, config, publication_id, show_name')
       .eq('id', moduleId)
       .single()
     mod = data
@@ -37,7 +37,7 @@ export async function generateArticleModuleSection(
   if (!articles) {
     const { data } = await supabaseAdmin
       .from('module_articles')
-      .select(`id, headline, content, is_active, rank, ai_image_url, image_alt,
+      .select(`id, headline, content, is_active, rank, ai_image_url, image_alt, trade_image_url, trade_image_alt,
         rss_post:rss_posts(source_url, image_url, image_alt)`)
       .eq('issue_id', issue.id)
       .eq('article_module_id', moduleId)
@@ -115,16 +115,20 @@ export async function generateArticleModuleSection(
       </div>`
   }).join('')
 
+  const showHeader = mod.show_name !== false
+  const headerRow = showHeader ? `
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${mod.name}</h2>
+          </td>
+        </tr>` : ''
+
   return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
     <td style="padding:0 10px;">
       <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
-        <tr>
-          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${mod.name}</h2>
-          </td>
-        </tr>
+        ${headerRow}
         <tr>
           <td style="padding: 0 10px 10px 10px;">
             ${articlesHtml}

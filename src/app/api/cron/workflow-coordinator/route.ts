@@ -2,6 +2,7 @@ import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { STEP_ENDPOINTS } from '@/types/workflow-states'
+import { PlaybookRunner } from '@/lib/remediation'
 
 /**
  * Workflow Coordinator Cron Job
@@ -126,23 +127,35 @@ export const GET = withApiHandler(
 
     const { data: stuckCampaigns } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, workflow_state, workflow_state_started_at')
+      .select('id, date, workflow_state, workflow_state_started_at, publication_id')
       .in('workflow_state', [
         'archiving', 'fetching_feeds', 'extracting',
         'scoring', 'generating', 'finalizing'
       ])
       .lt('workflow_state_started_at', fifteenMinutesAgo.toISOString())
 
+    const remediationResults = []
+
     if (stuckCampaigns && stuckCampaigns.length > 0) {
       logger.warn({ stuck: stuckCampaigns.map(c => `${c.id} (${c.workflow_state} since ${c.workflow_state_started_at})`) },
-        `Found ${stuckCampaigns.length} stuck issue(s)`)
+        `Found ${stuckCampaigns.length} stuck issue(s) — attempting remediation`)
+
+      for (const stuck of stuckCampaigns) {
+        const stuckMinutes = Math.round(
+          (Date.now() - new Date(stuck.workflow_state_started_at).getTime()) / 60_000
+        )
+        const runner = new PlaybookRunner(stuck.publication_id, logger)
+        const playbookResult = await runner.runStuckWorkflow(stuck.id, stuck.workflow_state, stuckMinutes)
+        remediationResults.push({ issueId: stuck.id, ...playbookResult })
+      }
     }
 
     return NextResponse.json({
       message: 'Workflow coordinator completed',
       processed: issues.length,
       results,
-      stuck_issues: stuckCampaigns?.length || 0
+      stuck_issues: stuckCampaigns?.length || 0,
+      remediation: remediationResults,
     })
   }
 )

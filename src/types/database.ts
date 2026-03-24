@@ -594,6 +594,7 @@ export interface PollModule {
   name: string
   display_order: number
   is_active: boolean
+  show_name: boolean
   block_order: PollBlockType[]
   config: Record<string, unknown>
   created_at: string
@@ -671,6 +672,7 @@ export interface AIAppModule {
   selection_mode: AIAppSelectionMode
   block_order: AIAppBlockType[]
   config: Record<string, unknown>
+  show_name: boolean
   // Module-specific settings
   apps_count: number
   max_per_category: number
@@ -730,6 +732,7 @@ export interface PromptModule {
   name: string
   display_order: number
   is_active: boolean
+  show_name: boolean
   selection_mode: PromptSelectionMode
   block_order: PromptBlockType[]
   config: Record<string, unknown>
@@ -767,6 +770,7 @@ export interface SparkLoopRecModule {
   name: string
   display_order: number
   is_active: boolean
+  show_name: boolean
   selection_mode: SparkLoopRecSelectionMode
   block_order: SparkLoopRecBlockType[]
   config: Record<string, unknown>
@@ -1459,6 +1463,7 @@ export interface AdModule {
   name: string
   display_order: number
   is_active: boolean
+  show_name: boolean
   selection_mode: AdSelectionMode
   block_order: AdBlockType[]
   config: Record<string, unknown>
@@ -1555,6 +1560,7 @@ export interface ArticleModule {
   name: string
   display_order: number
   is_active: boolean
+  show_name: boolean
   selection_mode: ArticleSelectionMode
   block_order: ArticleBlockType[]
   config: Record<string, unknown>

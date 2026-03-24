@@ -51,6 +51,18 @@
     {
       "path": "/api/cron/ingest-congress-feeds",
       "schedule": "0 */3 * * *"
+    },
+    {
+      "path": "/api/cron/feed-health-analysis",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/log-analysis",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-metrics",
+      "schedule": "0 3 * * *"
     }
   ],
   "functions": {

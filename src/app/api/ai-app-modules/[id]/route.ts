@@ -97,6 +97,11 @@ export const PATCH = withApiHandler(
       console.log(`[AIAppModules] Saving block_config:`, JSON.stringify(body.block_config))
     }
 
+    // Show section name
+    if (body.show_name !== undefined) {
+      updates.show_name = Boolean(body.show_name)
+    }
+
     // Directory visibility
     if (body.show_in_directory !== undefined) {
       updates.show_in_directory = Boolean(body.show_in_directory)

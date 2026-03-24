@@ -101,7 +101,14 @@ export async function getPromptJSON(key: string, newsletterId: string, fallbackT
       if (promptJSON.input && !promptJSON.messages) {
         promptJSON.messages = promptJSON.input
       }
-      promptJSON._provider = 'openai'
+      // Auto-detect provider from model name (same logic as publication_settings path)
+      const fallbackModelName = (promptJSON.model || '').toLowerCase()
+      if (fallbackModelName.includes('claude') || fallbackModelName.includes('sonnet') || fallbackModelName.includes('opus') || fallbackModelName.includes('haiku')) {
+        promptJSON._provider = 'claude'
+        console.log(`[AI] Auto-detected Claude provider from model: ${promptJSON.model} (app_settings fallback)`)
+      } else {
+        promptJSON._provider = 'openai'
+      }
       return promptJSON
     }
 
@@ -303,6 +310,21 @@ export async function callWithStructuredPrompt(
         delete processedRequest.messages
       }
 
+      // Translate max_tokens → max_output_tokens for OpenAI Responses API
+      if ('max_tokens' in processedRequest) {
+        processedRequest.max_output_tokens = processedRequest.max_tokens
+        delete processedRequest.max_tokens
+      }
+
+      // Remove 'system' field — Responses API uses system messages in the input array
+      if ('system' in processedRequest && processedRequest.input) {
+        processedRequest.input = [
+          { role: 'system', content: processedRequest.system },
+          ...processedRequest.input
+        ]
+        delete processedRequest.system
+      }
+
       const response = await (openai as any).responses.create(processedRequest, {
         signal: controller.signal
       })
@@ -342,15 +364,29 @@ export async function callAIWithPrompt(
   placeholders: Record<string, string> = {},
   fallbackText?: string
 ): Promise<any> {
+  const startMs = Date.now()
+
   // Load complete JSON prompt from database
   const promptJSON = await getPromptJSON(promptKey, newsletterId, fallbackText)
 
   // Extract provider info
   const provider = promptJSON._provider || 'openai'
+  const model = promptJSON.model || 'unknown'
 
   // Remove internal fields before sending to API
   delete promptJSON._provider
 
   // Call AI with complete structured prompt (pass promptKey for subject line logging)
-  return await callWithStructuredPrompt(promptJSON, placeholders, provider, promptKey)
+  const result = await callWithStructuredPrompt(promptJSON, placeholders, provider, promptKey)
+
+  // Record AI latency metric (non-blocking)
+  try {
+    const { MetricsRecorder } = await import('@/lib/monitoring/metrics-recorder')
+    const metrics = new MetricsRecorder(newsletterId)
+    await metrics.recordTiming('ai_api_latency_ms', startMs, { provider, model, promptKey })
+  } catch {
+    // Metrics recording should never break AI calls
+  }
+
+  return result
 }

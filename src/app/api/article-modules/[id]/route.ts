@@ -57,7 +57,8 @@ export const PATCH = withApiHandler(
       'config',
       'articles_count',
       'lookback_hours',
-      'ai_image_prompt'
+      'ai_image_prompt',
+      'show_name'
     ]
 
     for (const field of allowedFields) {

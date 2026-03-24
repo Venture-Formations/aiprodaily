@@ -51,13 +51,12 @@ export class ModuleFeedGenerator {
 
     const config = (mod.config as Record<string, any>) || {}
     const rssConfig = config.rss_output || {}
-    const itemsCount = rssConfig.items_count || 5
     const includeImages = rssConfig.include_images !== false
     const includeFullContent = rssConfig.include_full_content !== false
 
     // Get publication info for feed metadata
     const { data: pub, error: pubError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('name, slug')
       .eq('id', publicationId)
       .single()
@@ -71,9 +70,9 @@ export class ModuleFeedGenerator {
     // Find the most recent issue with articles for this module
     const { data: recentIssue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, status, mailerlite_issue_id')
+      .select('id, date, status')
       .eq('publication_id', publicationId)
-      .in('status', ['draft', 'in_review', 'approved', 'sent'])
+      .in('status', ['draft', 'in_review', 'approved'])
       .order('date', { ascending: false })
       .limit(1)
       .single()
@@ -93,14 +92,13 @@ export class ModuleFeedGenerator {
       .select(`
         id, headline, content, rank, trade_image_url, trade_image_alt, ticker,
         rss_post:rss_posts(
-          source_url, title, metadata
+          source_url, title
         )
       `)
       .eq('issue_id', recentIssue.id)
       .eq('article_module_id', moduleId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
-      .limit(itemsCount)
 
     if (articlesError) {
       console.error(`[ModuleFeed] Failed to fetch articles for issue ${recentIssue.id}, module ${moduleId}: ${articlesError.message}`)
@@ -127,11 +125,10 @@ export class ModuleFeedGenerator {
         : article.rss_post
 
       const sourceUrl = rssPost?.source_url || '#'
-      const tradeMeta = (rssPost?.metadata as Record<string, any>) || {}
 
       // Wrap source URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, mod.name, recentIssue.date, recentIssue.mailerlite_issue_id, recentIssue.id)
+        ? wrapTrackingUrl(sourceUrl, mod.name, recentIssue.date, undefined, recentIssue.id)
         : '#'
 
       const itemData: any = {
@@ -152,16 +149,8 @@ export class ModuleFeedGenerator {
           : plain
       }
 
-      // Author: congress member name from trade metadata
-      if (tradeMeta.member) {
-        itemData.author = [{ name: tradeMeta.member }]
-      }
-
-      // Category: transaction type
+      // Category: ticker
       const categories: { name: string }[] = []
-      if (tradeMeta.transaction) {
-        categories.push({ name: tradeMeta.transaction })
-      }
       if (article.ticker) {
         categories.push({ name: article.ticker })
       }

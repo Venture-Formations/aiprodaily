@@ -62,7 +62,32 @@ export async function processRSSWorkflow(input: {
 
   console.log('=== WORKFLOW COMPLETE ===')
 
+  // Record workflow metrics (non-blocking, inside step for Node.js module access)
+  await recordWorkflowMetrics(input.publication_id, issueId, moduleIds.length)
+
   return { issueId, success: true }
+}
+
+async function recordWorkflowMetrics(publicationId: string, issueId: string, moduleCount: number) {
+  "use step"
+  try {
+    const { MetricsRecorder } = await import('@/lib/monitoring/metrics-recorder')
+    const metrics = new MetricsRecorder(publicationId)
+
+    // Record article count
+    const { supabaseAdmin } = await import('@/lib/supabase')
+    const { count } = await supabaseAdmin
+      .from('module_articles')
+      .select('id', { count: 'exact', head: true })
+      .eq('issue_id', issueId)
+      .eq('is_active', true)
+
+    if (count != null) {
+      await metrics.record('article_count_per_issue', count, { moduleCount: String(moduleCount) })
+    }
+  } catch (error) {
+    console.error('[Workflow] Failed to record metrics:', error)
+  }
 }
 
 // Step functions with retry logic

@@ -5,6 +5,7 @@ import type { issueWithArticles, issueWithEvents, Article } from '@/types/databa
 import { generateFullNewsletterHtml } from '../newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
 import { getEnvironment, isProduction } from '../env-guard'
+import { isCircuitOpen, recordRateLimitHit } from '../remediation/circuit-breaker'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -21,12 +22,25 @@ const mailerliteClient = axios.create({
   },
 })
 
+// Circuit breaker: reject calls while circuit is open
+mailerliteClient.interceptors.request.use(async (config) => {
+  if (await isCircuitOpen()) {
+    console.warn('[MailerLite] Circuit breaker OPEN — skipping API call')
+    const error = new axios.Cancel('MailerLite circuit breaker is open')
+    return Promise.reject(error)
+  }
+  return config
+})
+
 // On 429, retry once after Retry-After (or default 60s)
 mailerliteClient.interceptors.response.use(
   (res) => res,
   async (err) => {
     const status = err?.response?.status
     if (status !== 429) return Promise.reject(err)
+
+    // Record hit for circuit breaker (async, non-blocking)
+    recordRateLimitHit().catch(() => {})
 
     const attempt = (err.config._rateLimitAttempt ?? 0) + 1
     if (attempt > MAILERLITE_RATE_LIMIT_RETRY_ATTEMPTS) {

@@ -111,7 +111,7 @@ const VALID_COLUMNS: Record<string, Set<string>> = {
 
   article_modules: new Set([
     'id', 'publication_id', 'name', 'display_order', 'is_active',
-    'selection_mode', 'block_order', 'config',
+    'show_name', 'selection_mode', 'block_order', 'config',
     'articles_count', 'lookback_hours', 'ai_image_prompt',
     'created_at', 'updated_at',
   ]),

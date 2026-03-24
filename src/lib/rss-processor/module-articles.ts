@@ -203,7 +203,7 @@ export class ModuleArticles {
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
       .select(`
-        id, title, description, content, full_article_text, source_url, image_url, image_alt, feed_id, issue_id, article_module_id,
+        id, title, description, content, full_article_text, source_url, image_url, image_alt, feed_id, issue_id, article_module_id, ticker, member_name, transaction_type,
         post_ratings(total_score, criteria_1_score, criteria_2_score, criteria_3_score, criteria_4_score, criteria_5_score)
       `)
       .eq('issue_id', issueId)
@@ -322,7 +322,10 @@ export class ModuleArticles {
               skipped: false,
               fact_check_score: null,
               fact_check_details: null,
-              word_count: 0
+              word_count: 0,
+              ticker: (post as any).ticker || null,
+              member_name: (post as any).member_name || null,
+              transaction_type: (post as any).transaction_type || null
             }])
 
           if (insertError && insertError.code !== '23505') {
