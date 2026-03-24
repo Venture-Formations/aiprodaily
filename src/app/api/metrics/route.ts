@@ -1,5 +1,5 @@
 import { withApiHandler } from '@/lib/api-handler'
-import { NextResponse, NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { MetricsRecorder } from '@/lib/monitoring/metrics-recorder'
 
 /**

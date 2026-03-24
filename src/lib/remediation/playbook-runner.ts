@@ -1,9 +1,9 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import type { Logger } from 'pino'
 import { remediateStuckWorkflow } from './playbooks/stuck-workflow'
-import { remediateFeedDown, reactivateFeed } from './playbooks/rss-feed-down'
-import { remediateRefusalSpike, clearFallbackModel } from './playbooks/ai-refusal-spike'
-import { recordRateLimitHit, isCircuitOpen, closeCircuit } from './circuit-breaker'
+import { remediateFeedDown } from './playbooks/rss-feed-down'
+import { remediateRefusalSpike } from './playbooks/ai-refusal-spike'
+import { recordRateLimitHit } from './circuit-breaker'
 
 export interface PlaybookResult {
   playbook: string

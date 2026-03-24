@@ -38,7 +38,6 @@ export default function FeedHealthRules() {
   const slug = pathname?.split('/')[2] || ''
 
   const [rules, setRules] = useState<FeedHealthRule[]>([])
-  const [publicationId, setPublicationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
@@ -63,7 +62,6 @@ export default function FeedHealthRules() {
         const pubData = await pubRes.json()
         const pubId = pubData.newsletters?.[0]?.id
         if (!pubId) return
-        setPublicationId(pubId)
         await fetchRules(pubId)
       } catch (error) {
         console.error('Failed to initialize:', error)
@@ -116,7 +114,6 @@ export default function FeedHealthRules() {
   }
 
   const activeRules = rules.filter(r => r.is_active)
-  const inactiveRules = rules.filter(r => !r.is_active)
   const aiRules = rules.filter(r => r.created_by === 'ai')
   const manualRules = rules.filter(r => r.created_by === 'manual')
 

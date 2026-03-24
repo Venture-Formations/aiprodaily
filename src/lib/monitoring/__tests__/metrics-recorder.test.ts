@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 const mockSingle = vi.fn()
 const mockInsert = vi.fn(() => ({ error: null }))
-const mockDelete = vi.fn()
 const mockChain: Record<string, any> = {
   select: vi.fn(() => mockChain),
   eq: vi.fn(() => mockChain),
