@@ -37,7 +37,7 @@ export async function generateArticleModuleSection(
   if (!articles) {
     const { data } = await supabaseAdmin
       .from('module_articles')
-      .select(`id, headline, content, is_active, rank, ai_image_url, image_alt,
+      .select(`id, headline, content, is_active, rank, ai_image_url, image_alt, trade_image_url, trade_image_alt,
         rss_post:rss_posts(source_url, image_url, image_alt)`)
       .eq('issue_id', issue.id)
       .eq('article_module_id', moduleId)

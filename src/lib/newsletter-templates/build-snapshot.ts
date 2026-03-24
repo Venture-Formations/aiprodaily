@@ -248,6 +248,8 @@ async function fetchArticleSelections(issueId: string) {
       rank,
       ai_image_url,
       image_alt,
+      trade_image_url,
+      trade_image_alt,
       article_module_id,
       rss_post:rss_posts(
         source_url,
