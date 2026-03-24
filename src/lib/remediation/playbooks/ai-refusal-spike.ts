@@ -8,11 +8,28 @@ import { supabaseAdmin } from '@/lib/supabase'
  *
  * The flag is stored in app_settings with a timestamp so it can
  * auto-expire. callAIWithPrompt() checks this flag before each call.
+ *
+ * Uses the first active publication_id since app_settings requires it.
  */
 
 const REFUSAL_THRESHOLD = 3
 const FALLBACK_KEY = 'ai_fallback_model_active'
 const FALLBACK_EXPIRY_MS = 30 * 60 * 1000 // 30 minutes max
+
+/** Cache the publication ID */
+let cachedPublicationId: string | null = null
+
+async function getGlobalPublicationId(): Promise<string> {
+  if (cachedPublicationId) return cachedPublicationId
+  const { data } = await supabaseAdmin
+    .from('publications')
+    .select('id')
+    .eq('is_active', true)
+    .limit(1)
+    .single()
+  cachedPublicationId = data?.id || ''
+  return cachedPublicationId!
+}
 
 export interface RefusalSpikeResult {
   action: 'fallback_activated' | 'skipped' | 'fallback_cleared'
@@ -36,6 +53,7 @@ export async function remediateRefusalSpike(
     .from('app_settings')
     .select('value')
     .eq('key', FALLBACK_KEY)
+    .limit(1)
     .single()
 
   if (existing?.value) {
@@ -46,11 +64,12 @@ export async function remediateRefusalSpike(
   }
 
   // Activate fallback with current timestamp
+  const publicationId = await getGlobalPublicationId()
   await supabaseAdmin
     .from('app_settings')
     .upsert(
-      { key: FALLBACK_KEY, value: new Date().toISOString(), updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
+      { publication_id: publicationId, key: FALLBACK_KEY, value: new Date().toISOString(), updated_at: new Date().toISOString() },
+      { onConflict: 'publication_id,key' }
     )
 
   console.log(`[Remediation] AI fallback model activated for issue ${issueId} after ${refusalCount} refusals`)
@@ -67,6 +86,7 @@ export async function isFallbackModelActive(): Promise<boolean> {
       .from('app_settings')
       .select('value')
       .eq('key', FALLBACK_KEY)
+      .limit(1)
       .single()
 
     if (!data?.value) return false
@@ -88,10 +108,12 @@ export async function isFallbackModelActive(): Promise<boolean> {
  * Clear the fallback model flag (called when workflow completes).
  */
 export async function clearFallbackModel(): Promise<RefusalSpikeResult> {
+  const publicationId = await getGlobalPublicationId()
   await supabaseAdmin
     .from('app_settings')
     .delete()
     .eq('key', FALLBACK_KEY)
+    .eq('publication_id', publicationId)
 
   console.log('[Remediation] AI fallback model cleared')
   return { action: 'fallback_cleared' }

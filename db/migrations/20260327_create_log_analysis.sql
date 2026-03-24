@@ -17,13 +17,11 @@ CREATE TABLE IF NOT EXISTS log_analysis_reports (
 CREATE INDEX idx_log_reports_pub ON log_analysis_reports(publication_id);
 CREATE INDEX idx_log_reports_date ON log_analysis_reports(report_date DESC);
 
--- Seed the log analysis prompt
+-- Seed the log analysis prompt for all active publications
 INSERT INTO app_settings (publication_id, key, value, description, updated_at)
-VALUES (
-  'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf',
-  'ai_log_analysis',
+SELECT id, 'ai_log_analysis',
   '{"model":"gpt-4o-mini","messages":[{"role":"system","content":"You are a systems reliability engineer analyzing 24h of newsletter platform logs. Identify anomalies, new error types, increasing error rates, and potential issues. Return JSON: {\"anomalies\":[{\"description\":\"...\",\"severity\":\"low|medium|high\",\"source\":\"...\",\"count\":0}],\"recommendations\":[{\"action\":\"...\",\"priority\":\"low|medium|high\",\"reasoning\":\"...\"}],\"summary\":\"...\"}"},{"role":"user","content":"Log summary for {{report_date}}:\n\nError counts by source:\n{{error_counts}}\n\nNew error types (not seen in prior 7 days):\n{{new_errors}}\n\nTop 20 error messages:\n{{top_errors}}\n\nRecent remediation actions:\n{{remediation_summary}}\n\nAnalyze and recommend."}],"temperature":0.3,"max_tokens":1000}'::jsonb,
   'AI prompt for daily log analysis and anomaly detection',
   NOW()
-)
+FROM publications WHERE is_active = true
 ON CONFLICT (publication_id, key) DO NOTHING;

@@ -20,7 +20,20 @@ const mockChain: Record<string, any> = {
 
 vi.mock('@/lib/supabase', () => ({
   supabaseAdmin: {
-    from: vi.fn(() => mockChain),
+    from: vi.fn((table: string) => {
+      if (table === 'publications') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                single: vi.fn().mockResolvedValue({ data: { id: 'pub-test-123' } }),
+              })),
+            })),
+          })),
+        }
+      }
+      return mockChain
+    }),
   },
 }))
 
