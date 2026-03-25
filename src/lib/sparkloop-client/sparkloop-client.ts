@@ -1067,6 +1067,31 @@ export class SparkLoopService {
       referralsByRefCode.get(ref.ref_code)!.push(new Date(ref.subscribed_at))
     }
 
+    // Fetch all-time first send per ref_code (for effective snapshot start calculation).
+    // We need the absolute first send, not just within the rolling window, so the
+    // snapshot baseline is anchored to when we actually started sending for each rec.
+    const firstSendByRefCode = new Map<string, Date>()
+    let fsOffset = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .select('ref_code, subscribed_at')
+        .eq('publication_id', publicationId)
+        .order('subscribed_at', { ascending: true })
+        .range(fsOffset, fsOffset + REF_PAGE - 1)
+      if (!page || page.length === 0) break
+      for (const row of page) {
+        // Only keep the first (earliest) send per ref_code
+        if (!firstSendByRefCode.has(row.ref_code)) {
+          firstSendByRefCode.set(row.ref_code, new Date(row.subscribed_at))
+        }
+      }
+      // Once we've seen all ref_codes, we can stop early
+      if (firstSendByRefCode.size >= recs.length) break
+      if (page.length < REF_PAGE) break
+      fsOffset += REF_PAGE
+    }
+
     // Calculate metrics for each recommendation
     for (const rec of recs) {
       const S = rec.screening_period || 14
