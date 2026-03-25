@@ -164,29 +164,22 @@ export const GET = withApiHandler(
       })
     }
 
-    // Build a lookup: ref_code -> { cpaDollars, survivalRate, screeningPeriod, name, logo }
-    // survivalRate = 1 - AT Slip % (uses override_slip if set, else calculated from matured sends)
-    const recLookup = new Map<string, { cpaDollars: number; survivalRate: number; screeningPeriod: number; name: string; logo: string | null }>()
+    // Build a lookup: ref_code -> { cpaDollars, confirmRate, screeningPeriod, name, logo }
+    // confirmRate = confirmsGained / maturedSends (only confirms earn money, not rejects)
+    const recLookup = new Map<string, { cpaDollars: number; confirmRate: number; screeningPeriod: number; name: string; logo: string | null }>()
     for (const rec of recommendations || []) {
       const cpaDollars = (rec.cpa || 0) / 100
-      const hasOverrideSlip = rec.override_slip !== null && rec.override_slip !== undefined
+      const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
+      const slipData = slipDataByRefCode.get(rec.ref_code)
+      const confirmsGained = slipData?.confirmsGained ?? 0
 
-      let slipRate: number
-      if (hasOverrideSlip) {
-        slipRate = Number(rec.override_slip) / 100
-      } else {
-        const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
-        const slipData = slipDataByRefCode.get(rec.ref_code)
-        const confirmsGained = slipData?.confirmsGained ?? 0
-        const rejectsGained = slipData?.rejectsGained ?? 0
-        const allTimeSlip = maturedSends > 0
-          ? Math.max(0, maturedSends - (confirmsGained + rejectsGained))
-          : 0
-        slipRate = maturedSends > 0 ? allTimeSlip / maturedSends : defaultRcr > 0 ? (1 - defaultRcr) : 0
-      }
+      // AT confirmation rate: what fraction of matured sends actually got confirmed
+      const confirmRate = maturedSends > 0
+        ? confirmsGained / maturedSends
+        : defaultRcr  // fall back to default RCR when no matured data yet
 
       recLookup.set(rec.ref_code, {
-        cpaDollars, survivalRate: 1 - slipRate, screeningPeriod: rec.screening_period || 14,
+        cpaDollars, confirmRate, screeningPeriod: rec.screening_period || 14,
         name: rec.publication_name || rec.ref_code,
         logo: rec.publication_logo || null,
       })
@@ -290,7 +283,7 @@ export const GET = withApiHandler(
 
     Array.from(snapshotsByRefCode.entries()).forEach(([refCode, refMap]) => {
       const dates = Array.from(refMap.keys()).sort()
-      const info = recLookup.get(refCode) || { cpaDollars: 0, survivalRate: defaultRcr, screeningPeriod: 14 }
+      const info = recLookup.get(refCode) || { cpaDollars: 0, confirmRate: defaultRcr, screeningPeriod: 14 }
 
       for (let i = 1; i < dates.length; i++) {
         const prev = refMap.get(dates[i - 1])!
@@ -350,10 +343,10 @@ export const GET = withApiHandler(
       if (!dateKey || !dailyMap.has(dateKey)) continue
 
       const day = dailyMap.get(dateKey)!
-      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, survivalRate: defaultRcr }
+      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, confirmRate: defaultRcr }
 
       day.subscribes += 1
-      day.projectedEarnings += info.cpaDollars * info.survivalRate
+      day.projectedEarnings += info.cpaDollars * info.confirmRate
     }
 
     // Compute summary totals
