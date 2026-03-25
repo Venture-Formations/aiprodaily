@@ -28,12 +28,15 @@ export function RecommendContent({
 }: RecommendContentProps) {
   const [status, setStatus] = useState<'idle' | 'subscribing' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [inputEmail, setInputEmail] = useState('')
 
-  // Check if email is valid (MailerLite merge var not replaced, or missing)
-  const hasValidEmail = email && email !== '{$email}' && !email.includes('{$') && email.includes('@')
+  // Check if URL email is valid (MailerLite merge var not replaced, or missing)
+  const urlEmailValid = email && email !== '{$email}' && !email.includes('{$') && email.includes('@')
+  const resolvedEmail = urlEmailValid ? email : inputEmail
+  const canSubscribe = resolvedEmail.includes('@')
 
   const handleSubscribe = async () => {
-    if (!hasValidEmail) return
+    if (!canSubscribe) return
 
     setStatus('subscribing')
     setErrorMsg(null)
@@ -43,7 +46,7 @@ export function RecommendContent({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: resolvedEmail,
           ref_code: refCode,
           issue_id: issueId || undefined,
         }),
@@ -115,13 +118,7 @@ export function RecommendContent({
 
             {/* Subscribe area */}
             <div className="mt-6">
-              {!hasValidEmail ? (
-                <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-                  <p className="text-sm text-amber-800">
-                    Please open this link from your email to subscribe.
-                  </p>
-                </div>
-              ) : status === 'success' ? (
+              {status === 'success' ? (
                 <div className="rounded-lg bg-green-50 border border-green-200 p-4 text-center">
                   <div className="mx-auto w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-3">
                     <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,9 +134,19 @@ export function RecommendContent({
                 </div>
               ) : (
                 <>
+                  {!urlEmailValid && (
+                    <input
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={inputEmail}
+                      onChange={(e) => setInputEmail(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && canSubscribe) handleSubscribe() }}
+                      className="w-full mb-3 px-4 py-3 border border-slate-300 rounded-lg text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  )}
                   <button
                     onClick={handleSubscribe}
-                    disabled={status === 'subscribing'}
+                    disabled={status === 'subscribing' || !canSubscribe}
                     className="w-full py-3.5 px-4 text-white rounded-lg font-semibold text-base hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: primaryColor }}
                   >
