@@ -989,30 +989,8 @@ export class SparkLoopService {
     const today = new Date()
     const todayStr = toDateString(today)
 
-    // Get today's snapshots for all recs
-    const { data: todaySnaps } = await supabaseAdmin
-      .from('sparkloop_daily_snapshots')
-      .select('ref_code, sparkloop_confirmed, sparkloop_rejected')
-      .eq('publication_id', publicationId)
-      .eq('snapshot_date', todayStr)
-
-    const todayMap = new Map<string, { confirmed: number; rejected: number }>()
-    for (const snap of todaySnaps || []) {
-      todayMap.set(snap.ref_code, {
-        confirmed: snap.sparkloop_confirmed,
-        rejected: snap.sparkloop_rejected,
-      })
-    }
-
-    // Get window-start date (W days ago) — used as the earliest possible snapshot anchor
-    const windowStart = new Date(today)
-    windowStart.setDate(windowStart.getDate() - windowDays)
-    const windowStartStr = toDateString(windowStart)
-
-    // Fetch all snapshots from before the window through today.
-    // We need snapshots across this full range because each rec's effective snapshot
-    // start is adjusted based on its first send date + screening period. A rec whose
-    // first send was recent will use a snapshot much closer to today than windowStart.
+    // Fetch all daily snapshots. We compute daily deltas and attribute each
+    // confirm/reject back S days to its send date using the screening period assumption.
     // Paginate to avoid Supabase's default 1000-row limit.
     const allSnaps: Array<{ ref_code: string; sparkloop_confirmed: number; sparkloop_rejected: number; snapshot_date: string }> = []
     let snapOffset = 0
@@ -1132,45 +1110,40 @@ export class SparkLoopService {
       const sendsInWindow = refDates.filter(d => d >= sendsFrom && d <= sendsTo)
       const sends = sendsInWindow.length
 
-      // Adjust snapshot start based on when our all-time first send could have matured.
-      // This ensures the snapshot baseline is anchored to when we started sending for
-      // this rec, preventing confirms from pre-tracking referrals from inflating the delta.
-      // Effective start = max(first_send_alltime + S, windowStart)
-      let effectiveStartStr = windowStartStr
-      const allTimeFirstSend = firstSendByRefCode.get(rec.ref_code)
-      if (allTimeFirstSend) {
-        const maturityDate = new Date(allTimeFirstSend)
-        maturityDate.setDate(maturityDate.getDate() + S)
-        if (maturityDate > windowStart) {
-          effectiveStartStr = toDateString(maturityDate)
+      // Attribution approach: assume confirms/rejects happen at end of screening period.
+      // A confirm on day X was from a send on day (X - S). So confirms appearing in
+      // the last W days correspond to sends from (S+W) to S days ago — our sends window.
+      //
+      // Compute daily snapshot deltas, attribute each back S days to its send date,
+      // then sum only those that fall within the sends window.
+      const recSnaps = snapsByRefCode.get(rec.ref_code) || []
+      let confirmsGained = 0
+      let rejectionsGained = 0
+
+      // recSnaps is sorted DESC. We need consecutive pairs to compute daily deltas.
+      for (let i = 0; i < recSnaps.length - 1; i++) {
+        const curr = recSnaps[i]      // more recent
+        const prev = recSnaps[i + 1]  // day before
+
+        const dailyConfirms = Math.max(0, curr.confirmed - prev.confirmed)
+        const dailyRejects = Math.max(0, curr.rejected - prev.rejected)
+
+        if (dailyConfirms === 0 && dailyRejects === 0) continue
+
+        // Attribute this day's confirms/rejects back S days to the send date
+        const [y, m, d] = curr.date.split('-').map(Number)
+        const confirmDate = new Date(y, m - 1, d)
+        const sendDate = new Date(confirmDate)
+        sendDate.setDate(sendDate.getDate() - S)
+
+        // Only count if the attributed send date falls within our sends window
+        if (sendDate >= sendsFrom && sendDate <= sendsTo) {
+          confirmsGained += dailyConfirms
+          rejectionsGained += dailyRejects
         }
       }
 
-      // Get snapshot deltas using the adjusted start
-      const todaySnap = todayMap.get(rec.ref_code)
-      const recSnaps = snapsByRefCode.get(rec.ref_code) || []
-      // Find closest snapshot on or before the effective start date
-      const startSnap = recSnaps.find(s => s.date <= effectiveStartStr)
-
-      if (!todaySnap || !startSnap) {
-        // Not enough snapshot history
-        results.set(rec.ref_code, {
-          rcr: null,
-          slippage_rate: null,
-          sends,
-          confirms_gained: 0,
-          rejections_gained: 0,
-        })
-        continue
-      }
-
-      // Clamp negative deltas to 0 (SparkLoop may adjust counts down)
-      const confirmsGained = Math.max(0, todaySnap.confirmed - startSnap.confirmed)
-      const rejectionsGained = Math.max(0, todaySnap.rejected - startSnap.rejected)
-
-      // RCR = confirms / sends (null if sends < 5), capped at 100%.
-      // With the adjusted snapshot start, confirms_gained is now scoped to the period
-      // after our first send could have matured, reducing pre-tracking contamination.
+      // RCR = confirms / sends (null if sends < 5)
       const rcr = sends >= 5 ? Math.min(100, (confirmsGained / sends) * 100) : null
 
       // Slippage = sends - (confirms + rejections), rate = slippage / sends
