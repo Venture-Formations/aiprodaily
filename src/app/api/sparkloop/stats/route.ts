@@ -164,23 +164,31 @@ export const GET = withApiHandler(
       })
     }
 
-    // Build a lookup: ref_code -> { cpaDollars, nonSlipRate, screeningPeriod, name, logo }
-    // nonSlipRate = 1 - AT Slip % (fraction that will eventually be confirmed or rejected)
-    const recLookup = new Map<string, { cpaDollars: number; nonSlipRate: number; screeningPeriod: number; name: string; logo: string | null }>()
+    // Build a lookup: ref_code -> { cpaDollars, rcr, nonSlipRate, screeningPeriod, name, logo }
+    // Projected earnings per pending referral = CPA × RCR × (1 - AT Slip %)
+    const recLookup = new Map<string, { cpaDollars: number; rcr: number; nonSlipRate: number; screeningPeriod: number; name: string; logo: string | null }>()
     for (const rec of recommendations || []) {
       const cpaDollars = (rec.cpa || 0) / 100
+
+      // RCR: override > SparkLoop > default
+      const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+      const hasSLRcr = slRcr !== null && slRcr > 0
+      const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
+      const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
+        : hasSLRcr ? slRcr! / 100
+        : defaultRcr
+
+      // AT non-slip rate: 1 - (slipped / maturedSends)
       const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
       const slipData = slipDataByRefCode.get(rec.ref_code)
       const confirmsGained = slipData?.confirmsGained ?? 0
       const rejectsGained = slipData?.rejectsGained ?? 0
-
-      // AT non-slip rate: 1 - (slipped / maturedSends)
       const nonSlipRate = maturedSends > 0
-        ? (confirmsGained + rejectsGained) / maturedSends
-        : defaultRcr  // fall back to default RCR when no matured data yet
+        ? Math.min(1, (confirmsGained + rejectsGained) / maturedSends)
+        : 1  // no slip data yet, assume no slippage
 
       recLookup.set(rec.ref_code, {
-        cpaDollars, nonSlipRate: Math.min(1, nonSlipRate), screeningPeriod: rec.screening_period || 14,
+        cpaDollars, rcr, nonSlipRate, screeningPeriod: rec.screening_period || 14,
         name: rec.publication_name || rec.ref_code,
         logo: rec.publication_logo || null,
       })
@@ -284,7 +292,7 @@ export const GET = withApiHandler(
 
     Array.from(snapshotsByRefCode.entries()).forEach(([refCode, refMap]) => {
       const dates = Array.from(refMap.keys()).sort()
-      const info = recLookup.get(refCode) || { cpaDollars: 0, nonSlipRate: defaultRcr, screeningPeriod: 14 }
+      const info = recLookup.get(refCode) || { cpaDollars: 0, rcr: defaultRcr, nonSlipRate: 1, screeningPeriod: 14 }
 
       for (let i = 1; i < dates.length; i++) {
         const prev = refMap.get(dates[i - 1])!
@@ -347,7 +355,7 @@ export const GET = withApiHandler(
       if (!dateKey || !dailyMap.has(dateKey)) continue
 
       const day = dailyMap.get(dateKey)!
-      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, nonSlipRate: defaultRcr, screeningPeriod: 14 }
+      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, rcr: defaultRcr, nonSlipRate: 1, screeningPeriod: 14 }
 
       day.subscribes += 1
 
@@ -355,7 +363,7 @@ export const GET = withApiHandler(
       const subscribedAt = new Date(ref.subscribed_at).getTime()
       const daysSinceSend = (todayTime - subscribedAt) / (1000 * 60 * 60 * 24)
       if (daysSinceSend <= info.screeningPeriod) {
-        day.projectedEarnings += info.cpaDollars * info.nonSlipRate
+        day.projectedEarnings += info.cpaDollars * info.rcr * info.nonSlipRate
       }
     }
 
