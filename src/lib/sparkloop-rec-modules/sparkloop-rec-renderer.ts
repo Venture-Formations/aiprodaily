@@ -64,7 +64,7 @@ export class SparkLoopRecModuleRenderer {
     const name = this.escapeHtml(rec.publication_name)
     const desc = this.escapeHtml(rec.description || '')
     const initial = rec.publication_name.charAt(0).toUpperCase()
-    const subscribeUrl = `${BASE_URL}/api/sparkloop/module-subscribe?email={$email}&ref_code=${encodeURIComponent(rec.ref_code)}&issue_id=${encodeURIComponent(issueId)}`
+    const subscribeUrl = `${BASE_URL}/website/recommend?ref=${encodeURIComponent(rec.ref_code)}&email={$email}&issue_id=${encodeURIComponent(issueId)}`
 
     const logoHtml = rec.publication_logo
       ? `<img src="${rec.publication_logo}" alt="${name}" width="48" height="48" style="border-radius: 8px; display: block;" />`
