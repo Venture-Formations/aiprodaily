@@ -56,24 +56,137 @@ export const GET = withApiHandler(
       ? parseFloat(defaults.sparkloop_default_rcr) / 100
       : FALLBACK_DEFAULT_RCR / 100
 
-    // Get all recommendations with CPA, RCR, and screening_period data
+    // Get all recommendations with CPA, RCR, screening_period, and override_slip
     const { data: recommendations } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('ref_code, publication_name, publication_logo, cpa, sparkloop_rcr, override_rcr, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings, screening_period')
+      .select('ref_code, publication_name, publication_logo, cpa, sparkloop_rcr, override_rcr, override_slip, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings, screening_period')
       .eq('publication_id', PUBLICATION_ID)
 
-    // Build a lookup: ref_code -> { cpaDollars, rcr, screeningPeriod, name, logo }
-    const recLookup = new Map<string, { cpaDollars: number; rcr: number; screeningPeriod: number; name: string; logo: string | null }>()
+    // --- Compute AT Slip % per recommendation (same logic as admin route) ---
+    const today = new Date()
+
+    // Group ref_codes by screening period for matured-sends query
+    const screeningGroups = new Map<number, string[]>()
+    for (const rec of recommendations || []) {
+      const s = rec.screening_period || 14
+      if (!screeningGroups.has(s)) screeningGroups.set(s, [])
+      screeningGroups.get(s)!.push(rec.ref_code)
+    }
+
+    // Count matured sends (subscribed > S days ago) per ref_code
+    const maturedSendsByRefCode = new Map<string, number>()
+    const firstSendByRefCode = new Map<string, string>()
+    const slipPageSize = 1000
+    await Promise.all(
+      Array.from(screeningGroups.entries()).map(async ([s, refCodes]) => {
+        const cutoff = new Date(today)
+        cutoff.setDate(cutoff.getDate() - s)
+        const cutoffStr = cutoff.toISOString().split('T')[0]
+
+        let offset = 0
+        const counts = new Map<string, number>()
+        while (true) {
+          const { data: page } = await supabaseAdmin
+            .from('sparkloop_referrals')
+            .select('ref_code, subscribed_at')
+            .eq('publication_id', PUBLICATION_ID)
+            .in('ref_code', refCodes)
+            .lte('subscribed_at', cutoffStr)
+            .range(offset, offset + slipPageSize - 1)
+          if (!page || page.length === 0) break
+          for (const row of page) {
+            counts.set(row.ref_code, (counts.get(row.ref_code) || 0) + 1)
+            const existing = firstSendByRefCode.get(row.ref_code)
+            if (!existing || row.subscribed_at < existing) {
+              firstSendByRefCode.set(row.ref_code, row.subscribed_at)
+            }
+          }
+          if (page.length < slipPageSize) break
+          offset += slipPageSize
+        }
+        counts.forEach((count, rc) => {
+          maturedSendsByRefCode.set(rc, count)
+        })
+      })
+    )
+
+    // Fetch all daily snapshots for delta-based confirms/rejects
+    type SnapRow = { ref_code: string; snapshot_date: string; sparkloop_confirmed: number; sparkloop_rejected: number }
+    const allSnapshots: SnapRow[] = []
+    let snapOffset = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_daily_snapshots')
+        .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
+        .eq('publication_id', PUBLICATION_ID)
+        .order('snapshot_date', { ascending: true })
+        .range(snapOffset, snapOffset + slipPageSize - 1)
+      if (!page || page.length === 0) break
+      allSnapshots.push(...(page as SnapRow[]))
+      if (page.length < slipPageSize) break
+      snapOffset += slipPageSize
+    }
+
+    // Group snapshots by ref_code
+    const snapsByRefCode = new Map<string, SnapRow[]>()
+    for (const snap of allSnapshots) {
+      if (!snapsByRefCode.has(snap.ref_code)) snapsByRefCode.set(snap.ref_code, [])
+      snapsByRefCode.get(snap.ref_code)!.push(snap)
+    }
+
+    // Compute AT slip data per ref_code
+    const slipDataByRefCode = new Map<string, { confirmsGained: number; rejectsGained: number }>()
+    for (const rec of recommendations || []) {
+      const s = rec.screening_period || 14
+      const snaps = snapsByRefCode.get(rec.ref_code)
+      if (!snaps || snaps.length < 2) continue
+
+      const firstSend = firstSendByRefCode.get(rec.ref_code)
+      if (!firstSend) continue
+
+      const baselineDate = new Date(firstSend)
+      baselineDate.setDate(baselineDate.getDate() + s)
+      const baselineDateStr = baselineDate.toISOString().split('T')[0]
+
+      let baselineSnap: SnapRow | null = null
+      for (let i = 1; i < snaps.length; i++) {
+        if (snaps[i].snapshot_date >= baselineDateStr) {
+          baselineSnap = snaps[i]
+          break
+        }
+      }
+      if (!baselineSnap) continue
+
+      const latestSnap = snaps[snaps.length - 1]
+      slipDataByRefCode.set(rec.ref_code, {
+        confirmsGained: Math.max(0, latestSnap.sparkloop_confirmed - baselineSnap.sparkloop_confirmed),
+        rejectsGained: Math.max(0, latestSnap.sparkloop_rejected - baselineSnap.sparkloop_rejected),
+      })
+    }
+
+    // Build a lookup: ref_code -> { cpaDollars, survivalRate, screeningPeriod, name, logo }
+    // survivalRate = 1 - AT Slip % (uses override_slip if set, else calculated from matured sends)
+    const recLookup = new Map<string, { cpaDollars: number; survivalRate: number; screeningPeriod: number; name: string; logo: string | null }>()
     for (const rec of recommendations || []) {
       const cpaDollars = (rec.cpa || 0) / 100
-      const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
-      const hasSLRcr = slRcr !== null && slRcr > 0
-      const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
-      const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
-        : hasSLRcr ? slRcr! / 100
-        : defaultRcr
+      const hasOverrideSlip = rec.override_slip !== null && rec.override_slip !== undefined
+
+      let slipRate: number
+      if (hasOverrideSlip) {
+        slipRate = Number(rec.override_slip) / 100
+      } else {
+        const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
+        const slipData = slipDataByRefCode.get(rec.ref_code)
+        const confirmsGained = slipData?.confirmsGained ?? 0
+        const rejectsGained = slipData?.rejectsGained ?? 0
+        const allTimeSlip = maturedSends > 0
+          ? Math.max(0, maturedSends - (confirmsGained + rejectsGained))
+          : 0
+        slipRate = maturedSends > 0 ? allTimeSlip / maturedSends : defaultRcr > 0 ? (1 - defaultRcr) : 0
+      }
+
       recLookup.set(rec.ref_code, {
-        cpaDollars, rcr, screeningPeriod: rec.screening_period || 14,
+        cpaDollars, survivalRate: 1 - slipRate, screeningPeriod: rec.screening_period || 14,
         name: rec.publication_name || rec.ref_code,
         logo: rec.publication_logo || null,
       })
@@ -177,7 +290,7 @@ export const GET = withApiHandler(
 
     Array.from(snapshotsByRefCode.entries()).forEach(([refCode, refMap]) => {
       const dates = Array.from(refMap.keys()).sort()
-      const info = recLookup.get(refCode) || { cpaDollars: 0, rcr: defaultRcr, screeningPeriod: 14 }
+      const info = recLookup.get(refCode) || { cpaDollars: 0, survivalRate: defaultRcr, screeningPeriod: 14 }
 
       for (let i = 1; i < dates.length; i++) {
         const prev = refMap.get(dates[i - 1])!
@@ -237,10 +350,10 @@ export const GET = withApiHandler(
       if (!dateKey || !dailyMap.has(dateKey)) continue
 
       const day = dailyMap.get(dateKey)!
-      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, rcr: defaultRcr }
+      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, survivalRate: defaultRcr }
 
       day.subscribes += 1
-      day.projectedEarnings += info.cpaDollars * info.rcr
+      day.projectedEarnings += info.cpaDollars * info.survivalRate
     }
 
     // Compute summary totals
