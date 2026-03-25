@@ -1062,7 +1062,7 @@ export class SparkLoopService {
     // Minimum screening for any rec (S=1 means at least 1 day ago)
     sendsRangeEnd.setDate(sendsRangeEnd.getDate() - 1)
 
-    // Fetch all referrals in the broadest date range.
+    // Fetch all referrals in the broadest date range (for sends counting).
     // Paginate to avoid Supabase's default 1000-row limit.
     const allReferrals: Array<{ ref_code: string; subscribed_at: string }> = []
     let refOffset = 0
@@ -1089,6 +1089,31 @@ export class SparkLoopService {
       referralsByRefCode.get(ref.ref_code)!.push(new Date(ref.subscribed_at))
     }
 
+    // Fetch all-time first send per ref_code (for effective snapshot start calculation).
+    // We need the absolute first send, not just within the rolling window, so the
+    // snapshot baseline is anchored to when we actually started sending for each rec.
+    const firstSendByRefCode = new Map<string, Date>()
+    let fsOffset = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .select('ref_code, subscribed_at')
+        .eq('publication_id', publicationId)
+        .order('subscribed_at', { ascending: true })
+        .range(fsOffset, fsOffset + REF_PAGE - 1)
+      if (!page || page.length === 0) break
+      for (const row of page) {
+        // Only keep the first (earliest) send per ref_code
+        if (!firstSendByRefCode.has(row.ref_code)) {
+          firstSendByRefCode.set(row.ref_code, new Date(row.subscribed_at))
+        }
+      }
+      // Once we've seen all ref_codes, we can stop early
+      if (firstSendByRefCode.size >= recs.length) break
+      if (page.length < REF_PAGE) break
+      fsOffset += REF_PAGE
+    }
+
     // Calculate metrics for each recommendation
     for (const rec of recs) {
       const S = rec.screening_period || 14
@@ -1107,14 +1132,14 @@ export class SparkLoopService {
       const sendsInWindow = refDates.filter(d => d >= sendsFrom && d <= sendsTo)
       const sends = sendsInWindow.length
 
-      // Adjust snapshot start based on when our first send could have matured.
-      // Without this, the snapshot delta includes confirms/rejects from subscribers
-      // sent before we started tracking (pre-tracking contamination).
-      // Effective start = max(first_send + S, windowStart) — never go further back than W days.
+      // Adjust snapshot start based on when our all-time first send could have matured.
+      // This ensures the snapshot baseline is anchored to when we started sending for
+      // this rec, preventing confirms from pre-tracking referrals from inflating the delta.
+      // Effective start = max(first_send_alltime + S, windowStart)
       let effectiveStartStr = windowStartStr
-      if (sendsInWindow.length > 0) {
-        const firstSend = new Date(Math.min(...sendsInWindow.map(d => d.getTime())))
-        const maturityDate = new Date(firstSend)
+      const allTimeFirstSend = firstSendByRefCode.get(rec.ref_code)
+      if (allTimeFirstSend) {
+        const maturityDate = new Date(allTimeFirstSend)
         maturityDate.setDate(maturityDate.getDate() + S)
         if (maturityDate > windowStart) {
           effectiveStartStr = toDateString(maturityDate)
