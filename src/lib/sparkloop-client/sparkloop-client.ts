@@ -1053,14 +1053,14 @@ export class SparkLoopService {
     })
 
     // Compute the broadest date range needed for send counts
-    // We need referrals where subscribed_at is between (S+W) and (S+1) days ago
+    // We need referrals where subscribed_at is between (S+W) and S days ago
     // S varies per rec (default 14), so find the max range
     const maxScreening = Math.max(...recs.map(r => r.screening_period || 14))
     const sendsRangeStart = new Date(today)
     sendsRangeStart.setDate(sendsRangeStart.getDate() - (maxScreening + windowDays))
     const sendsRangeEnd = new Date(today)
-    // Minimum screening+1 for any rec
-    sendsRangeEnd.setDate(sendsRangeEnd.getDate() - 2) // at least S+1=2 days ago for S=1
+    // Minimum screening for any rec (S=1 means at least 1 day ago)
+    sendsRangeEnd.setDate(sendsRangeEnd.getDate() - 1)
 
     // Fetch all referrals in the broadest date range.
     // Paginate to avoid Supabase's default 1000-row limit.
@@ -1094,11 +1094,13 @@ export class SparkLoopService {
       const S = rec.screening_period || 14
       const W = windowDays
 
-      // Sends window: subscribed_at between (S+W) and (S+1) days ago
+      // Sends window: subscribed_at between (S+W) and S days ago
+      // Using S (not S+1) so referrals sent exactly S days ago are included —
+      // SparkLoop can confirm them on day S, and excluding them causes RCR > 100%.
       const sendsFrom = new Date(today)
       sendsFrom.setDate(sendsFrom.getDate() - (S + W))
       const sendsTo = new Date(today)
-      sendsTo.setDate(sendsTo.getDate() - (S + 1))
+      sendsTo.setDate(sendsTo.getDate() - S)
 
       // Count sends in window from pre-fetched data
       const refDates = referralsByRefCode.get(rec.ref_code) || []
@@ -1141,11 +1143,10 @@ export class SparkLoopService {
       const confirmsGained = Math.max(0, todaySnap.confirmed - startSnap.confirmed)
       const rejectionsGained = Math.max(0, todaySnap.rejected - startSnap.rejected)
 
-      // RCR = confirms / sends (null if sends < 5).
+      // RCR = confirms / sends (null if sends < 5), capped at 100%.
       // With the adjusted snapshot start, confirms_gained is now scoped to the period
       // after our first send could have matured, reducing pre-tracking contamination.
-      // RCR can still exceed 100% if external sources contribute confirms.
-      const rcr = sends >= 5 ? (confirmsGained / sends) * 100 : null
+      const rcr = sends >= 5 ? Math.min(100, (confirmsGained / sends) * 100) : null
 
       // Slippage = sends - (confirms + rejections), rate = slippage / sends
       let slippageRate: number | null = null
