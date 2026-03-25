@@ -18,7 +18,7 @@ const inputSchema = z.object({
  * POST /api/sparkloop/recommend-subscribe
  *
  * Called from the recommendation landing page when user clicks "Subscribe".
- * Subscribes via SparkLoop API and tracks with source='recommendation_page'.
+ * Subscribes via SparkLoop API and tracks with source='newsletter_module'.
  */
 export const POST = withApiHandler(
   {
@@ -123,7 +123,7 @@ export const POST = withApiHandler(
       subscriber_uuid: subscriberUuid || undefined,
       country_code: countryCode,
       recommendations: refCode,
-      utm_source: 'recommendation_page',
+      utm_source: 'newsletter_module',
     })
 
     // Update click record (fire-and-forget)
@@ -143,7 +143,7 @@ export const POST = withApiHandler(
           publication_id: PUBLICATION_ID,
           subscriber_email: email,
           ref_code: refCode,
-          source: 'recommendation_page',
+          source: 'newsletter_module',
           status: 'subscribed',
           subscribed_at: new Date().toISOString(),
         }, {
@@ -158,10 +158,10 @@ export const POST = withApiHandler(
     try {
       await supabaseAdmin.from('sparkloop_events').insert({
         publication_id: PUBLICATION_ID,
-        event_type: 'recommendation_page_subscribe',
+        event_type: 'newsletter_module_subscribe',
         subscriber_email: email,
         raw_payload: {
-          source: 'recommendation_page',
+          source: 'newsletter_module',
           ref_code: refCode,
           issue_id: issueId || null,
           subscriber_uuid: subscriberUuid,
