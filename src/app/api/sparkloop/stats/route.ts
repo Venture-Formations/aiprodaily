@@ -164,29 +164,31 @@ export const GET = withApiHandler(
       })
     }
 
-    // Build a lookup: ref_code -> { cpaDollars, survivalRate, screeningPeriod, name, logo }
-    // survivalRate = 1 - AT Slip % (uses override_slip if set, else calculated from matured sends)
-    const recLookup = new Map<string, { cpaDollars: number; survivalRate: number; screeningPeriod: number; name: string; logo: string | null }>()
+    // Build a lookup: ref_code -> { cpaDollars, rcr, nonSlipRate, screeningPeriod, name, logo }
+    // Projected earnings per pending referral = CPA × RCR × (1 - AT Slip %)
+    const recLookup = new Map<string, { cpaDollars: number; rcr: number; nonSlipRate: number; screeningPeriod: number; name: string; logo: string | null }>()
     for (const rec of recommendations || []) {
       const cpaDollars = (rec.cpa || 0) / 100
-      const hasOverrideSlip = rec.override_slip !== null && rec.override_slip !== undefined
 
-      let slipRate: number
-      if (hasOverrideSlip) {
-        slipRate = Number(rec.override_slip) / 100
-      } else {
-        const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
-        const slipData = slipDataByRefCode.get(rec.ref_code)
-        const confirmsGained = slipData?.confirmsGained ?? 0
-        const rejectsGained = slipData?.rejectsGained ?? 0
-        const allTimeSlip = maturedSends > 0
-          ? Math.max(0, maturedSends - (confirmsGained + rejectsGained))
-          : 0
-        slipRate = maturedSends > 0 ? allTimeSlip / maturedSends : defaultRcr > 0 ? (1 - defaultRcr) : 0
-      }
+      // RCR: override > SparkLoop > default
+      const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+      const hasSLRcr = slRcr !== null && slRcr > 0
+      const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
+      const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
+        : hasSLRcr ? slRcr! / 100
+        : defaultRcr
+
+      // AT non-slip rate: 1 - (slipped / maturedSends)
+      const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
+      const slipData = slipDataByRefCode.get(rec.ref_code)
+      const confirmsGained = slipData?.confirmsGained ?? 0
+      const rejectsGained = slipData?.rejectsGained ?? 0
+      const nonSlipRate = maturedSends > 0
+        ? Math.min(1, (confirmsGained + rejectsGained) / maturedSends)
+        : 1  // no slip data yet, assume no slippage
 
       recLookup.set(rec.ref_code, {
-        cpaDollars, survivalRate: 1 - slipRate, screeningPeriod: rec.screening_period || 14,
+        cpaDollars, rcr, nonSlipRate, screeningPeriod: rec.screening_period || 14,
         name: rec.publication_name || rec.ref_code,
         logo: rec.publication_logo || null,
       })
@@ -290,7 +292,7 @@ export const GET = withApiHandler(
 
     Array.from(snapshotsByRefCode.entries()).forEach(([refCode, refMap]) => {
       const dates = Array.from(refMap.keys()).sort()
-      const info = recLookup.get(refCode) || { cpaDollars: 0, survivalRate: defaultRcr, screeningPeriod: 14 }
+      const info = recLookup.get(refCode) || { cpaDollars: 0, rcr: defaultRcr, nonSlipRate: 1, screeningPeriod: 14 }
 
       for (let i = 1; i < dates.length; i++) {
         const prev = refMap.get(dates[i - 1])!
@@ -344,16 +346,25 @@ export const GET = withApiHandler(
       }
     })
 
-    // Count subscribes per day and compute projected earnings for pending referrals
+    // Count subscribes per day and compute projected earnings for pending referrals.
+    // Only referrals still within their screening period are "pending" and contribute
+    // to projected earnings. Matured referrals have already been confirmed/rejected/slipped.
+    const todayTime = today.getTime()
     for (const ref of referrals) {
       const dateKey = ref.subscribed_at?.split('T')[0]
       if (!dateKey || !dailyMap.has(dateKey)) continue
 
       const day = dailyMap.get(dateKey)!
-      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, survivalRate: defaultRcr }
+      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, rcr: defaultRcr, nonSlipRate: 1, screeningPeriod: 14 }
 
       day.subscribes += 1
-      day.projectedEarnings += info.cpaDollars * info.survivalRate
+
+      // Only project earnings for referrals still in screening period
+      const subscribedAt = new Date(ref.subscribed_at).getTime()
+      const daysSinceSend = (todayTime - subscribedAt) / (1000 * 60 * 60 * 24)
+      if (daysSinceSend <= info.screeningPeriod) {
+        day.projectedEarnings += info.cpaDollars * info.rcr * info.nonSlipRate
+      }
     }
 
     // Compute summary totals
