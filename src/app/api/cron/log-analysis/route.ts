@@ -34,21 +34,24 @@ const handler = withApiHandler(
       return NextResponse.json({ error: 'Failed to fetch publications' }, { status: 500 })
     }
 
-    const slack = new SlackNotificationService()
     const results = []
+    const allAnomalies: Array<{ description: string; severity: string; source: string; count: number }> = []
+    const allRecommendations: Array<{ action: string; priority: string; reasoning: string }> = []
+    const summaries: string[] = []
 
     for (const pub of publications) {
       try {
         const analyzer = new LogAnalyzer(pub.id, logger)
         const report = await analyzer.analyze(reportDate)
 
-        // Post Slack digest
-        await slack.sendDailyDigestAlert({
-          reportDate,
-          summary: report.summary,
-          anomalies: report.anomalies,
-          recommendations: report.recommendations,
-        })
+        // Collect for consolidated digest
+        if (report.anomalies.length > 0) {
+          allAnomalies.push(...report.anomalies.map(a => ({ ...a, source: `${pub.name}: ${a.source}` })))
+        }
+        if (report.recommendations.length > 0) {
+          allRecommendations.push(...report.recommendations)
+        }
+        if (report.summary) summaries.push(`${pub.name}: ${report.summary}`)
 
         results.push({
           publication: pub.name,
@@ -65,6 +68,15 @@ const handler = withApiHandler(
         })
       }
     }
+
+    // Send one consolidated Slack digest
+    const slack = new SlackNotificationService()
+    await slack.sendDailyDigestAlert({
+      reportDate,
+      summary: summaries.join('\n') || 'No significant issues detected.',
+      anomalies: allAnomalies,
+      recommendations: allRecommendations,
+    })
 
     logger.info({ results }, 'Daily log analysis complete')
 
