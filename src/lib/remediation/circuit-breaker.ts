@@ -8,7 +8,8 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Auto-closes after the cooldown period elapses.
  *
  * State is stored in app_settings (global, not per-tenant) because
- * MailerLite rate limits are account-wide.
+ * MailerLite rate limits are account-wide. Uses the first active
+ * publication_id since app_settings requires it.
  */
 
 const CIRCUIT_OPEN_KEY = 'mailerlite_circuit_open'
@@ -19,19 +20,42 @@ const TRIP_THRESHOLD = 3
 const WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 const COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
 
+/** Cache the publication ID so we don't query on every call */
+let cachedPublicationId: string | null = null
+
+/** @internal Reset cache for testing */
+export function _resetPublicationCache() { cachedPublicationId = null }
+
+async function getGlobalPublicationId(): Promise<string> {
+  if (cachedPublicationId) return cachedPublicationId
+  const { data } = await supabaseAdmin
+    .from('publications')
+    .select('id')
+    .eq('is_active', true)
+    .limit(1)
+    .single()
+  cachedPublicationId = data?.id || ''
+  return cachedPublicationId!
+}
+
 async function getSetting(key: string): Promise<string | null> {
   const { data } = await supabaseAdmin
     .from('app_settings')
     .select('value')
     .eq('key', key)
+    .limit(1)
     .single()
   return data?.value ?? null
 }
 
 async function upsertSetting(key: string, value: string): Promise<void> {
+  const publicationId = await getGlobalPublicationId()
   await supabaseAdmin
     .from('app_settings')
-    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+    .upsert(
+      { publication_id: publicationId, key, value, updated_at: new Date().toISOString() },
+      { onConflict: 'publication_id,key' }
+    )
 }
 
 /**
@@ -100,11 +124,13 @@ export async function recordRateLimitHit(): Promise<{ tripped: boolean }> {
  */
 export async function closeCircuit(): Promise<void> {
   try {
-    // Remove the open timestamp (null value signals closed)
+    // Remove the open timestamp
+    const publicationId = await getGlobalPublicationId()
     await supabaseAdmin
       .from('app_settings')
       .delete()
       .eq('key', CIRCUIT_OPEN_KEY)
+      .eq('publication_id', publicationId)
 
     await upsertSetting(CIRCUIT_429_COUNT_KEY, '0')
     await upsertSetting(CIRCUIT_WINDOW_START_KEY, '')

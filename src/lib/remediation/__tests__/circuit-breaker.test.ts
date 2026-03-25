@@ -1,27 +1,45 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mocks — must be declared before imports
+// Mocks
 // ---------------------------------------------------------------------------
 const mockSingle = vi.fn()
+const mockUpsert = vi.fn(() => ({ error: null }))
 const mockChain: Record<string, any> = {
   select: vi.fn(() => mockChain),
   eq: vi.fn(() => mockChain),
+  limit: vi.fn(() => mockChain),
   single: mockSingle,
-  upsert: vi.fn(() => ({ error: null })),
+  upsert: mockUpsert,
   delete: vi.fn(() => mockChain),
 }
 
 vi.mock('@/lib/supabase', () => ({
   supabaseAdmin: {
-    from: vi.fn(() => mockChain),
+    from: vi.fn((table: string) => {
+      if (table === 'publications') {
+        // Always return a publication ID for getGlobalPublicationId
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                single: vi.fn().mockResolvedValue({ data: { id: 'pub-test-123' } }),
+              })),
+            })),
+          })),
+        }
+      }
+      return mockChain
+    }),
   },
 }))
 
-import { isCircuitOpen, recordRateLimitHit, closeCircuit } from '../circuit-breaker'
+import { isCircuitOpen, recordRateLimitHit, closeCircuit, _resetPublicationCache } from '../circuit-breaker'
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  mockSingle.mockReset()
+  mockUpsert.mockReset().mockReturnValue({ error: null })
+  _resetPublicationCache()
 })
 
 describe('isCircuitOpen', () => {
@@ -38,11 +56,8 @@ describe('isCircuitOpen', () => {
 
   it('returns false and auto-closes when cooldown has elapsed', async () => {
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-    // First call for isCircuitOpen check
     mockSingle.mockResolvedValueOnce({ data: { value: tenMinutesAgo } })
-    // Subsequent calls during closeCircuit
     mockSingle.mockResolvedValue({ data: null })
-
     expect(await isCircuitOpen()).toBe(false)
   })
 
@@ -54,7 +69,6 @@ describe('isCircuitOpen', () => {
 
 describe('recordRateLimitHit', () => {
   it('starts a new window on first hit', async () => {
-    // No existing window
     mockSingle
       .mockResolvedValueOnce({ data: null }) // window_start
       .mockResolvedValueOnce({ data: null }) // 429_count
@@ -66,8 +80,8 @@ describe('recordRateLimitHit', () => {
   it('does not trip on hits below threshold', async () => {
     const recentWindow = new Date(Date.now() - 60_000).toISOString()
     mockSingle
-      .mockResolvedValueOnce({ data: { value: recentWindow } }) // window_start
-      .mockResolvedValueOnce({ data: { value: '1' } }) // 429_count = 1
+      .mockResolvedValueOnce({ data: { value: recentWindow } })
+      .mockResolvedValueOnce({ data: { value: '1' } })
 
     const result = await recordRateLimitHit()
     expect(result.tripped).toBe(false)
@@ -76,8 +90,8 @@ describe('recordRateLimitHit', () => {
   it('trips when threshold reached', async () => {
     const recentWindow = new Date(Date.now() - 60_000).toISOString()
     mockSingle
-      .mockResolvedValueOnce({ data: { value: recentWindow } }) // window_start
-      .mockResolvedValueOnce({ data: { value: '2' } }) // 429_count = 2 (will become 3)
+      .mockResolvedValueOnce({ data: { value: recentWindow } })
+      .mockResolvedValueOnce({ data: { value: '2' } })
 
     const result = await recordRateLimitHit()
     expect(result.tripped).toBe(true)
@@ -86,8 +100,8 @@ describe('recordRateLimitHit', () => {
   it('starts new window when existing window expired', async () => {
     const oldWindow = new Date(Date.now() - 10 * 60 * 1000).toISOString()
     mockSingle
-      .mockResolvedValueOnce({ data: { value: oldWindow } }) // expired window_start
-      .mockResolvedValueOnce({ data: { value: '5' } }) // old count (irrelevant)
+      .mockResolvedValueOnce({ data: { value: oldWindow } })
+      .mockResolvedValueOnce({ data: { value: '5' } })
 
     const result = await recordRateLimitHit()
     expect(result.tripped).toBe(false)
@@ -104,7 +118,6 @@ describe('closeCircuit', () => {
   it('deletes the open key and resets counters', async () => {
     mockSingle.mockResolvedValue({ data: null })
     await closeCircuit()
-    // Verify delete was called (on the chain after .eq)
     expect(mockChain.delete).toHaveBeenCalled()
   })
 })
