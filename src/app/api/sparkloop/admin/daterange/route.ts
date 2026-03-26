@@ -91,18 +91,28 @@ export const GET = withApiHandler(
     const confirmedImpressionsByRef: Record<string, number> = {}
     const pageImpressionsByRef: Record<string, number> = {}
     const confirmedPageImpressionsByRef: Record<string, number> = {}
+    // Track unique emails per ref_code to deduplicate repeat opens
+    const seenPopupEmails: Record<string, Set<string>> = {}
+    const seenPageEmails: Record<string, Set<string>> = {}
     for (const evt of popupEvents) {
       const payload = evt.raw_payload
       const refCodes = payload?.ref_codes as string[] | null
       const source = payload?.source as string | null
-      const isConfirmed = evt.subscriber_email ? confirmedEmailHashes.has(hashEmail(evt.subscriber_email)) : false
-      if (refCodes) {
+      const emailHash = evt.subscriber_email ? hashEmail(evt.subscriber_email) : null
+      const isConfirmed = emailHash ? confirmedEmailHashes.has(emailHash) : false
+      if (refCodes && emailHash) {
         const isPage = source === 'recs_page'
         for (const rc of refCodes) {
           if (isPage) {
+            if (!seenPageEmails[rc]) seenPageEmails[rc] = new Set()
+            if (seenPageEmails[rc].has(emailHash)) continue  // dedupe
+            seenPageEmails[rc].add(emailHash)
             pageImpressionsByRef[rc] = (pageImpressionsByRef[rc] || 0) + 1
             if (isConfirmed) confirmedPageImpressionsByRef[rc] = (confirmedPageImpressionsByRef[rc] || 0) + 1
           } else {
+            if (!seenPopupEmails[rc]) seenPopupEmails[rc] = new Set()
+            if (seenPopupEmails[rc].has(emailHash)) continue  // dedupe
+            seenPopupEmails[rc].add(emailHash)
             impressionsByRef[rc] = (impressionsByRef[rc] || 0) + 1
             if (isConfirmed) confirmedImpressionsByRef[rc] = (confirmedImpressionsByRef[rc] || 0) + 1
           }
