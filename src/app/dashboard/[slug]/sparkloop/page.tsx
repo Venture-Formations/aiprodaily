@@ -213,7 +213,11 @@ export default function SparkLoopAdminPage() {
 
     // Page value: same formula but using page_cr instead of popup CR
     const pageValue = recsPagePreview.reduce((sum, rec) => {
-      const pageCr = rec.page_cr !== null ? Number(rec.page_cr) : 0
+      // Use stored page_cr, or compute from page_impressions/page_submissions if null
+      let pageCr = rec.page_cr !== null ? Number(rec.page_cr) : 0
+      if (pageCr <= 0 && rec.page_impressions > 0 && rec.page_submissions > 0) {
+        pageCr = (rec.page_submissions / rec.page_impressions) * 100
+      }
       if (pageCr <= 0 || !rec.cpa) return sum
       const cpaDollars = rec.cpa / 100
       const rcr = rec.effective_rcr / 100
