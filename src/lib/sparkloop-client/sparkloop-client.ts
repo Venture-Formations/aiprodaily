@@ -1067,31 +1067,6 @@ export class SparkLoopService {
       referralsByRefCode.get(ref.ref_code)!.push(new Date(ref.subscribed_at))
     }
 
-    // Fetch all-time first send per ref_code (for effective snapshot start calculation).
-    // We need the absolute first send, not just within the rolling window, so the
-    // snapshot baseline is anchored to when we actually started sending for each rec.
-    const firstSendByRefCode = new Map<string, Date>()
-    let fsOffset = 0
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_referrals')
-        .select('ref_code, subscribed_at')
-        .eq('publication_id', publicationId)
-        .order('subscribed_at', { ascending: true })
-        .range(fsOffset, fsOffset + REF_PAGE - 1)
-      if (!page || page.length === 0) break
-      for (const row of page) {
-        // Only keep the first (earliest) send per ref_code
-        if (!firstSendByRefCode.has(row.ref_code)) {
-          firstSendByRefCode.set(row.ref_code, new Date(row.subscribed_at))
-        }
-      }
-      // Once we've seen all ref_codes, we can stop early
-      if (firstSendByRefCode.size >= recs.length) break
-      if (page.length < REF_PAGE) break
-      fsOffset += REF_PAGE
-    }
-
     // Calculate metrics for each recommendation
     for (const rec of recs) {
       const S = rec.screening_period || 14
@@ -1100,10 +1075,9 @@ export class SparkLoopService {
       // Sends window: subscribed_at between (S+W) and S days ago
       // Using S (not S+1) so referrals sent exactly S days ago are included —
       // SparkLoop can confirm them on day S, and excluding them causes RCR > 100%.
-      const sendsFrom = new Date(today)
-      sendsFrom.setDate(sendsFrom.getDate() - (S + W))
-      const sendsTo = new Date(today)
-      sendsTo.setDate(sendsTo.getDate() - S)
+      // Use midnight boundaries so sends and attributed confirms use the same date logic.
+      const sendsFrom = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (S + W))
+      const sendsTo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - S, 23, 59, 59, 999)
 
       // Count sends in window from pre-fetched data
       const refDates = referralsByRefCode.get(rec.ref_code) || []
@@ -1136,15 +1110,27 @@ export class SparkLoopService {
         const sendDate = new Date(confirmDate)
         sendDate.setDate(sendDate.getDate() - S)
 
-        // Only count if the attributed send date falls within our sends window
+        // Only count if the attributed send date falls within our sends window.
+        // sendDate is at midnight (constructed from date parts), sendsFrom is at
+        // midnight, sendsTo is at 23:59:59 — so this comparison is date-aligned.
         if (sendDate >= sendsFrom && sendDate <= sendsTo) {
           confirmsGained += dailyConfirms
           rejectionsGained += dailyRejects
         }
       }
 
+      // Clamp confirms + rejects to sends. SparkLoop doesn't confirm exactly on
+      // day S — timing jitter means a few confirms from adjacent send dates leak
+      // into the window. This is a logical constraint, not a mask: you can't have
+      // more confirms than sends.
+      if (sends > 0 && (confirmsGained + rejectionsGained) > sends) {
+        const scale = sends / (confirmsGained + rejectionsGained)
+        confirmsGained = Math.floor(confirmsGained * scale)
+        rejectionsGained = Math.floor(rejectionsGained * scale)
+      }
+
       // RCR = confirms / sends (null if sends < 5)
-      const rcr = sends >= 5 ? Math.min(100, (confirmsGained / sends) * 100) : null
+      const rcr = sends >= 5 ? (confirmsGained / sends) * 100 : null
 
       // Slippage = sends - (confirms + rejections), rate = slippage / sends
       let slippageRate: number | null = null
