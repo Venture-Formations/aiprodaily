@@ -9,6 +9,8 @@ const PAGE_SIZE = 1000
  *
  * Returns per-ref_code metrics filtered by date range.
  */
+export const maxDuration = 60
+
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin/daterange' },
   async ({ request, logger }) => {
@@ -18,9 +20,16 @@ export const GET = withApiHandler(
 
     const tz = searchParams.get('tz') || 'CST'
 
-    if (!start || !end) {
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+    if (!start || !end || !DATE_RE.test(start) || !DATE_RE.test(end)) {
       return NextResponse.json(
-        { success: false, error: 'start and end date params required (YYYY-MM-DD)' },
+        { success: false, error: 'start and end must be YYYY-MM-DD format' },
+        { status: 400 }
+      )
+    }
+    if (new Date(start) > new Date(end)) {
+      return NextResponse.json(
+        { success: false, error: 'end must be >= start' },
         { status: 400 }
       )
     }
@@ -34,21 +43,24 @@ export const GET = withApiHandler(
     endDateObj.setUTCMilliseconds(-1)
     const endDate = endDateObj.toISOString()
 
-    // 1a. Get confirmed subscriber emails in range (subscriptions_success events)
+    // 1a. Get subscriptions_success events (confirmed emails + avg offers selected in one pass)
     const confirmedEmails = new Set<string>()
+    const successEvents: { subscriber_email: string | null; raw_payload: Record<string, unknown> | null }[] = []
     let ceFrom = 0
     while (true) {
-      const { data: page } = await supabaseAdmin
+      const { data: page, error: ceErr } = await supabaseAdmin
         .from('sparkloop_events')
-        .select('subscriber_email')
+        .select('subscriber_email, raw_payload')
         .eq('publication_id', PUBLICATION_ID)
         .eq('event_type', 'subscriptions_success')
         .gte('event_timestamp', startDate)
         .lte('event_timestamp', endDate)
         .range(ceFrom, ceFrom + PAGE_SIZE - 1)
+      if (ceErr) throw new Error(`Subscriptions success query failed: ${ceErr.message}`)
       if (!page || page.length === 0) break
       for (const evt of page) {
         if (evt.subscriber_email) confirmedEmails.add(evt.subscriber_email)
+        successEvents.push(evt)
       }
       if (page.length < PAGE_SIZE) break
       ceFrom += PAGE_SIZE
@@ -297,24 +309,7 @@ export const GET = withApiHandler(
       uniqueIps = ips.size
     }
 
-    // 4. Avg offers selected from subscriptions_success events in range - paginated
-    let successEvents: { raw_payload: Record<string, unknown> | null }[] = []
-    pageFrom = 0
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_events')
-        .select('raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
-        .eq('event_type', 'subscriptions_success')
-        .gte('event_timestamp', startDate)
-        .lte('event_timestamp', endDate)
-        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
-      if (!page || page.length === 0) break
-      successEvents = successEvents.concat(page)
-      if (page.length < PAGE_SIZE) break
-      pageFrom += PAGE_SIZE
-    }
-
+    // 4. Avg offers selected — computed from successEvents already fetched in step 1a
     let avgOffersSelected = 0
     if (successEvents.length > 0) {
       let totalSelected = 0

@@ -990,9 +990,15 @@ export class SparkLoopService {
     const today = new Date()
     const todayStr = toDateString(today)
 
-    // Fetch all daily snapshots. We compute daily deltas and attribute each
-    // confirm/reject back S days to its send date using the screening period assumption.
-    // Paginate to avoid Supabase's default 1000-row limit.
+    // Compute max screening period early so we can bound the snapshot fetch
+    const maxScreeningForFetch = Math.max(...recs.map(r => r.screening_period || 14))
+
+    // Fetch daily snapshots bounded by (maxScreening + windowDays + buffer) days back.
+    // We only need snapshots within the attribution window, not all-time history.
+    const snapLowerDate = new Date(today)
+    snapLowerDate.setDate(snapLowerDate.getDate() - (maxScreeningForFetch + windowDays + 7))
+    const snapLowerStr = toDateString(snapLowerDate)
+
     const allSnaps: Array<{ ref_code: string; sparkloop_confirmed: number; sparkloop_rejected: number; snapshot_date: string }> = []
     let snapOffset = 0
     const SNAP_PAGE = 1000
@@ -1001,6 +1007,7 @@ export class SparkLoopService {
         .from('sparkloop_daily_snapshots')
         .select('ref_code, sparkloop_confirmed, sparkloop_rejected, snapshot_date')
         .eq('publication_id', publicationId)
+        .gte('snapshot_date', snapLowerStr)
         .lte('snapshot_date', todayStr)
         .order('snapshot_date', { ascending: false })
         .range(snapOffset, snapOffset + SNAP_PAGE - 1)

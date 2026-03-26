@@ -14,6 +14,8 @@ const FALLBACK_DEFAULT_RCR = 25
  *
  * Get all recommendations for admin management
  */
+export const maxDuration = 60
+
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin' },
   async ({ request, logger }) => {

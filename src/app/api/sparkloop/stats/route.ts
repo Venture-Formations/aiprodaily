@@ -28,6 +28,8 @@ interface DailyStats {
  * daily deltas and assign confirmed earnings using a CPA-weighted average across
  * recommendations that had confirms that day.
  */
+export const maxDuration = 60
+
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/stats' },
   async ({ request, logger }) => {
@@ -102,13 +104,16 @@ export const GET = withApiHandler(
         let offset = 0
         const counts = new Map<string, number>()
         while (true) {
-          const { data: page } = await supabaseAdmin
+          const { data: page, error: pageErr } = await supabaseAdmin
             .from('sparkloop_referrals')
             .select('ref_code, subscribed_at')
             .eq('publication_id', PUBLICATION_ID)
             .in('ref_code', refCodes)
             .lte('subscribed_at', cutoffStr)
+            .order('subscribed_at', { ascending: true })
+            .order('ref_code', { ascending: true })
             .range(offset, offset + slipPageSize - 1)
+          if (pageErr) { logger.error({ error: pageErr }, 'Matured sends query failed'); break }
           if (!page || page.length === 0) break
           for (const row of page) {
             counts.set(row.ref_code, (counts.get(row.ref_code) || 0) + 1)
@@ -126,17 +131,27 @@ export const GET = withApiHandler(
       })
     )
 
-    // Fetch all daily snapshots for delta-based confirms/rejects
+    // Fetch daily snapshots for delta-based confirms/rejects — bounded by earliest first send
     type SnapRow = { ref_code: string; snapshot_date: string; sparkloop_confirmed: number; sparkloop_rejected: number }
     const allSnapshots: SnapRow[] = []
+    // Compute lower bound: earliest firstSend date (or 180 days fallback)
+    const earliestFirstSend = firstSendByRefCode.size > 0
+      ? Array.from(firstSendByRefCode.values()).reduce((min, d) => (d < min ? d : min))
+      : null
+    const snapLowerBound = earliestFirstSend
+      ? earliestFirstSend.split('T')[0]
+      : toDateStr(new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000))
+
     let snapOffset = 0
     while (true) {
-      const { data: page } = await supabaseAdmin
+      const { data: page, error: snapErr } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
         .eq('publication_id', PUBLICATION_ID)
+        .gte('snapshot_date', snapLowerBound)
         .order('snapshot_date', { ascending: true })
         .range(snapOffset, snapOffset + slipPageSize - 1)
+      if (snapErr) { logger.error({ error: snapErr }, 'AT slip snapshot query failed'); break }
       if (!page || page.length === 0) break
       allSnapshots.push(...(page as SnapRow[]))
       if (page.length < slipPageSize) break
@@ -216,7 +231,7 @@ export const GET = withApiHandler(
     let referrals: { ref_code: string; subscribed_at: string }[] = []
     let pageFrom = 0
     while (true) {
-      const { data: page } = await supabaseAdmin
+      const { data: page, error: refErr } = await supabaseAdmin
         .from('sparkloop_referrals')
         .select('ref_code, subscribed_at')
         .eq('publication_id', PUBLICATION_ID)
@@ -226,6 +241,7 @@ export const GET = withApiHandler(
         .order('subscribed_at', { ascending: true })
         .order('ref_code', { ascending: true })
         .range(pageFrom, pageFrom + pageSize - 1)
+      if (refErr) { logger.error({ error: refErr }, 'Referrals query failed'); break }
       if (!page || page.length === 0) break
       referrals = referrals.concat(page)
       if (page.length < pageSize) break
@@ -256,7 +272,7 @@ export const GET = withApiHandler(
     let snapshots: { ref_code: string; snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number; sparkloop_earnings: number }[] = []
     let snapPageFrom = 0
     while (true) {
-      const { data: snapPage } = await supabaseAdmin
+      const { data: snapPage, error: chartSnapErr } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected, sparkloop_earnings')
         .eq('publication_id', PUBLICATION_ID)
@@ -265,6 +281,7 @@ export const GET = withApiHandler(
         .order('snapshot_date', { ascending: true })
         .order('ref_code', { ascending: true })
         .range(snapPageFrom, snapPageFrom + pageSize - 1)
+      if (chartSnapErr) { logger.error({ error: chartSnapErr }, 'Chart snapshot query failed'); break }
       if (!snapPage || snapPage.length === 0) break
       snapshots = snapshots.concat(snapPage)
       if (snapPage.length < pageSize) break
@@ -440,6 +457,13 @@ export const GET = withApiHandler(
           earnings: Math.round(earnings * 100) / 100,
         }
       })
+
+    logger.info({
+      recommendations: recommendations?.length ?? 0,
+      slipSnapshots: allSnapshots.length,
+      chartSnapshots: snapshots.length,
+      referrals: referrals.length,
+    }, 'Stats request complete')
 
     return NextResponse.json({
       success: true,
