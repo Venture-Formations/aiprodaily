@@ -92,11 +92,13 @@ interface DetailedTabProps {
 
 interface DateRangeMetrics {
   impressions: number
+  confirmed_impressions: number
   submissions: number
   confirms: number
   rejections: number
   pending: number
   page_impressions: number
+  confirmed_page_impressions: number
   page_submissions: number
 }
 
@@ -272,11 +274,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     if (!dateRangeMetrics) return recommendations
     return recommendations.map(rec => {
       const drm = dateRangeMetrics[rec.ref_code]
-      const impr = drm?.impressions ?? 0
+      // Use confirmed impressions (only from subscribers who completed signup)
+      const impr = drm?.confirmed_impressions ?? 0
       const subs = drm?.submissions ?? 0
-      const pageImpr = drm?.page_impressions ?? 0
+      const pageImpr = drm?.confirmed_page_impressions ?? 0
       const pageSubs = drm?.page_submissions ?? 0
-      // Calculate CRs from date-filtered data
+      // Calculate CRs from confirmed impressions
       const crForRange = impr > 0 ? Math.round((subs / impr) * 10000) / 100 : null
       const pageCrForRange = pageImpr > 0 ? Math.round((pageSubs / pageImpr) * 10000) / 100 : null
       return {

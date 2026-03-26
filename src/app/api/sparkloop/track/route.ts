@@ -71,6 +71,36 @@ export const POST = withApiHandler(
             p_ref_codes: event.ref_codes,
           })
           console.log(`[SparkLoop Track] Recorded ${event.ref_codes.length} ${isRecsPage ? 'page' : 'popup'} impressions`)
+        } else if (eventType === 'subscriptions_success') {
+          // Record confirmed impressions — this subscriber actually completed signup,
+          // so their popup_opened impression is now "confirmed". Look up the ref_codes
+          // they were shown (from their popup_opened event) and increment confirmed_impressions.
+          const isRecsPage = event.source === 'recs_page'
+          const { data: openEvent } = await supabaseAdmin
+            .from('sparkloop_events')
+            .select('raw_payload')
+            .eq('publication_id', PUBLICATION_ID)
+            .eq('event_type', 'popup_opened')
+            .eq('subscriber_email', event.subscriber_email)
+            .order('event_timestamp', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          const shownRefCodes = (openEvent?.raw_payload as Record<string, unknown>)?.ref_codes as string[] | null
+          if (shownRefCodes && shownRefCodes.length > 0) {
+            const rpcName = isRecsPage
+              ? 'increment_sparkloop_confirmed_page_impressions'
+              : 'increment_sparkloop_confirmed_impressions'
+            const { error: rpcErr } = await supabaseAdmin.rpc(rpcName, {
+              p_publication_id: PUBLICATION_ID,
+              p_ref_codes: shownRefCodes,
+            })
+            if (rpcErr) {
+              // RPC may not exist yet — log and continue
+              console.warn(`[SparkLoop Track] ${rpcName} RPC failed:`, rpcErr.message)
+            }
+            console.log(`[SparkLoop Track] Recorded ${shownRefCodes.length} confirmed ${isRecsPage ? 'page' : 'popup'} impressions`)
+          }
         } else if (eventType === 'recommendation_selected') {
           // Record selection for the selected recommendation
           await supabaseAdmin.rpc('increment_sparkloop_selections', {

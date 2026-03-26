@@ -34,13 +34,34 @@ export const GET = withApiHandler(
     endDateObj.setUTCMilliseconds(-1)
     const endDate = endDateObj.toISOString()
 
-    // 1. Impressions: popup_opened events in range (split by source) - paginated
-    let popupEvents: { raw_payload: Record<string, unknown> | null }[] = []
+    // 1a. Get confirmed subscriber emails in range (subscriptions_success events)
+    const confirmedEmails = new Set<string>()
+    let ceFrom = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('subscriber_email')
+        .eq('publication_id', PUBLICATION_ID)
+        .eq('event_type', 'subscriptions_success')
+        .gte('event_timestamp', startDate)
+        .lte('event_timestamp', endDate)
+        .range(ceFrom, ceFrom + PAGE_SIZE - 1)
+      if (!page || page.length === 0) break
+      for (const evt of page) {
+        if (evt.subscriber_email) confirmedEmails.add(evt.subscriber_email)
+      }
+      if (page.length < PAGE_SIZE) break
+      ceFrom += PAGE_SIZE
+    }
+
+    // 1b. Impressions: popup_opened events in range (split by source) - paginated
+    // Track both raw impressions and confirmed impressions (only from confirmed subscribers)
+    let popupEvents: { subscriber_email: string | null; raw_payload: Record<string, unknown> | null }[] = []
     let pageFrom = 0
     while (true) {
       const { data: page, error } = await supabaseAdmin
         .from('sparkloop_events')
-        .select('raw_payload')
+        .select('subscriber_email, raw_payload')
         .eq('publication_id', PUBLICATION_ID)
         .eq('event_type', 'popup_opened')
         .gte('event_timestamp', startDate)
@@ -54,15 +75,24 @@ export const GET = withApiHandler(
     }
 
     const impressionsByRef: Record<string, number> = {}
+    const confirmedImpressionsByRef: Record<string, number> = {}
     const pageImpressionsByRef: Record<string, number> = {}
+    const confirmedPageImpressionsByRef: Record<string, number> = {}
     for (const evt of popupEvents) {
       const payload = evt.raw_payload
       const refCodes = payload?.ref_codes as string[] | null
       const source = payload?.source as string | null
+      const isConfirmed = evt.subscriber_email ? confirmedEmails.has(evt.subscriber_email) : false
       if (refCodes) {
-        const target = source === 'recs_page' ? pageImpressionsByRef : impressionsByRef
+        const isPage = source === 'recs_page'
         for (const rc of refCodes) {
-          target[rc] = (target[rc] || 0) + 1
+          if (isPage) {
+            pageImpressionsByRef[rc] = (pageImpressionsByRef[rc] || 0) + 1
+            if (isConfirmed) confirmedPageImpressionsByRef[rc] = (confirmedPageImpressionsByRef[rc] || 0) + 1
+          } else {
+            impressionsByRef[rc] = (impressionsByRef[rc] || 0) + 1
+            if (isConfirmed) confirmedImpressionsByRef[rc] = (confirmedImpressionsByRef[rc] || 0) + 1
+          }
         }
       }
     }
@@ -310,22 +340,26 @@ export const GET = withApiHandler(
 
     const metrics: Record<string, {
       impressions: number
+      confirmed_impressions: number
       submissions: number
       confirms: number
       rejections: number
       pending: number
       page_impressions: number
+      confirmed_page_impressions: number
       page_submissions: number
     }> = {}
 
     for (const rc of allRefCodes) {
       metrics[rc] = {
         impressions: impressionsByRef[rc] || 0,
+        confirmed_impressions: confirmedImpressionsByRef[rc] || 0,
         submissions: refMetrics[rc]?.submissions || 0,
         confirms: refMetrics[rc]?.confirms || 0,
         rejections: refMetrics[rc]?.rejections || 0,
         pending: refMetrics[rc]?.pending || 0,
         page_impressions: pageImpressionsByRef[rc] || 0,
+        confirmed_page_impressions: confirmedPageImpressionsByRef[rc] || 0,
         page_submissions: pageRefMetrics[rc]?.submissions || 0,
       }
     }
