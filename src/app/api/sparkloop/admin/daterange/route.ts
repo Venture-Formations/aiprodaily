@@ -378,12 +378,14 @@ export const GET = withApiHandler(
       }
     }
 
-    // Compute avg value per subscriber using actual SparkLoop earnings
-    // attributed to sends that matured in this time period.
-    const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
+    // Compute avg value per subscriber.
+    // Earnings in date range come from sends that matured (subscribed S days before).
+    // So the matching subscribers are those who subscribed between (start - S) and (end - S).
+    // Since S varies per recommendation, we query per screening group.
+
+    // Total earnings from the date range (snapshot deltas already shifted by S)
     let totalEarningsInRange = 0
     for (const rc of Object.keys(refMetrics)) {
-      // Use actual SparkLoop earnings delta when available, fall back to confirms × CPA
       const earningsCents = refMetrics[rc]?.earningsCents || 0
       if (earningsCents > 0) {
         totalEarningsInRange += earningsCents / 100
@@ -394,8 +396,50 @@ export const GET = withApiHandler(
         totalEarningsInRange += confirms * cpaDollars
       }
     }
-    const avgValuePerSubscriber = uniqueSubscribers > 0
-      ? Math.round((totalEarningsInRange / uniqueSubscribers) * 100) / 100
+
+    // Count unique subscribers whose sends matured in this period.
+    // For each screening group, the send window is (start - S) to (end - S).
+    const maturedSubEmails = new Set<string>()
+    const screeningGroupsForAvg = new Map<number, string[]>()
+    for (const rec of recScreening || []) {
+      const s = rec.screening_period || 14
+      if (!screeningGroupsForAvg.has(s)) screeningGroupsForAvg.set(s, [])
+      screeningGroupsForAvg.get(s)!.push(rec.ref_code)
+    }
+
+    await Promise.all(
+      Array.from(screeningGroupsForAvg.entries()).map(async ([s, refCodes]) => {
+        const sendStart = new Date(start)
+        sendStart.setDate(sendStart.getDate() - s)
+        const sendEnd = new Date(end)
+        sendEnd.setDate(sendEnd.getDate() - s)
+        const sendStartStr = sendStart.toISOString().split('T')[0] + 'T00:00:00.000Z'
+        const sendEndStr = sendEnd.toISOString().split('T')[0] + 'T23:59:59.999Z'
+
+        let offset = 0
+        while (true) {
+          const { data: page } = await supabaseAdmin
+            .from('sparkloop_referrals')
+            .select('subscriber_email')
+            .eq('publication_id', PUBLICATION_ID)
+            .in('ref_code', refCodes)
+            .gte('subscribed_at', sendStartStr)
+            .lte('subscribed_at', sendEndStr)
+            .range(offset, offset + PAGE_SIZE - 1)
+          if (!page || page.length === 0) break
+          for (const row of page) {
+            if (row.subscriber_email) maturedSubEmails.add(row.subscriber_email)
+          }
+          if (page.length < PAGE_SIZE) break
+          offset += PAGE_SIZE
+        }
+      })
+    )
+
+    const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
+    const maturedSubscribers = maturedSubEmails.size
+    const avgValuePerSubscriber = maturedSubscribers > 0
+      ? Math.round((totalEarningsInRange / maturedSubscribers) * 100) / 100
       : 0
 
     logger.info({ start, end, popupEvents: popupEvents.length, referrals: referrals.length, uniqueIps }, 'Date range query completed')
