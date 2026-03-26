@@ -97,13 +97,13 @@ export const GET = withApiHandler(
       }
     }
 
-    // 2. Referrals in date range (by subscribed_at), split by source — for submission counts
-    let referrals: { ref_code: string; source: string }[] = []
+    // 2. Referrals in date range (by subscribed_at), split by source — for submission counts + unique subs
+    let referrals: { ref_code: string; source: string; subscriber_email: string }[] = []
     pageFrom = 0
     while (true) {
       const { data: page, error } = await supabaseAdmin
         .from('sparkloop_referrals')
-        .select('ref_code, source')
+        .select('ref_code, source, subscriber_email')
         .eq('publication_id', PUBLICATION_ID)
         .in('source', ['custom_popup', 'recs_page', 'newsletter_module'])
         .gte('subscribed_at', startDate)
@@ -132,12 +132,14 @@ export const GET = withApiHandler(
     // Fetch screening_period per recommendation
     const { data: recScreening } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('ref_code, screening_period')
+      .select('ref_code, screening_period, cpa')
       .eq('publication_id', PUBLICATION_ID)
 
     const screeningByRef: Record<string, number> = {}
+    const recCpaMap: Record<string, number> = {}
     for (const rec of recScreening || []) {
       screeningByRef[rec.ref_code] = rec.screening_period || 14
+      recCpaMap[rec.ref_code] = rec.cpa || 0
     }
 
     // Determine the widest snapshot window we need (max screening period)
@@ -364,6 +366,19 @@ export const GET = withApiHandler(
       }
     }
 
+    // Compute avg value per subscriber: (confirmed + projected earnings) / unique subscribers
+    const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
+    let totalEarningsInRange = 0
+    for (const rc of Object.keys(refMetrics)) {
+      const confirms = refMetrics[rc]?.confirms || 0
+      const pending = refMetrics[rc]?.pending || 0
+      const cpaDollars = (recCpaMap[rc] || 0) / 100
+      totalEarningsInRange += (confirms + pending) * cpaDollars
+    }
+    const avgValuePerSubscriber = uniqueSubscribers > 0
+      ? Math.round((totalEarningsInRange / uniqueSubscribers) * 100) / 100
+      : 0
+
     logger.info({ start, end, popupEvents: popupEvents.length, referrals: referrals.length, uniqueIps }, 'Date range query completed')
 
     return NextResponse.json({
@@ -373,6 +388,8 @@ export const GET = withApiHandler(
       rangeStats: {
         uniqueIps,
         avgOffersSelected,
+        avgValuePerSubscriber,
+        uniqueSubscribers,
       },
     })
   }

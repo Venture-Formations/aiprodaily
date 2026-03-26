@@ -105,6 +105,8 @@ interface DateRangeMetrics {
 interface RangeStats {
   uniqueIps: number
   avgOffersSelected: number
+  avgValuePerSubscriber?: number
+  uniqueSubscribers?: number
 }
 
 import { toLocalDateStr } from '@/lib/date-utils'
@@ -1067,6 +1069,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
             <>
               <span className="text-purple-600">Unique IPs ({dateStart} to {dateEnd}): <strong>{rangeStats.uniqueIps}</strong></span>
               <span className="text-purple-600">Avg Offers Selected: <strong>{rangeStats.avgOffersSelected.toFixed(1)}</strong></span>
+              {rangeStats.avgValuePerSubscriber !== undefined && (
+                <span className="text-purple-600">Avg Value/Sub: <strong>${rangeStats.avgValuePerSubscriber.toFixed(2)}</strong></span>
+              )}
+              {rangeStats.uniqueSubscribers !== undefined && (
+                <span className="text-purple-600">Unique Subs: <strong>{rangeStats.uniqueSubscribers}</strong></span>
+              )}
             </>
           )}
           {!dateRangeActive && (

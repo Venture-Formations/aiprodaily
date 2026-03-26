@@ -266,6 +266,24 @@ export default function SparkLoopAdminPage() {
       .slice(5, 8)
   }, [recommendations])
 
+  // Compute estimated value per subscriber from current offerings
+  const estimatedValue = useMemo(() => {
+    // Popup value: sum of calculated_score (CR × CPA × RCR × (1 - Slip))
+    const popupValue = popupPreview.reduce((sum, rec) => sum + (rec.calculated_score || 0), 0)
+
+    // Page value: same formula but using page_cr instead of popup CR
+    const pageValue = recsPagePreview.reduce((sum, rec) => {
+      const pageCr = rec.page_cr !== null ? Number(rec.page_cr) : 0
+      if (pageCr <= 0 || !rec.cpa) return sum
+      const cpaDollars = rec.cpa / 100
+      const rcr = rec.effective_rcr / 100
+      const slip = rec.effective_slip / 100
+      return sum + (pageCr / 100) * cpaDollars * rcr * (1 - slip)
+    }, 0)
+
+    return { popup: popupValue, page: pageValue, total: popupValue + pageValue }
+  }, [popupPreview, recsPagePreview])
+
   const getSourceColor = (source: string) => {
     if (source === 'override') return 'text-orange-600'
     if (source === 'ours') return 'text-blue-600'
@@ -445,6 +463,30 @@ export default function SparkLoopAdminPage() {
                 </div>
                 <div className="text-2xl font-bold text-blue-600">
                   {formatDollars(chartStats?.summary.projectedFromPending || 0)}
+                </div>
+              </div>
+            </div>
+
+            {/* Estimated Value Per Subscriber */}
+            <div className="bg-white rounded-lg border p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-0.5">Est. Value / Subscriber</div>
+                    <div className="text-xl font-bold text-green-600">{formatDollars(estimatedValue.total)}</div>
+                  </div>
+                  <div className="h-8 w-px bg-gray-200" />
+                  <div>
+                    <div className="text-xs text-gray-400">Popup ({popupPreview.length})</div>
+                    <div className="text-sm font-semibold text-gray-700">{formatDollars(estimatedValue.popup)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Page ({recsPagePreview.length})</div>
+                    <div className="text-sm font-semibold text-gray-700">{formatDollars(estimatedValue.page)}</div>
+                  </div>
+                </div>
+                <div className="text-[10px] text-gray-400 max-w-[200px] text-right">
+                  Based on current offerings: CR × CPA × RCR × (1 - Slip)
                 </div>
               </div>
             </div>
