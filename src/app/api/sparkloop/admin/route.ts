@@ -258,10 +258,19 @@ export const GET = withApiHandler(
       // excluding the first snapshot (inflated with pre-existing cumulative totals).
       const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
       const slipData = slipDataByRefCode.get(rec.ref_code)
-      const confirmsGained = slipData?.confirmsGained ?? 0
-      const rejectsGained = slipData?.rejectsGained ?? 0
+      let confirmsGained = slipData?.confirmsGained ?? 0
+      let rejectsGained = slipData?.rejectsGained ?? 0
+
+      // SparkLoop timing jitter can cause resolved to slightly exceed matured sends.
+      // Scale proportionally to fit within matured sends (preserves confirm/reject ratio).
+      if (maturedSends > 0 && (confirmsGained + rejectsGained) > maturedSends) {
+        const scale = maturedSends / (confirmsGained + rejectsGained)
+        confirmsGained = Math.floor(confirmsGained * scale)
+        rejectsGained = maturedSends - confirmsGained
+      }
+
       const allTimeSlip = maturedSends > 0
-        ? Math.max(0, maturedSends - (confirmsGained + rejectsGained))
+        ? maturedSends - (confirmsGained + rejectsGained)
         : 0
       const allTimeSlipRate = maturedSends > 0 ? (allTimeSlip / maturedSends) * 100 : 0
 
