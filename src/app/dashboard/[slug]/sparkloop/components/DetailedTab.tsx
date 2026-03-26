@@ -183,6 +183,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [dateRangeMetrics, setDateRangeMetrics] = useState<Record<string, DateRangeMetrics> | null>(null)
   const [dateRangeLoading, setDateRangeLoading] = useState(false)
   const [rangeStats, setRangeStats] = useState<RangeStats | null>(null)
+  const [timezone, setTimezone] = useState<'CST' | 'UTC'>('CST')
 
   // Action state
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -220,7 +221,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     const fetchDateRange = async () => {
       setDateRangeLoading(true)
       try {
-        const res = await fetch(`/api/sparkloop/admin/daterange?start=${dateStart}&end=${dateEnd}`)
+        const res = await fetch(`/api/sparkloop/admin/daterange?start=${dateStart}&end=${dateEnd}&tz=${timezone}`)
         const data = await res.json()
         if (data.success) {
           setDateRangeMetrics(data.metrics)
@@ -232,7 +233,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       setDateRangeLoading(false)
     }
     fetchDateRange()
-  }, [dateStart, dateEnd])
+  }, [dateStart, dateEnd, timezone])
 
   const clearDateRange = useCallback(() => {
     setDateStart('')
@@ -1028,6 +1029,23 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
             Clear
           </button>
         )}
+        <span className="text-xs text-gray-300">|</span>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-xs font-medium ${timezone === 'CST' ? 'text-gray-700' : 'text-gray-400'}`}>CST</span>
+          <button
+            onClick={() => setTimezone(timezone === 'CST' ? 'UTC' : 'CST')}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              timezone === 'UTC' ? 'bg-purple-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                timezone === 'UTC' ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`}
+            />
+          </button>
+          <span className={`text-xs font-medium ${timezone === 'UTC' ? 'text-gray-700' : 'text-gray-400'}`}>UTC</span>
+        </div>
         {dateRangeLoading && (
           <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-300 border-t-purple-500" />
         )}

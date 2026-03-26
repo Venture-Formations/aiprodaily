@@ -16,6 +16,8 @@ export const GET = withApiHandler(
     const start = searchParams.get('start')
     const end = searchParams.get('end')
 
+    const tz = searchParams.get('tz') || 'CST'
+
     if (!start || !end) {
       return NextResponse.json(
         { success: false, error: 'start and end date params required (YYYY-MM-DD)' },
@@ -23,8 +25,14 @@ export const GET = withApiHandler(
       )
     }
 
-    const startDate = `${start}T00:00:00.000Z`
-    const endDate = `${end}T23:59:59.999Z`
+    // CST = UTC-6: midnight CST = 06:00 UTC; UTC = no offset
+    const offset = tz === 'UTC' ? 'T00:00:00.000Z' : 'T06:00:00.000Z'
+    const startDate = `${start}${offset}`
+    // End date goes to end of day in the selected timezone
+    const endDateObj = new Date(`${end}${offset}`)
+    endDateObj.setUTCDate(endDateObj.getUTCDate() + 1)
+    endDateObj.setUTCMilliseconds(-1)
+    const endDate = endDateObj.toISOString()
 
     // 1. Impressions: popup_opened events in range (split by source) - paginated
     let popupEvents: { raw_payload: Record<string, unknown> | null }[] = []
