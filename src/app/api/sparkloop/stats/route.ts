@@ -411,10 +411,10 @@ export const GET = withApiHandler(
     // Pending in range = subscribes - confirmed - rejected (within the date window)
     const totalPendingInRange = Math.max(0, totalSubscribesInRange - totalConfirmedInRange - totalRejectedInRange)
 
-    // Convert to array — "pending" bar shows subscribes (all start as pending)
+    // Convert to array — pending = subscribes that haven't been confirmed or rejected yet
     const dailyStats: DailyStats[] = Array.from(dailyMap.entries()).map(([date, stats]) => ({
       date,
-      pending: stats.subscribes,
+      pending: Math.max(0, stats.subscribes - stats.confirmed - stats.rejected),
       confirmed: stats.confirmed,
       rejected: stats.rejected,
       projectedEarnings: Math.round(stats.projectedEarnings * 100) / 100,
