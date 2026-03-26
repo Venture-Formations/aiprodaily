@@ -226,10 +226,20 @@ export const GET = withApiHandler(
       const slipData = slipDataByRefCode.get(rec.ref_code)
       const confirmsGained = slipData?.confirmsGained ?? 0
       const rejectsGained = slipData?.rejectsGained ?? 0
-      const allTimeSlip = maturedSends > 0
-        ? Math.max(0, maturedSends - (confirmsGained + rejectsGained))
-        : 0
-      const allTimeSlipRate = maturedSends > 0 ? (allTimeSlip / maturedSends) * 100 : 0
+      const totalResolved = confirmsGained + rejectsGained
+
+      // When resolved > maturedSends, snapshot deltas include referrals from
+      // non-tracked sources (popup, direct SparkLoop). We can't determine true
+      // slip in this case — use the 14D/30D rolling slip as the fallback instead.
+      let allTimeSlipRate: number
+      if (maturedSends === 0) {
+        allTimeSlipRate = 0
+      } else if (totalResolved > maturedSends) {
+        // Can't compute — resolved exceeds our sends. Will fall through to rolling slip.
+        allTimeSlipRate = -1  // sentinel: will be replaced below
+      } else {
+        allTimeSlipRate = ((maturedSends - totalResolved) / maturedSends) * 100
+      }
 
       // Override slip
       const hasOverrideSlip = rec.override_slip !== null && rec.override_slip !== undefined
@@ -238,6 +248,11 @@ export const GET = withApiHandler(
       if (hasOverrideSlip) {
         effectiveSlip = Number(rec.override_slip)
         slipSource = maturedSends > 0 ? 'override_with_data' : 'override'
+      } else if (allTimeSlipRate < 0) {
+        // AT slip is unreliable — resolved > sends. Use 0 as placeholder,
+        // the rolling 14D/30D slip columns provide the better signal.
+        effectiveSlip = 0
+        slipSource = 'insufficient_data'
       } else {
         effectiveSlip = allTimeSlipRate
         slipSource = 'calculated'
@@ -255,7 +270,7 @@ export const GET = withApiHandler(
         effective_rcr: effectiveRcr,
         cr_source: crSource,
         rcr_source: rcrSource,
-        alltime_slip: allTimeSlipRate,
+        alltime_slip: Math.max(0, allTimeSlipRate),
         effective_slip: effectiveSlip,
         slip_source: slipSource,
         matured_sends: maturedSends,
