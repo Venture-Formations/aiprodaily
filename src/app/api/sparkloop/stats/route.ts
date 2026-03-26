@@ -253,12 +253,12 @@ export const GET = withApiHandler(
     // Fetch daily snapshots — need day before fromDate to compute deltas for the first day
     const snapshotFromDate = new Date(fromDate)
     snapshotFromDate.setDate(snapshotFromDate.getDate() - 1)
-    let snapshots: { ref_code: string; snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number }[] = []
+    let snapshots: { ref_code: string; snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number; sparkloop_earnings: number }[] = []
     let snapPageFrom = 0
     while (true) {
       const { data: snapPage } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
-        .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
+        .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected, sparkloop_earnings')
         .eq('publication_id', PUBLICATION_ID)
         .gte('snapshot_date', toDateStr(snapshotFromDate))
         .lte('snapshot_date', toDateStr(toDate))
@@ -272,7 +272,7 @@ export const GET = withApiHandler(
     }
 
     // Group snapshots by ref_code, then by date
-    const snapshotsByRefCode = new Map<string, Map<string, { pending: number; confirmed: number; rejected: number }>>()
+    const snapshotsByRefCode = new Map<string, Map<string, { pending: number; confirmed: number; rejected: number; earnings: number }>>()
     for (const snap of snapshots || []) {
       let refMap = snapshotsByRefCode.get(snap.ref_code)
       if (!refMap) {
@@ -283,6 +283,7 @@ export const GET = withApiHandler(
         pending: snap.sparkloop_pending || 0,
         confirmed: snap.sparkloop_confirmed || 0,
         rejected: snap.sparkloop_rejected || 0,
+        earnings: snap.sparkloop_earnings || 0,
       })
     }
 
@@ -327,11 +328,14 @@ export const GET = withApiHandler(
 
         if (confirmDelta > 0) {
           confirmedByDate.set(attributionDate, (confirmedByDate.get(attributionDate) || 0) + confirmDelta)
-          confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + (confirmDelta * info.cpaDollars))
+          // Use actual SparkLoop earnings delta when available, fall back to confirms × CPA
+          const earningsDelta = Math.max(0, (curr.earnings || 0) - (prev.earnings || 0))
+          const earningsForDay = earningsDelta > 0 ? earningsDelta / 100 : confirmDelta * info.cpaDollars
+          confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + earningsForDay)
           // Accumulate per-recommendation totals for top earners (only if attribution date is in range)
           if (dailyMap.has(attributionDate)) {
             confirmedByRef.set(refCode, (confirmedByRef.get(refCode) || 0) + confirmDelta)
-            earningsByRef.set(refCode, (earningsByRef.get(refCode) || 0) + (confirmDelta * info.cpaDollars))
+            earningsByRef.set(refCode, (earningsByRef.get(refCode) || 0) + earningsForDay)
           }
         }
         if (rejectDelta > 0) {

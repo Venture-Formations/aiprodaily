@@ -915,7 +915,7 @@ export class SparkLoopService {
 
     const { data: recs, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('ref_code, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending')
+      .select('ref_code, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings')
       .eq('publication_id', publicationId)
 
     if (error || !recs) {
@@ -934,6 +934,7 @@ export class SparkLoopService {
           sparkloop_confirmed: rec.sparkloop_confirmed || 0,
           sparkloop_rejected: rec.sparkloop_rejected || 0,
           sparkloop_pending: rec.sparkloop_pending || 0,
+          sparkloop_earnings: rec.sparkloop_earnings || 0,
         }, {
           onConflict: 'publication_id,ref_code,snapshot_date',
         })
