@@ -334,8 +334,11 @@ export const GET = withApiHandler(
 
         if (confirmDelta > 0) {
           confirmedByDate.set(attributionDate, (confirmedByDate.get(attributionDate) || 0) + confirmDelta)
-          // Use actual SparkLoop earnings delta when available, fall back to confirms × CPA
-          const earningsDelta = Math.max(0, (curr.earnings || 0) - (prev.earnings || 0))
+          // Use actual SparkLoop earnings delta when both snapshots have earnings data.
+          // If prev.earnings is 0, it likely means the column was just added and prev has no data —
+          // the "delta" would be the entire all-time earnings, which is wrong.
+          const prevHasEarnings = (prev.earnings || 0) > 0
+          const earningsDelta = prevHasEarnings ? Math.max(0, (curr.earnings || 0) - prev.earnings) : 0
           const earningsForDay = earningsDelta > 0 ? earningsDelta / 100 : confirmDelta * info.cpaDollars
           confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + earningsForDay)
           // Accumulate per-recommendation totals for top earners (only if attribution date is in range)
@@ -393,17 +396,6 @@ export const GET = withApiHandler(
       }
     }
 
-    // Compute summary totals
-    // Use aggregate sparkloop_confirmed/rejected/pending from recommendations (source of truth)
-    let aggConfirmed = 0
-    let aggRejected = 0
-    let aggPending = 0
-    for (const rec of recommendations || []) {
-      aggConfirmed += rec.sparkloop_confirmed || 0
-      aggRejected += rec.sparkloop_rejected || 0
-      aggPending += rec.sparkloop_pending || 0
-    }
-
     // Sum daily chart totals within the selected date range
     let totalConfirmedInRange = 0
     let totalRejectedInRange = 0
@@ -457,10 +449,10 @@ export const GET = withApiHandler(
     return NextResponse.json({
       success: true,
       summary: {
-        totalPending: aggPending,
-        totalConfirmed: aggConfirmed,
-        totalRejected: aggRejected,
-        totalSubscribes: aggPending + aggConfirmed + aggRejected,
+        totalPending: totalPendingInRange,
+        totalConfirmed: totalConfirmedInRange,
+        totalRejected: totalRejectedInRange,
+        totalSubscribes: totalSubscribesInRange,
         totalEarnings: Math.round(totalConfirmedEarnings * 100) / 100,
         projectedFromPending: Math.round(totalProjectedEarnings * 100) / 100,
       },
