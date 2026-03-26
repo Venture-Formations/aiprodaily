@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
+import { buildDateRangeBoundaries, type SupportedTz } from '@/lib/date-utils'
 
 /**
  * GET /api/sparkloop/admin/submissions
@@ -19,7 +20,7 @@ export const GET = withApiHandler(
     const start = searchParams.get('start')
     const end = searchParams.get('end')
 
-    const tz = searchParams.get('tz') || 'CST'
+    const tz = (searchParams.get('tz') || 'CST') as SupportedTz
 
     if (!refCode || !start || !end) {
       return NextResponse.json(
@@ -28,14 +29,8 @@ export const GET = withApiHandler(
       )
     }
 
-    // CST = UTC-6: midnight CST = 06:00 UTC; UTC = no offset
-    const offset = tz === 'UTC' ? 'T00:00:00.000Z' : 'T06:00:00.000Z'
-    const startDate = `${start}${offset}`
-    const endDate = `${end}${offset}`
-    // End date goes to end of day in the selected timezone
-    const endDateObj = new Date(endDate)
-    endDateObj.setUTCDate(endDateObj.getUTCDate() + 1)
-    endDateObj.setUTCMilliseconds(-1)
+    const { startDate: startDateObj, endDate: endDateObj } = buildDateRangeBoundaries(start, end, tz)
+    const startDate = startDateObj.toISOString()
     const endDateFinal = endDateObj.toISOString()
 
     const { data: referrals, error } = await supabaseAdmin

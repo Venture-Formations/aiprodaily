@@ -14,6 +14,8 @@ const FALLBACK_DEFAULT_RCR = 25
  *
  * Get all recommendations for admin management
  */
+export const maxDuration = 60
+
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin' },
   async ({ request, logger }) => {
@@ -148,37 +150,68 @@ export const GET = withApiHandler(
       snapsByRefCode.get(snap.ref_code)!.push(snap)
     }
 
-    // For each ref_code, compute delta confirms/rejects from baseline to latest snapshot
+    // For each ref_code, compute confirms/rejects using attribution approach:
+    // Each daily snapshot delta is attributed back S days to the send date.
+    // Only count confirms/rejects whose attributed send date has actual sends in our table.
+    // This prevents pre-existing SparkLoop referrals from inflating our metrics.
+
+    // First, collect all our send dates per ref_code
+    const sendDatesByRefCode = new Map<string, Set<string>>()
+    for (const rec of data || []) {
+      sendDatesByRefCode.set(rec.ref_code, new Set())
+    }
+    // Paginate through all our referrals to build send date sets
+    let refPageOffset = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .select('ref_code, subscribed_at')
+        .eq('publication_id', PUBLICATION_ID)
+        .range(refPageOffset, refPageOffset + SNAP_PAGE - 1)
+      if (!page || page.length === 0) break
+      for (const row of page) {
+        const dateSet = sendDatesByRefCode.get(row.ref_code)
+        if (dateSet) dateSet.add(row.subscribed_at.split('T')[0])
+      }
+      if (page.length < SNAP_PAGE) break
+      refPageOffset += SNAP_PAGE
+    }
+
     const slipDataByRefCode = new Map<string, { confirmsGained: number; rejectsGained: number }>()
     for (const rec of data || []) {
-      const s = rec.screening_period || 14
+      const screeningDays = rec.screening_period || 14
       const snaps = snapsByRefCode.get(rec.ref_code)
       if (!snaps || snaps.length < 2) continue
 
-      const firstSend = firstSendByRefCode.get(rec.ref_code)
-      if (!firstSend) continue
+      const sendDates = sendDatesByRefCode.get(rec.ref_code)
+      if (!sendDates || sendDates.size === 0) continue
 
-      // Baseline date = first_send + S days
-      const baselineDate = new Date(firstSend)
-      baselineDate.setDate(baselineDate.getDate() + s)
-      const baselineDateStr = baselineDate.toISOString().split('T')[0]
+      let confirmsGained = 0
+      let rejectsGained = 0
 
-      // Skip the very first snapshot (index 0) — it has inflated cumulative totals.
-      // Find baseline: first snapshot on or after baselineDate, excluding index 0.
-      let baselineSnap: SnapRow | null = null
+      // Iterate consecutive snapshot pairs (sorted ascending)
       for (let i = 1; i < snaps.length; i++) {
-        if (snaps[i].snapshot_date >= baselineDateStr) {
-          baselineSnap = snaps[i]
-          break
+        const prev = snaps[i - 1]
+        const curr = snaps[i]
+
+        const dailyConfirms = Math.max(0, curr.sparkloop_confirmed - prev.sparkloop_confirmed)
+        const dailyRejects = Math.max(0, curr.sparkloop_rejected - prev.sparkloop_rejected)
+        if (dailyConfirms === 0 && dailyRejects === 0) continue
+
+        // Attribute back S days to the send date
+        const [y, m, d] = curr.snapshot_date.split('-').map(Number)
+        const sendDate = new Date(y, m - 1, d)
+        sendDate.setDate(sendDate.getDate() - screeningDays)
+        const sendDateStr = `${sendDate.getFullYear()}-${String(sendDate.getMonth() + 1).padStart(2, '0')}-${String(sendDate.getDate()).padStart(2, '0')}`
+
+        // Only count if we had sends on that date
+        if (sendDates.has(sendDateStr)) {
+          confirmsGained += dailyConfirms
+          rejectsGained += dailyRejects
         }
       }
-      if (!baselineSnap) continue
 
-      const latestSnap = snaps[snaps.length - 1]
-      slipDataByRefCode.set(rec.ref_code, {
-        confirmsGained: Math.max(0, latestSnap.sparkloop_confirmed - baselineSnap.sparkloop_confirmed),
-        rejectsGained: Math.max(0, latestSnap.sparkloop_rejected - baselineSnap.sparkloop_rejected),
-      })
+      slipDataByRefCode.set(rec.ref_code, { confirmsGained, rejectsGained })
     }
 
     // Calculate scores for each recommendation

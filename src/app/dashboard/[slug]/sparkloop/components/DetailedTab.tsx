@@ -2,66 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Download, Settings2, Search, X, Calendar, Ban, Pause, Play, Pencil, RefreshCw, CheckCircle, Check } from 'lucide-react'
-
-interface Recommendation {
-  id: string
-  ref_code: string
-  publication_name: string
-  publication_logo: string | null
-  description: string | null
-  type: 'free' | 'paid'
-  status: 'active' | 'paused' | 'archived' | 'awaiting_approval'
-  cpa: number | null
-  sparkloop_rcr: number | null
-  max_payout: number | null
-  screening_period: number | null
-  excluded: boolean
-  excluded_reason: string | null
-  paused_reason: string | null
-  impressions: number
-  submissions: number
-  confirms: number
-  rejections: number
-  our_cr: number | null
-  our_rcr: number | null
-  sparkloop_confirmed: number
-  sparkloop_pending: number
-  sparkloop_rejected: number
-  sparkloop_earnings: number
-  sparkloop_net_earnings: number
-  our_total_subscribes: number
-  our_confirms: number
-  our_rejections: number
-  our_pending: number
-  remaining_budget_dollars: number | null
-  last_synced_at: string | null
-  calculated_score: number
-  effective_cr: number
-  effective_rcr: number
-  cr_source: string
-  rcr_source: string
-  unique_ips: number
-  override_cr: number | null
-  override_rcr: number | null
-  override_slip: number | null
-  alltime_slip: number
-  effective_slip: number
-  slip_source: string
-  matured_sends: number
-  submission_capped?: boolean
-  page_impressions: number
-  page_submissions: number
-  page_cr: number | null
-  rcr_14d: number | null
-  rcr_30d: number | null
-  slippage_14d: number | null
-  slippage_30d: number | null
-  sends_14d: number
-  sends_30d: number
-  confirms_gained_14d: number
-  confirms_gained_30d: number
-  eligible_for_module: boolean
-}
+import type { Recommendation } from '../types'
 
 interface GlobalStats {
   uniqueIps: number
@@ -92,17 +33,21 @@ interface DetailedTabProps {
 
 interface DateRangeMetrics {
   impressions: number
+  confirmed_impressions: number
   submissions: number
   confirms: number
   rejections: number
   pending: number
   page_impressions: number
+  confirmed_page_impressions: number
   page_submissions: number
 }
 
 interface RangeStats {
   uniqueIps: number
   avgOffersSelected: number
+  avgValuePerSubscriber?: number
+  uniqueSubscribers?: number
 }
 
 import { toLocalDateStr } from '@/lib/date-utils'
@@ -183,6 +128,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [dateRangeMetrics, setDateRangeMetrics] = useState<Record<string, DateRangeMetrics> | null>(null)
   const [dateRangeLoading, setDateRangeLoading] = useState(false)
   const [rangeStats, setRangeStats] = useState<RangeStats | null>(null)
+  const [timezone, setTimezone] = useState<'CST' | 'UTC'>('CST')
 
   // Action state
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -220,7 +166,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     const fetchDateRange = async () => {
       setDateRangeLoading(true)
       try {
-        const res = await fetch(`/api/sparkloop/admin/daterange?start=${dateStart}&end=${dateEnd}`)
+        const res = await fetch(`/api/sparkloop/admin/daterange?start=${dateStart}&end=${dateEnd}&tz=${timezone}`)
         const data = await res.json()
         if (data.success) {
           setDateRangeMetrics(data.metrics)
@@ -232,7 +178,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       setDateRangeLoading(false)
     }
     fetchDateRange()
-  }, [dateStart, dateEnd])
+  }, [dateStart, dateEnd, timezone])
 
   const clearDateRange = useCallback(() => {
     setDateStart('')
@@ -271,11 +217,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     if (!dateRangeMetrics) return recommendations
     return recommendations.map(rec => {
       const drm = dateRangeMetrics[rec.ref_code]
-      const impr = drm?.impressions ?? 0
+      // Use confirmed impressions (only from subscribers who completed signup)
+      const impr = drm?.confirmed_impressions ?? 0
       const subs = drm?.submissions ?? 0
-      const pageImpr = drm?.page_impressions ?? 0
+      const pageImpr = drm?.confirmed_page_impressions ?? 0
       const pageSubs = drm?.page_submissions ?? 0
-      // Calculate CRs from date-filtered data
+      // Calculate CRs from confirmed impressions
       const crForRange = impr > 0 ? Math.round((subs / impr) * 10000) / 100 : null
       const pageCrForRange = pageImpr > 0 ? Math.round((pageSubs / pageImpr) * 10000) / 100 : null
       return {
@@ -1028,6 +975,26 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
             Clear
           </button>
         )}
+        <span className="text-xs text-gray-300">|</span>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-xs font-medium ${timezone === 'CST' ? 'text-gray-700' : 'text-gray-400'}`}>CST</span>
+          <button
+            role="switch"
+            aria-checked={timezone === 'UTC'}
+            aria-label="Timezone: toggle between CT and UTC"
+            onClick={() => setTimezone(timezone === 'CST' ? 'UTC' : 'CST')}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              timezone === 'UTC' ? 'bg-purple-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                timezone === 'UTC' ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`}
+            />
+          </button>
+          <span className={`text-xs font-medium ${timezone === 'UTC' ? 'text-gray-700' : 'text-gray-400'}`}>UTC</span>
+        </div>
         {dateRangeLoading && (
           <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-300 border-t-purple-500" />
         )}
@@ -1046,6 +1013,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
             <>
               <span className="text-purple-600">Unique IPs ({dateStart} to {dateEnd}): <strong>{rangeStats.uniqueIps}</strong></span>
               <span className="text-purple-600">Avg Offers Selected: <strong>{rangeStats.avgOffersSelected.toFixed(1)}</strong></span>
+              {rangeStats.avgValuePerSubscriber !== undefined && (
+                <span className="text-purple-600">Avg Value/Sub: <strong>${rangeStats.avgValuePerSubscriber.toFixed(2)}</strong></span>
+              )}
+              {rangeStats.uniqueSubscribers !== undefined && (
+                <span className="text-purple-600">Unique Subs: <strong>{rangeStats.uniqueSubscribers}</strong></span>
+              )}
             </>
           )}
           {!dateRangeActive && (

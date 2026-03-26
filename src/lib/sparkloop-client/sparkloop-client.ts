@@ -915,7 +915,7 @@ export class SparkLoopService {
 
     const { data: recs, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('ref_code, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending')
+      .select('ref_code, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings')
       .eq('publication_id', publicationId)
 
     if (error || !recs) {
@@ -934,6 +934,7 @@ export class SparkLoopService {
           sparkloop_confirmed: rec.sparkloop_confirmed || 0,
           sparkloop_rejected: rec.sparkloop_rejected || 0,
           sparkloop_pending: rec.sparkloop_pending || 0,
+          sparkloop_earnings: rec.sparkloop_earnings || 0,
         }, {
           onConflict: 'publication_id,ref_code,snapshot_date',
         })
@@ -989,9 +990,15 @@ export class SparkLoopService {
     const today = new Date()
     const todayStr = toDateString(today)
 
-    // Fetch all daily snapshots. We compute daily deltas and attribute each
-    // confirm/reject back S days to its send date using the screening period assumption.
-    // Paginate to avoid Supabase's default 1000-row limit.
+    // Compute max screening period early so we can bound the snapshot fetch
+    const maxScreeningForFetch = Math.max(...recs.map(r => r.screening_period || 14))
+
+    // Fetch daily snapshots bounded by (maxScreening + windowDays + buffer) days back.
+    // We only need snapshots within the attribution window, not all-time history.
+    const snapLowerDate = new Date(today)
+    snapLowerDate.setDate(snapLowerDate.getDate() - (maxScreeningForFetch + windowDays + 7))
+    const snapLowerStr = toDateString(snapLowerDate)
+
     const allSnaps: Array<{ ref_code: string; sparkloop_confirmed: number; sparkloop_rejected: number; snapshot_date: string }> = []
     let snapOffset = 0
     const SNAP_PAGE = 1000
@@ -1000,6 +1007,7 @@ export class SparkLoopService {
         .from('sparkloop_daily_snapshots')
         .select('ref_code, sparkloop_confirmed, sparkloop_rejected, snapshot_date')
         .eq('publication_id', publicationId)
+        .gte('snapshot_date', snapLowerStr)
         .lte('snapshot_date', todayStr)
         .order('snapshot_date', { ascending: false })
         .range(snapOffset, snapOffset + SNAP_PAGE - 1)
@@ -1069,15 +1077,14 @@ export class SparkLoopService {
 
     // Calculate metrics for each recommendation
     for (const rec of recs) {
-      const S = rec.screening_period || 14
-      const W = windowDays
+      const screeningDays = rec.screening_period || 14
 
-      // Sends window: subscribed_at between (S+W) and S days ago
-      // Using S (not S+1) so referrals sent exactly S days ago are included —
-      // SparkLoop can confirm them on day S, and excluding them causes RCR > 100%.
+      // Sends window: subscribed_at between (screeningDays+windowDays) and screeningDays days ago
+      // Using screeningDays (not screeningDays+1) so referrals sent exactly screeningDays days ago
+      // are included — SparkLoop can confirm them on that day.
       // Use midnight boundaries so sends and attributed confirms use the same date logic.
-      const sendsFrom = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (S + W))
-      const sendsTo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - S, 23, 59, 59, 999)
+      const sendsFrom = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (screeningDays + windowDays))
+      const sendsTo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - screeningDays, 23, 59, 59, 999)
 
       // Count sends in window from pre-fetched data
       const refDates = referralsByRefCode.get(rec.ref_code) || []
@@ -1085,8 +1092,8 @@ export class SparkLoopService {
       const sends = sendsInWindow.length
 
       // Attribution approach: assume confirms/rejects happen at end of screening period.
-      // A confirm on day X was from a send on day (X - S). So confirms appearing in
-      // the last W days correspond to sends from (S+W) to S days ago — our sends window.
+      // A confirm on day X was from a send on day (X - screeningDays). So confirms
+      // appearing in the last windowDays correspond to sends in our sends window.
       //
       // Compute daily snapshot deltas, attribute each back S days to its send date,
       // then sum only those that fall within the sends window.
@@ -1104,11 +1111,11 @@ export class SparkLoopService {
 
         if (dailyConfirms === 0 && dailyRejects === 0) continue
 
-        // Attribute this day's confirms/rejects back S days to the send date
+        // Attribute this day's confirms/rejects back screeningDays to the send date
         const [y, m, d] = curr.date.split('-').map(Number)
         const confirmDate = new Date(y, m - 1, d)
         const sendDate = new Date(confirmDate)
-        sendDate.setDate(sendDate.getDate() - S)
+        sendDate.setDate(sendDate.getDate() - screeningDays)
 
         // Only count if the attributed send date falls within our sends window.
         // sendDate is at midnight (constructed from date parts), sendsFrom is at
@@ -1119,8 +1126,18 @@ export class SparkLoopService {
         }
       }
 
+      // Clamp confirms + rejects to sends. SparkLoop doesn't confirm exactly on
+      // day S — timing jitter means a few confirms from adjacent send dates leak
+      // into the window. This is a logical constraint, not a mask: you can't have
+      // more confirms than sends.
+      if (sends > 0 && (confirmsGained + rejectionsGained) > sends) {
+        const scale = sends / (confirmsGained + rejectionsGained)
+        confirmsGained = Math.floor(confirmsGained * scale)
+        rejectionsGained = Math.floor(rejectionsGained * scale)
+      }
+
       // RCR = confirms / sends (null if sends < 5)
-      const rcr = sends >= 5 ? Math.min(100, (confirmsGained / sends) * 100) : null
+      const rcr = sends >= 5 ? (confirmsGained / sends) * 100 : null
 
       // Slippage = sends - (confirms + rejections), rate = slippage / sends
       let slippageRate: number | null = null

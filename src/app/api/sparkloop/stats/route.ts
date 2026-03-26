@@ -3,7 +3,7 @@ import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
 import { PUBLICATION_ID } from '@/lib/config'
-import { toLocalDateStr as toDateStr } from '@/lib/date-utils'
+import { toLocalDateStr as toDateStr, buildDateRangeBoundaries, getTodayStr, getDaysAgoStr, type SupportedTz } from '@/lib/date-utils'
 const FALLBACK_DEFAULT_RCR = 25
 
 interface DailyStats {
@@ -28,24 +28,31 @@ interface DailyStats {
  * daily deltas and assign confirmed earnings using a CPA-weighted average across
  * recommendations that had confirms that day.
  */
+export const maxDuration = 60
+
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/stats' },
   async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get('days') || '30')
+    const days = Math.max(1, Math.min(365, parseInt(searchParams.get('days') || '30') || 30))
     const startDate = searchParams.get('start')
     const endDate = searchParams.get('end')
+    const tz = (searchParams.get('tz') || 'CST') as SupportedTz
 
-    // Calculate date range
+    // Calculate date range (DST-aware via buildDateRangeBoundaries)
     let fromDate: Date
-    let toDate: Date = new Date()
+    let toDate: Date
 
     if (startDate && endDate) {
-      fromDate = new Date(startDate)
-      toDate = new Date(endDate)
+      const bounds = buildDateRangeBoundaries(startDate, endDate, tz)
+      fromDate = bounds.startDate
+      toDate = bounds.endDate
     } else {
-      fromDate = new Date()
-      fromDate.setDate(fromDate.getDate() - days)
+      const todayStr = getTodayStr(tz)
+      const fromStr = getDaysAgoStr(days, tz)
+      const bounds = buildDateRangeBoundaries(fromStr, todayStr, tz)
+      fromDate = bounds.startDate
+      toDate = bounds.endDate
     }
 
     // Load default RCR from publication_settings
@@ -86,13 +93,16 @@ export const GET = withApiHandler(
         let offset = 0
         const counts = new Map<string, number>()
         while (true) {
-          const { data: page } = await supabaseAdmin
+          const { data: page, error: pageErr } = await supabaseAdmin
             .from('sparkloop_referrals')
             .select('ref_code, subscribed_at')
             .eq('publication_id', PUBLICATION_ID)
             .in('ref_code', refCodes)
             .lte('subscribed_at', cutoffStr)
+            .order('subscribed_at', { ascending: true })
+            .order('ref_code', { ascending: true })
             .range(offset, offset + slipPageSize - 1)
+          if (pageErr) { logger.error({ error: pageErr }, 'Matured sends query failed'); break }
           if (!page || page.length === 0) break
           for (const row of page) {
             counts.set(row.ref_code, (counts.get(row.ref_code) || 0) + 1)
@@ -110,17 +120,27 @@ export const GET = withApiHandler(
       })
     )
 
-    // Fetch all daily snapshots for delta-based confirms/rejects
+    // Fetch daily snapshots for delta-based confirms/rejects — bounded by earliest first send
     type SnapRow = { ref_code: string; snapshot_date: string; sparkloop_confirmed: number; sparkloop_rejected: number }
     const allSnapshots: SnapRow[] = []
+    // Compute lower bound: earliest firstSend date (or 180 days fallback)
+    const earliestFirstSend = firstSendByRefCode.size > 0
+      ? Array.from(firstSendByRefCode.values()).reduce((min, d) => (d < min ? d : min))
+      : null
+    const snapLowerBound = earliestFirstSend
+      ? earliestFirstSend.split('T')[0]
+      : toDateStr(new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000))
+
     let snapOffset = 0
     while (true) {
-      const { data: page } = await supabaseAdmin
+      const { data: page, error: snapErr } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
         .eq('publication_id', PUBLICATION_ID)
+        .gte('snapshot_date', snapLowerBound)
         .order('snapshot_date', { ascending: true })
         .range(snapOffset, snapOffset + slipPageSize - 1)
+      if (snapErr) { logger.error({ error: snapErr }, 'AT slip snapshot query failed'); break }
       if (!page || page.length === 0) break
       allSnapshots.push(...(page as SnapRow[]))
       if (page.length < slipPageSize) break
@@ -200,7 +220,7 @@ export const GET = withApiHandler(
     let referrals: { ref_code: string; subscribed_at: string }[] = []
     let pageFrom = 0
     while (true) {
-      const { data: page } = await supabaseAdmin
+      const { data: page, error: refErr } = await supabaseAdmin
         .from('sparkloop_referrals')
         .select('ref_code, subscribed_at')
         .eq('publication_id', PUBLICATION_ID)
@@ -210,6 +230,7 @@ export const GET = withApiHandler(
         .order('subscribed_at', { ascending: true })
         .order('ref_code', { ascending: true })
         .range(pageFrom, pageFrom + pageSize - 1)
+      if (refErr) { logger.error({ error: refErr }, 'Referrals query failed'); break }
       if (!page || page.length === 0) break
       referrals = referrals.concat(page)
       if (page.length < pageSize) break
@@ -237,18 +258,19 @@ export const GET = withApiHandler(
     // Fetch daily snapshots — need day before fromDate to compute deltas for the first day
     const snapshotFromDate = new Date(fromDate)
     snapshotFromDate.setDate(snapshotFromDate.getDate() - 1)
-    let snapshots: { ref_code: string; snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number }[] = []
+    let snapshots: { ref_code: string; snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number; sparkloop_earnings: number }[] = []
     let snapPageFrom = 0
     while (true) {
-      const { data: snapPage } = await supabaseAdmin
+      const { data: snapPage, error: chartSnapErr } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
-        .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
+        .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected, sparkloop_earnings')
         .eq('publication_id', PUBLICATION_ID)
         .gte('snapshot_date', toDateStr(snapshotFromDate))
         .lte('snapshot_date', toDateStr(toDate))
         .order('snapshot_date', { ascending: true })
         .order('ref_code', { ascending: true })
         .range(snapPageFrom, snapPageFrom + pageSize - 1)
+      if (chartSnapErr) { logger.error({ error: chartSnapErr }, 'Chart snapshot query failed'); break }
       if (!snapPage || snapPage.length === 0) break
       snapshots = snapshots.concat(snapPage)
       if (snapPage.length < pageSize) break
@@ -256,7 +278,7 @@ export const GET = withApiHandler(
     }
 
     // Group snapshots by ref_code, then by date
-    const snapshotsByRefCode = new Map<string, Map<string, { pending: number; confirmed: number; rejected: number }>>()
+    const snapshotsByRefCode = new Map<string, Map<string, { pending: number; confirmed: number; rejected: number; earnings: number }>>()
     for (const snap of snapshots || []) {
       let refMap = snapshotsByRefCode.get(snap.ref_code)
       if (!refMap) {
@@ -267,6 +289,7 @@ export const GET = withApiHandler(
         pending: snap.sparkloop_pending || 0,
         confirmed: snap.sparkloop_confirmed || 0,
         rejected: snap.sparkloop_rejected || 0,
+        earnings: snap.sparkloop_earnings || 0,
       })
     }
 
@@ -311,11 +334,14 @@ export const GET = withApiHandler(
 
         if (confirmDelta > 0) {
           confirmedByDate.set(attributionDate, (confirmedByDate.get(attributionDate) || 0) + confirmDelta)
-          confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + (confirmDelta * info.cpaDollars))
+          // Use actual SparkLoop earnings delta when available, fall back to confirms × CPA
+          const earningsDelta = Math.max(0, (curr.earnings || 0) - (prev.earnings || 0))
+          const earningsForDay = earningsDelta > 0 ? earningsDelta / 100 : confirmDelta * info.cpaDollars
+          confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + earningsForDay)
           // Accumulate per-recommendation totals for top earners (only if attribution date is in range)
           if (dailyMap.has(attributionDate)) {
             confirmedByRef.set(refCode, (confirmedByRef.get(refCode) || 0) + confirmDelta)
-            earningsByRef.set(refCode, (earningsByRef.get(refCode) || 0) + (confirmDelta * info.cpaDollars))
+            earningsByRef.set(refCode, (earningsByRef.get(refCode) || 0) + earningsForDay)
           }
         }
         if (rejectDelta > 0) {
@@ -395,10 +421,10 @@ export const GET = withApiHandler(
     // Pending in range = subscribes - confirmed - rejected (within the date window)
     const totalPendingInRange = Math.max(0, totalSubscribesInRange - totalConfirmedInRange - totalRejectedInRange)
 
-    // Convert to array — "pending" bar shows subscribes (all start as pending)
+    // Convert to array — pending = subscribes that haven't been confirmed or rejected yet
     const dailyStats: DailyStats[] = Array.from(dailyMap.entries()).map(([date, stats]) => ({
       date,
-      pending: stats.subscribes,
+      pending: Math.max(0, stats.subscribes - stats.confirmed - stats.rejected),
       confirmed: stats.confirmed,
       rejected: stats.rejected,
       projectedEarnings: Math.round(stats.projectedEarnings * 100) / 100,
@@ -420,6 +446,13 @@ export const GET = withApiHandler(
           earnings: Math.round(earnings * 100) / 100,
         }
       })
+
+    logger.info({
+      recommendations: recommendations?.length ?? 0,
+      slipSnapshots: allSnapshots.length,
+      chartSnapshots: snapshots.length,
+      referrals: referrals.length,
+    }, 'Stats request complete')
 
     return NextResponse.json({
       success: true,

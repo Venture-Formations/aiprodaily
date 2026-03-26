@@ -17,66 +17,7 @@ import {
 import DetailedTab from './components/DetailedTab'
 import OffersTab from './components/OffersTab'
 import PublicationsTab from './components/PublicationsTab'
-
-interface Recommendation {
-  id: string
-  ref_code: string
-  publication_name: string
-  publication_logo: string | null
-  description: string | null
-  type: 'free' | 'paid'
-  status: 'active' | 'paused'
-  cpa: number | null
-  sparkloop_rcr: number | null
-  max_payout: number | null
-  screening_period: number | null
-  excluded: boolean
-  excluded_reason: string | null
-  paused_reason: string | null
-  impressions: number
-  submissions: number
-  confirms: number
-  rejections: number
-  our_cr: number | null
-  our_rcr: number | null
-  sparkloop_confirmed: number
-  sparkloop_pending: number
-  sparkloop_rejected: number
-  sparkloop_earnings: number
-  sparkloop_net_earnings: number
-  our_total_subscribes: number
-  our_confirms: number
-  our_rejections: number
-  our_pending: number
-  remaining_budget_dollars: number | null
-  last_synced_at: string | null
-  calculated_score: number
-  effective_cr: number
-  effective_rcr: number
-  cr_source: string
-  rcr_source: string
-  unique_ips: number
-  override_cr: number | null
-  override_rcr: number | null
-  override_slip: number | null
-  alltime_slip: number
-  effective_slip: number
-  slip_source: string
-  matured_sends: number
-  submission_capped?: boolean
-  page_impressions: number
-  page_submissions: number
-  page_cr: number | null
-  rcr_14d: number | null
-  rcr_30d: number | null
-  slippage_14d: number | null
-  slippage_30d: number | null
-  sends_14d: number
-  sends_30d: number
-  confirms_gained_14d: number
-  confirms_gained_30d: number
-  eligible_for_module: boolean
-}
+import type { Recommendation } from './types'
 
 interface Counts {
   total: number
@@ -144,6 +85,7 @@ export default function SparkLoopAdminPage() {
   const [chartStats, setChartStats] = useState<ChartStats | null>(null)
   const [chartLoading, setChartLoading] = useState(true)
   const [timeframe, setTimeframe] = useState<'7' | '30' | '90'>('30')
+  const [timezone, setTimezone] = useState<'CST' | 'UTC'>('CST')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -152,7 +94,7 @@ export default function SparkLoopAdminPage() {
 
   useEffect(() => {
     fetchChartStats()
-  }, [timeframe])
+  }, [timeframe, timezone])
 
   async function fetchRecommendations() {
     setLoading(true)
@@ -184,7 +126,7 @@ export default function SparkLoopAdminPage() {
   async function fetchChartStats() {
     setChartLoading(true)
     try {
-      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}`)
+      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}&tz=${timezone}`)
       const data = await res.json()
       if (data.success) {
         setChartStats(data)
@@ -264,6 +206,24 @@ export default function SparkLoopAdminPage() {
       .sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
       .slice(5, 8)
   }, [recommendations])
+
+  // Compute estimated value per subscriber from current offerings
+  const estimatedValue = useMemo(() => {
+    // Popup value: sum of calculated_score (CR × CPA × RCR × (1 - Slip))
+    const popupValue = popupPreview.reduce((sum, rec) => sum + (rec.calculated_score || 0), 0)
+
+    // Page value: same formula but using page_cr instead of popup CR
+    const pageValue = recsPagePreview.reduce((sum, rec) => {
+      const pageCr = rec.page_cr !== null ? Number(rec.page_cr) : 0
+      if (pageCr <= 0 || !rec.cpa) return sum
+      const cpaDollars = rec.cpa / 100
+      const rcr = rec.effective_rcr / 100
+      const slip = rec.effective_slip / 100
+      return sum + (pageCr / 100) * cpaDollars * rcr * (1 - slip)
+    }, 0)
+
+    return { popup: popupValue, page: pageValue, total: popupValue + pageValue }
+  }, [popupPreview, recsPagePreview])
 
   const getSourceColor = (source: string) => {
     if (source === 'override') return 'text-orange-600'
@@ -409,7 +369,7 @@ export default function SparkLoopAdminPage() {
         ) : activeTab === 'overview' ? (
           <>
             {/* Summary Stats */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className={`grid grid-cols-4 gap-4 mb-6 transition-opacity ${chartLoading ? 'opacity-40' : ''}`}>
               <div className="bg-white rounded-lg border p-4">
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
                   <Clock className="w-4 h-4" />
@@ -448,22 +408,72 @@ export default function SparkLoopAdminPage() {
               </div>
             </div>
 
+            {/* Estimated Value Per Subscriber */}
+            {loading ? (
+              <div className="bg-white rounded-lg border p-4 mb-6 h-16 animate-pulse bg-gray-50" />
+            ) : (
+              <div className="bg-white rounded-lg border p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5">Est. Value / Subscriber</div>
+                      <div className="text-xl font-bold text-green-600">{formatDollars(estimatedValue.total)}</div>
+                    </div>
+                    <div className="h-8 w-px bg-gray-200" />
+                    <div>
+                      <div className="text-xs text-gray-400">Popup ({popupPreview.length})</div>
+                      <div className="text-sm font-semibold text-gray-700">{formatDollars(estimatedValue.popup)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400">Page ({recsPagePreview.length})</div>
+                      <div className="text-sm font-semibold text-gray-700">{formatDollars(estimatedValue.page)}</div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-gray-500 max-w-[200px] text-right">
+                    Based on current offerings: CR × CPA × RCR × (1 - Slip)
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Chart Section */}
             <div className="bg-white rounded-lg border p-6 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Referral Activity</h2>
-                <div className="flex gap-2">
-                  {(['7', '30', '90'] as const).map(t => (
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-2">
+                    {(['7', '30', '90'] as const).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setTimeframe(t)}
+                        className={`px-3 py-1.5 text-sm rounded-lg ${
+                          timeframe === t ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                        }`}
+                      >
+                        {t} Days
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-gray-300">|</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-xs font-medium ${timezone === 'CST' ? 'text-gray-700' : 'text-gray-400'}`}>CST</span>
                     <button
-                      key={t}
-                      onClick={() => setTimeframe(t)}
-                      className={`px-3 py-1.5 text-sm rounded-lg ${
-                        timeframe === t ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                      role="switch"
+                      aria-checked={timezone === 'UTC'}
+                      aria-label="Timezone: toggle between CT and UTC"
+                      onClick={() => setTimezone(timezone === 'CST' ? 'UTC' : 'CST')}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        timezone === 'UTC' ? 'bg-purple-600' : 'bg-gray-300'
                       }`}
                     >
-                      {t} Days
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          timezone === 'UTC' ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                        }`}
+                      />
                     </button>
-                  ))}
+                    <span className={`text-xs font-medium ${timezone === 'UTC' ? 'text-gray-700' : 'text-gray-400'}`}>UTC</span>
+                  </div>
                 </div>
               </div>
 
