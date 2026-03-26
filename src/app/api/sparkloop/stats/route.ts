@@ -339,12 +339,13 @@ export const GET = withApiHandler(
           // the "delta" would be the entire all-time earnings, which is wrong.
           const prevHasEarnings = (prev.earnings || 0) > 0
           const earningsDelta = prevHasEarnings ? Math.max(0, (curr.earnings || 0) - prev.earnings) : 0
-          const earningsForDay = earningsDelta > 0 ? earningsDelta / 100 : confirmDelta * info.cpaDollars
-          confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + earningsForDay)
+          const grossEarningsForDay = earningsDelta > 0 ? earningsDelta / 100 : confirmDelta * info.cpaDollars
+          const netEarningsForDay = grossEarningsForDay * (1 - 0.233)  // SparkLoop takes 23.3%
+          confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + netEarningsForDay)
           // Accumulate per-recommendation totals for top earners (only if attribution date is in range)
           if (dailyMap.has(attributionDate)) {
             confirmedByRef.set(refCode, (confirmedByRef.get(refCode) || 0) + confirmDelta)
-            earningsByRef.set(refCode, (earningsByRef.get(refCode) || 0) + earningsForDay)
+            earningsByRef.set(refCode, (earningsByRef.get(refCode) || 0) + netEarningsForDay)
           }
         }
         if (rejectDelta > 0) {
@@ -392,7 +393,7 @@ export const GET = withApiHandler(
       const subscribedAt = new Date(ref.subscribed_at).getTime()
       const daysSinceSend = (todayTime - subscribedAt) / (1000 * 60 * 60 * 24)
       if (daysSinceSend <= info.screeningPeriod) {
-        day.projectedEarnings += info.cpaDollars * info.rcr * info.nonSlipRate
+        day.projectedEarnings += info.cpaDollars * info.rcr * info.nonSlipRate * (1 - 0.233)
       }
     }
 
