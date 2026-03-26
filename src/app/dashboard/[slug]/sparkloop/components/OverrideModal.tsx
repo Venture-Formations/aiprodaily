@@ -1,28 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-
-interface Recommendation {
-  id: string
-  publication_name: string
-  our_cr: number | null
-  sparkloop_rcr: number | null
-  impressions: number
-  effective_cr: number
-  effective_rcr: number
-  cr_source: string
-  rcr_source: string
-  override_cr: number | null
-  override_rcr: number | null
-  override_slip: number | null
-  alltime_slip: number
-  effective_slip: number
-  slip_source: string
-  our_total_subscribes: number
-  sparkloop_confirmed: number
-  sparkloop_rejected: number
-  sparkloop_pending: number
-}
+import type { Recommendation } from '../types'
 
 interface Defaults {
   cr: number

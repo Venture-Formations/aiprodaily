@@ -1077,15 +1077,14 @@ export class SparkLoopService {
 
     // Calculate metrics for each recommendation
     for (const rec of recs) {
-      const S = rec.screening_period || 14
-      const W = windowDays
+      const screeningDays = rec.screening_period || 14
 
-      // Sends window: subscribed_at between (S+W) and S days ago
-      // Using S (not S+1) so referrals sent exactly S days ago are included —
-      // SparkLoop can confirm them on day S, and excluding them causes RCR > 100%.
+      // Sends window: subscribed_at between (screeningDays+windowDays) and screeningDays days ago
+      // Using screeningDays (not screeningDays+1) so referrals sent exactly screeningDays days ago
+      // are included — SparkLoop can confirm them on that day.
       // Use midnight boundaries so sends and attributed confirms use the same date logic.
-      const sendsFrom = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (S + W))
-      const sendsTo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - S, 23, 59, 59, 999)
+      const sendsFrom = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (screeningDays + windowDays))
+      const sendsTo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - screeningDays, 23, 59, 59, 999)
 
       // Count sends in window from pre-fetched data
       const refDates = referralsByRefCode.get(rec.ref_code) || []
@@ -1093,8 +1092,8 @@ export class SparkLoopService {
       const sends = sendsInWindow.length
 
       // Attribution approach: assume confirms/rejects happen at end of screening period.
-      // A confirm on day X was from a send on day (X - S). So confirms appearing in
-      // the last W days correspond to sends from (S+W) to S days ago — our sends window.
+      // A confirm on day X was from a send on day (X - screeningDays). So confirms
+      // appearing in the last windowDays correspond to sends in our sends window.
       //
       // Compute daily snapshot deltas, attribute each back S days to its send date,
       // then sum only those that fall within the sends window.
@@ -1112,11 +1111,11 @@ export class SparkLoopService {
 
         if (dailyConfirms === 0 && dailyRejects === 0) continue
 
-        // Attribute this day's confirms/rejects back S days to the send date
+        // Attribute this day's confirms/rejects back screeningDays to the send date
         const [y, m, d] = curr.date.split('-').map(Number)
         const confirmDate = new Date(y, m - 1, d)
         const sendDate = new Date(confirmDate)
-        sendDate.setDate(sendDate.getDate() - S)
+        sendDate.setDate(sendDate.getDate() - screeningDays)
 
         // Only count if the attributed send date falls within our sends window.
         // sendDate is at midnight (constructed from date parts), sendsFrom is at

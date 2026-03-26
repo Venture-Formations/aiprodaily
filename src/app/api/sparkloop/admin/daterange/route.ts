@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
-import { buildDateRangeBoundaries, type SupportedTz } from '@/lib/date-utils'
+import { buildDateRangeBoundaries, toLocalDateStr, type SupportedTz } from '@/lib/date-utils'
 
 function hashEmail(email: string): string {
   return createHash('sha256').update(email.toLowerCase()).digest('hex').slice(0, 16)
@@ -166,17 +166,17 @@ export const GET = withApiHandler(
     // Determine the widest snapshot window we need (max screening period)
     const allScreeningPeriods = Object.values(screeningByRef)
     const maxScreening = allScreeningPeriods.length > 0 ? Math.max(...allScreeningPeriods) : 14
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = toLocalDateStr(new Date())
 
     // We need snapshots from (start - 1) to (end + maxScreening), capped at today
     const snapStartDate = new Date(start)
     snapStartDate.setDate(snapStartDate.getDate() - 1)
-    const snapStartStr = snapStartDate.toISOString().split('T')[0]
+    const snapStartStr = toLocalDateStr(snapStartDate)
 
     const snapEndDate = new Date(end)
     snapEndDate.setDate(snapEndDate.getDate() + maxScreening)
-    const snapEndStr = snapEndDate.toISOString().split('T')[0] < todayStr
-      ? snapEndDate.toISOString().split('T')[0]
+    const snapEndStr = toLocalDateStr(snapEndDate) < todayStr
+      ? toLocalDateStr(snapEndDate)
       : todayStr
 
     let snapshots: { ref_code: string; snapshot_date: string; sparkloop_confirmed: number; sparkloop_rejected: number }[] = []
@@ -250,13 +250,13 @@ export const GET = withApiHandler(
       // "Before" snapshot: day before (start + screening)
       const beforeDate = new Date(start)
       beforeDate.setDate(beforeDate.getDate() + screening - 1)
-      const beforeDateStr = beforeDate.toISOString().split('T')[0]
+      const beforeDateStr = toLocalDateStr(beforeDate)
 
       // "After" snapshot: (end + screening), capped at today
       const afterDate = new Date(end)
       afterDate.setDate(afterDate.getDate() + screening)
-      const afterDateStr = afterDate.toISOString().split('T')[0] < todayStr
-        ? afterDate.toISOString().split('T')[0]
+      const afterDateStr = toLocalDateStr(afterDate) < todayStr
+        ? toLocalDateStr(afterDate)
         : todayStr
 
       const beforeSnap = findSnapshot(refSnapshots, beforeDateStr)

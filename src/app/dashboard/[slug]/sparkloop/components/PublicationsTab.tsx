@@ -2,13 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Search, X, ChevronDown, Download } from 'lucide-react'
-
-interface Recommendation {
-  id: string
-  ref_code: string
-  publication_name: string
-  publication_logo: string | null
-}
+import type { Recommendation } from '../types'
 
 interface Referral {
   subscriber_email: string
