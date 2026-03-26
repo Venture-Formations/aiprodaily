@@ -9,25 +9,31 @@ CREATE OR REPLACE FUNCTION increment_sparkloop_confirmed_impressions(
   p_publication_id uuid,
   p_ref_codes text[]
 )
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
   UPDATE sparkloop_recommendations
   SET confirmed_impressions = confirmed_impressions + 1
   WHERE publication_id = p_publication_id
     AND ref_code = ANY(p_ref_codes);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- RPC to increment confirmed page impressions
 CREATE OR REPLACE FUNCTION increment_sparkloop_confirmed_page_impressions(
   p_publication_id uuid,
   p_ref_codes text[]
 )
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
   UPDATE sparkloop_recommendations
   SET confirmed_page_impressions = confirmed_page_impressions + 1
   WHERE publication_id = p_publication_id
     AND ref_code = ANY(p_ref_codes);
 END;
-$$ LANGUAGE plpgsql;
+$$;
