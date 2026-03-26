@@ -88,7 +88,7 @@ export const GET = withApiHandler(
       Array.from(screeningGroups.entries()).map(async ([s, refCodes]) => {
         const cutoff = new Date(today)
         cutoff.setDate(cutoff.getDate() - s)
-        const cutoffStr = cutoff.toISOString().split('T')[0]
+        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z'
 
         let offset = 0
         const counts = new Map<string, number>()

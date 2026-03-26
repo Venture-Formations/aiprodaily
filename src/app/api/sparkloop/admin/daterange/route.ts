@@ -91,18 +91,28 @@ export const GET = withApiHandler(
     const confirmedImpressionsByRef: Record<string, number> = {}
     const pageImpressionsByRef: Record<string, number> = {}
     const confirmedPageImpressionsByRef: Record<string, number> = {}
+    // Track unique emails per ref_code to deduplicate repeat opens
+    const seenPopupEmails: Record<string, Set<string>> = {}
+    const seenPageEmails: Record<string, Set<string>> = {}
     for (const evt of popupEvents) {
       const payload = evt.raw_payload
       const refCodes = payload?.ref_codes as string[] | null
       const source = payload?.source as string | null
-      const isConfirmed = evt.subscriber_email ? confirmedEmailHashes.has(hashEmail(evt.subscriber_email)) : false
-      if (refCodes) {
+      const emailHash = evt.subscriber_email ? hashEmail(evt.subscriber_email) : null
+      const isConfirmed = emailHash ? confirmedEmailHashes.has(emailHash) : false
+      if (refCodes && emailHash) {
         const isPage = source === 'recs_page'
         for (const rc of refCodes) {
           if (isPage) {
+            if (!seenPageEmails[rc]) seenPageEmails[rc] = new Set()
+            if (seenPageEmails[rc].has(emailHash)) continue  // dedupe
+            seenPageEmails[rc].add(emailHash)
             pageImpressionsByRef[rc] = (pageImpressionsByRef[rc] || 0) + 1
             if (isConfirmed) confirmedPageImpressionsByRef[rc] = (confirmedPageImpressionsByRef[rc] || 0) + 1
           } else {
+            if (!seenPopupEmails[rc]) seenPopupEmails[rc] = new Set()
+            if (seenPopupEmails[rc].has(emailHash)) continue  // dedupe
+            seenPopupEmails[rc].add(emailHash)
             impressionsByRef[rc] = (impressionsByRef[rc] || 0) + 1
             if (isConfirmed) confirmedImpressionsByRef[rc] = (confirmedImpressionsByRef[rc] || 0) + 1
           }
@@ -184,7 +194,7 @@ export const GET = withApiHandler(
     while (true) {
       const { data: snapPage } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
-        .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
+        .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected, sparkloop_earnings')
         .eq('publication_id', PUBLICATION_ID)
         .gte('snapshot_date', snapStartStr)
         .lte('snapshot_date', snapEndStr)
@@ -196,8 +206,8 @@ export const GET = withApiHandler(
       snapPageFrom += PAGE_SIZE
     }
 
-    // Group snapshots by ref_code -> date -> { confirmed, rejected }
-    const snapshotsByRefCode: Record<string, Record<string, { confirmed: number; rejected: number }>> = {}
+    // Group snapshots by ref_code -> date -> { confirmed, rejected, earnings }
+    const snapshotsByRefCode: Record<string, Record<string, { confirmed: number; rejected: number; earnings: number }>> = {}
     for (const snap of snapshots) {
       if (!snapshotsByRefCode[snap.ref_code]) {
         snapshotsByRefCode[snap.ref_code] = {}
@@ -205,11 +215,12 @@ export const GET = withApiHandler(
       snapshotsByRefCode[snap.ref_code][snap.snapshot_date] = {
         confirmed: snap.sparkloop_confirmed || 0,
         rejected: snap.sparkloop_rejected || 0,
+        earnings: (snap as Record<string, unknown>).sparkloop_earnings as number || 0,
       }
     }
 
     // Helper to find nearest snapshot on or before a date
-    const findSnapshot = (refSnapshots: Record<string, { confirmed: number; rejected: number }>, targetDate: string): { confirmed: number; rejected: number } | null => {
+    const findSnapshot = (refSnapshots: Record<string, { confirmed: number; rejected: number; earnings: number }>, targetDate: string): { confirmed: number; rejected: number; earnings: number } | null => {
       const dates = Object.keys(refSnapshots).sort()
       // Find the last date <= targetDate
       let best: string | null = null
@@ -227,6 +238,7 @@ export const GET = withApiHandler(
       confirms: number
       rejections: number
       pending: number
+      earningsCents: number
     }> = {}
 
     const pageRefMetrics: Record<string, {
@@ -270,12 +282,18 @@ export const GET = withApiHandler(
       const confirms = Math.max(0, afterConfirmed - beforeConfirmed)
       const rejections = Math.max(0, afterRejected - beforeRejected)
 
+      // Actual SparkLoop earnings delta for this ref_code in the period
+      const beforeEarnings = beforeSnap?.earnings ?? 0
+      const afterEarnings = afterSnap?.earnings ?? beforeEarnings
+      const earningsDelta = Math.max(0, afterEarnings - beforeEarnings)
+
       const subs = refSubmissions[refCode] || 0
       refMetrics[refCode] = {
         submissions: subs,
         confirms,
         rejections,
         pending: Math.max(0, subs - confirms - rejections),
+        earningsCents: earningsDelta,
       }
 
       const pageSubs = pageRefSubmissions[refCode] || 0
@@ -370,19 +388,68 @@ export const GET = withApiHandler(
       }
     }
 
-    // Compute avg value per subscriber: (confirmed earnings + discounted pending) / unique subscribers
-    // Confirmed: full CPA (already earned). Pending: CPA × RCR (must still be confirmed to earn).
-    const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
+    // Compute avg value per subscriber.
+    // Earnings in date range come from sends that matured (subscribed S days before).
+    // So the matching subscribers are those who subscribed between (start - S) and (end - S).
+    // Since S varies per recommendation, we query per screening group.
+
+    // Total earnings from the date range (snapshot deltas already shifted by S)
     let totalEarningsInRange = 0
     for (const rc of Object.keys(refMetrics)) {
-      const confirms = refMetrics[rc]?.confirms || 0
-      const pending = refMetrics[rc]?.pending || 0
-      const cpaDollars = (recCpaMap[rc] || 0) / 100
-      const rcr = recRcrMap[rc] || DEFAULT_RCR
-      totalEarningsInRange += confirms * cpaDollars + pending * cpaDollars * rcr
+      const earningsCents = refMetrics[rc]?.earningsCents || 0
+      if (earningsCents > 0) {
+        totalEarningsInRange += earningsCents / 100
+      } else {
+        // Fallback for historical data without earnings in snapshots
+        const confirms = refMetrics[rc]?.confirms || 0
+        const cpaDollars = (recCpaMap[rc] || 0) / 100
+        totalEarningsInRange += confirms * cpaDollars
+      }
     }
-    const avgValuePerSubscriber = uniqueSubscribers > 0
-      ? Math.round((totalEarningsInRange / uniqueSubscribers) * 100) / 100
+
+    // Count unique subscribers whose sends matured in this period.
+    // For each screening group, the send window is (start - S) to (end - S).
+    const maturedSubEmails = new Set<string>()
+    const screeningGroupsForAvg = new Map<number, string[]>()
+    for (const rec of recScreening || []) {
+      const s = rec.screening_period || 14
+      if (!screeningGroupsForAvg.has(s)) screeningGroupsForAvg.set(s, [])
+      screeningGroupsForAvg.get(s)!.push(rec.ref_code)
+    }
+
+    await Promise.all(
+      Array.from(screeningGroupsForAvg.entries()).map(async ([s, refCodes]) => {
+        const sendStart = new Date(start)
+        sendStart.setDate(sendStart.getDate() - s)
+        const sendEnd = new Date(end)
+        sendEnd.setDate(sendEnd.getDate() - s)
+        const sendStartStr = sendStart.toISOString().split('T')[0] + 'T00:00:00.000Z'
+        const sendEndStr = sendEnd.toISOString().split('T')[0] + 'T23:59:59.999Z'
+
+        let offset = 0
+        while (true) {
+          const { data: page } = await supabaseAdmin
+            .from('sparkloop_referrals')
+            .select('subscriber_email')
+            .eq('publication_id', PUBLICATION_ID)
+            .in('ref_code', refCodes)
+            .gte('subscribed_at', sendStartStr)
+            .lte('subscribed_at', sendEndStr)
+            .range(offset, offset + PAGE_SIZE - 1)
+          if (!page || page.length === 0) break
+          for (const row of page) {
+            if (row.subscriber_email) maturedSubEmails.add(row.subscriber_email)
+          }
+          if (page.length < PAGE_SIZE) break
+          offset += PAGE_SIZE
+        }
+      })
+    )
+
+    const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
+    const maturedSubscribers = maturedSubEmails.size
+    const avgValuePerSubscriber = maturedSubscribers > 0
+      ? Math.round((totalEarningsInRange / maturedSubscribers) * 100) / 100
       : 0
 
     logger.info({ start, end, popupEvents: popupEvents.length, referrals: referrals.length, uniqueIps }, 'Date range query completed')

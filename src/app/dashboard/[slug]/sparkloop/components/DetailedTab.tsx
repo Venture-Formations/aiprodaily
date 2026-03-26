@@ -217,12 +217,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     if (!dateRangeMetrics) return recommendations
     return recommendations.map(rec => {
       const drm = dateRangeMetrics[rec.ref_code]
-      // Use confirmed impressions (only from subscribers who completed signup)
-      const impr = drm?.confirmed_impressions ?? 0
+      // Use raw impressions (all popup opens, not just confirmed subscribers)
+      const impr = drm?.impressions ?? 0
       const subs = drm?.submissions ?? 0
-      const pageImpr = drm?.confirmed_page_impressions ?? 0
+      const pageImpr = drm?.page_impressions ?? 0
       const pageSubs = drm?.page_submissions ?? 0
-      // Calculate CRs from confirmed impressions
+      // Calculate CRs from raw impressions
       const crForRange = impr > 0 ? Math.round((subs / impr) * 10000) / 100 : null
       const pageCrForRange = pageImpr > 0 ? Math.round((pageSubs / pageImpr) * 10000) / 100 : null
       return {

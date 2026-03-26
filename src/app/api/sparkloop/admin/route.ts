@@ -92,7 +92,10 @@ export const GET = withApiHandler(
       Array.from(screeningGroups.entries()).map(async ([s, refCodes]) => {
         const cutoff = new Date(today)
         cutoff.setDate(cutoff.getDate() - s)
-        const cutoffStr = cutoff.toISOString().split('T')[0]
+        // Use end-of-day so all sends on the cutoff date are included.
+        // Without this, Supabase treats a bare date string as midnight,
+        // excluding sends after 00:00 UTC on that day.
+        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z'
 
         // Paginate to avoid Supabase's 1000-row limit
         let offset = 0

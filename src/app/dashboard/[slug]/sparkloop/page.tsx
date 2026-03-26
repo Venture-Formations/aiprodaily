@@ -85,7 +85,6 @@ export default function SparkLoopAdminPage() {
   const [chartStats, setChartStats] = useState<ChartStats | null>(null)
   const [chartLoading, setChartLoading] = useState(true)
   const [timeframe, setTimeframe] = useState<'7' | '30' | '90'>('30')
-  const [timezone, setTimezone] = useState<'CST' | 'UTC'>('CST')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -94,7 +93,7 @@ export default function SparkLoopAdminPage() {
 
   useEffect(() => {
     fetchChartStats()
-  }, [timeframe, timezone])
+  }, [timeframe])
 
   async function fetchRecommendations() {
     setLoading(true)
@@ -126,7 +125,7 @@ export default function SparkLoopAdminPage() {
   async function fetchChartStats() {
     setChartLoading(true)
     try {
-      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}&tz=${timezone}`)
+      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}`)
       const data = await res.json()
       if (data.success) {
         setChartStats(data)
@@ -453,26 +452,6 @@ export default function SparkLoopAdminPage() {
                         {t} Days
                       </button>
                     ))}
-                  </div>
-                  <span className="text-gray-300">|</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-xs font-medium ${timezone === 'CST' ? 'text-gray-700' : 'text-gray-400'}`}>CST</span>
-                    <button
-                      role="switch"
-                      aria-checked={timezone === 'UTC'}
-                      aria-label="Timezone: toggle between CT and UTC"
-                      onClick={() => setTimezone(timezone === 'CST' ? 'UTC' : 'CST')}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                        timezone === 'UTC' ? 'bg-purple-600' : 'bg-gray-300'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                          timezone === 'UTC' ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                        }`}
-                      />
-                    </button>
-                    <span className={`text-xs font-medium ${timezone === 'UTC' ? 'text-gray-700' : 'text-gray-400'}`}>UTC</span>
                   </div>
                 </div>
               </div>
