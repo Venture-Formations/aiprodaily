@@ -396,17 +396,6 @@ export const GET = withApiHandler(
       }
     }
 
-    // Compute summary totals
-    // Use aggregate sparkloop_confirmed/rejected/pending from recommendations (source of truth)
-    let aggConfirmed = 0
-    let aggRejected = 0
-    let aggPending = 0
-    for (const rec of recommendations || []) {
-      aggConfirmed += rec.sparkloop_confirmed || 0
-      aggRejected += rec.sparkloop_rejected || 0
-      aggPending += rec.sparkloop_pending || 0
-    }
-
     // Sum daily chart totals within the selected date range
     let totalConfirmedInRange = 0
     let totalRejectedInRange = 0
@@ -460,10 +449,10 @@ export const GET = withApiHandler(
     return NextResponse.json({
       success: true,
       summary: {
-        totalPending: aggPending,
-        totalConfirmed: aggConfirmed,
-        totalRejected: aggRejected,
-        totalSubscribes: aggPending + aggConfirmed + aggRejected,
+        totalPending: totalPendingInRange,
+        totalConfirmed: totalConfirmedInRange,
+        totalRejected: totalRejectedInRange,
+        totalSubscribes: totalSubscribesInRange,
         totalEarnings: Math.round(totalConfirmedEarnings * 100) / 100,
         projectedFromPending: Math.round(totalProjectedEarnings * 100) / 100,
       },
