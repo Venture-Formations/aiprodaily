@@ -144,6 +144,7 @@ export default function SparkLoopAdminPage() {
   const [chartStats, setChartStats] = useState<ChartStats | null>(null)
   const [chartLoading, setChartLoading] = useState(true)
   const [timeframe, setTimeframe] = useState<'7' | '30' | '90'>('30')
+  const [timezone, setTimezone] = useState<'CST' | 'UTC'>('CST')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -152,7 +153,7 @@ export default function SparkLoopAdminPage() {
 
   useEffect(() => {
     fetchChartStats()
-  }, [timeframe])
+  }, [timeframe, timezone])
 
   async function fetchRecommendations() {
     setLoading(true)
@@ -184,7 +185,7 @@ export default function SparkLoopAdminPage() {
   async function fetchChartStats() {
     setChartLoading(true)
     try {
-      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}`)
+      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}&tz=${timezone}`)
       const data = await res.json()
       if (data.success) {
         setChartStats(data)
@@ -452,18 +453,37 @@ export default function SparkLoopAdminPage() {
             <div className="bg-white rounded-lg border p-6 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Referral Activity</h2>
-                <div className="flex gap-2">
-                  {(['7', '30', '90'] as const).map(t => (
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-2">
+                    {(['7', '30', '90'] as const).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setTimeframe(t)}
+                        className={`px-3 py-1.5 text-sm rounded-lg ${
+                          timeframe === t ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                        }`}
+                      >
+                        {t} Days
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-gray-300">|</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-xs font-medium ${timezone === 'CST' ? 'text-gray-700' : 'text-gray-400'}`}>CST</span>
                     <button
-                      key={t}
-                      onClick={() => setTimeframe(t)}
-                      className={`px-3 py-1.5 text-sm rounded-lg ${
-                        timeframe === t ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                      onClick={() => setTimezone(timezone === 'CST' ? 'UTC' : 'CST')}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        timezone === 'UTC' ? 'bg-purple-600' : 'bg-gray-300'
                       }`}
                     >
-                      {t} Days
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          timezone === 'UTC' ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                        }`}
+                      />
                     </button>
-                  ))}
+                    <span className={`text-xs font-medium ${timezone === 'UTC' ? 'text-gray-700' : 'text-gray-400'}`}>UTC</span>
+                  </div>
                 </div>
               </div>
 

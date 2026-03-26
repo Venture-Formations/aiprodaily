@@ -35,17 +35,33 @@ export const GET = withApiHandler(
     const days = parseInt(searchParams.get('days') || '30')
     const startDate = searchParams.get('start')
     const endDate = searchParams.get('end')
+    const tz = searchParams.get('tz') || 'CST'
+
+    // CST = UTC-6: midnight CST = 06:00 UTC
+    const offset = tz === 'UTC' ? 'T00:00:00.000Z' : 'T06:00:00.000Z'
 
     // Calculate date range
     let fromDate: Date
-    let toDate: Date = new Date()
+    let toDate: Date
 
     if (startDate && endDate) {
-      fromDate = new Date(startDate)
-      toDate = new Date(endDate)
+      fromDate = new Date(`${startDate}${offset}`)
+      const endObj = new Date(`${endDate}${offset}`)
+      endObj.setUTCDate(endObj.getUTCDate() + 1)
+      endObj.setUTCMilliseconds(-1)
+      toDate = endObj
     } else {
-      fromDate = new Date()
-      fromDate.setDate(fromDate.getDate() - days)
+      // "today" in the selected timezone: get current date string in tz
+      const now = new Date()
+      // For CST, shift by +6h to get the CST date, then use that as the end date
+      const shifted = tz === 'CST' ? new Date(now.getTime() - 6 * 60 * 60 * 1000) : now
+      const todayStr = toDateStr(shifted)
+      const fromStr = toDateStr(new Date(shifted.getTime() - days * 24 * 60 * 60 * 1000))
+      fromDate = new Date(`${fromStr}${offset}`)
+      const endObj = new Date(`${todayStr}${offset}`)
+      endObj.setUTCDate(endObj.getUTCDate() + 1)
+      endObj.setUTCMilliseconds(-1)
+      toDate = endObj
     }
 
     // Load default RCR from publication_settings
