@@ -184,7 +184,7 @@ export const GET = withApiHandler(
     while (true) {
       const { data: snapPage } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
-        .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
+        .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected, sparkloop_earnings')
         .eq('publication_id', PUBLICATION_ID)
         .gte('snapshot_date', snapStartStr)
         .lte('snapshot_date', snapEndStr)
@@ -196,8 +196,8 @@ export const GET = withApiHandler(
       snapPageFrom += PAGE_SIZE
     }
 
-    // Group snapshots by ref_code -> date -> { confirmed, rejected }
-    const snapshotsByRefCode: Record<string, Record<string, { confirmed: number; rejected: number }>> = {}
+    // Group snapshots by ref_code -> date -> { confirmed, rejected, earnings }
+    const snapshotsByRefCode: Record<string, Record<string, { confirmed: number; rejected: number; earnings: number }>> = {}
     for (const snap of snapshots) {
       if (!snapshotsByRefCode[snap.ref_code]) {
         snapshotsByRefCode[snap.ref_code] = {}
@@ -205,11 +205,12 @@ export const GET = withApiHandler(
       snapshotsByRefCode[snap.ref_code][snap.snapshot_date] = {
         confirmed: snap.sparkloop_confirmed || 0,
         rejected: snap.sparkloop_rejected || 0,
+        earnings: (snap as Record<string, unknown>).sparkloop_earnings as number || 0,
       }
     }
 
     // Helper to find nearest snapshot on or before a date
-    const findSnapshot = (refSnapshots: Record<string, { confirmed: number; rejected: number }>, targetDate: string): { confirmed: number; rejected: number } | null => {
+    const findSnapshot = (refSnapshots: Record<string, { confirmed: number; rejected: number; earnings: number }>, targetDate: string): { confirmed: number; rejected: number; earnings: number } | null => {
       const dates = Object.keys(refSnapshots).sort()
       // Find the last date <= targetDate
       let best: string | null = null
@@ -227,6 +228,7 @@ export const GET = withApiHandler(
       confirms: number
       rejections: number
       pending: number
+      earningsCents: number
     }> = {}
 
     const pageRefMetrics: Record<string, {
@@ -270,12 +272,18 @@ export const GET = withApiHandler(
       const confirms = Math.max(0, afterConfirmed - beforeConfirmed)
       const rejections = Math.max(0, afterRejected - beforeRejected)
 
+      // Actual SparkLoop earnings delta for this ref_code in the period
+      const beforeEarnings = beforeSnap?.earnings ?? 0
+      const afterEarnings = afterSnap?.earnings ?? beforeEarnings
+      const earningsDelta = Math.max(0, afterEarnings - beforeEarnings)
+
       const subs = refSubmissions[refCode] || 0
       refMetrics[refCode] = {
         submissions: subs,
         confirms,
         rejections,
         pending: Math.max(0, subs - confirms - rejections),
+        earningsCents: earningsDelta,
       }
 
       const pageSubs = pageRefSubmissions[refCode] || 0
@@ -370,16 +378,21 @@ export const GET = withApiHandler(
       }
     }
 
-    // Compute avg value per subscriber: (confirmed earnings + discounted pending) / unique subscribers
-    // Confirmed: full CPA (already earned). Pending: CPA × RCR (must still be confirmed to earn).
+    // Compute avg value per subscriber using actual SparkLoop earnings
+    // attributed to sends that matured in this time period.
     const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
     let totalEarningsInRange = 0
     for (const rc of Object.keys(refMetrics)) {
-      const confirms = refMetrics[rc]?.confirms || 0
-      const pending = refMetrics[rc]?.pending || 0
-      const cpaDollars = (recCpaMap[rc] || 0) / 100
-      const rcr = recRcrMap[rc] || DEFAULT_RCR
-      totalEarningsInRange += confirms * cpaDollars + pending * cpaDollars * rcr
+      // Use actual SparkLoop earnings delta when available, fall back to confirms × CPA
+      const earningsCents = refMetrics[rc]?.earningsCents || 0
+      if (earningsCents > 0) {
+        totalEarningsInRange += earningsCents / 100
+      } else {
+        // Fallback for historical data without earnings in snapshots
+        const confirms = refMetrics[rc]?.confirms || 0
+        const cpaDollars = (recCpaMap[rc] || 0) / 100
+        totalEarningsInRange += confirms * cpaDollars
+      }
     }
     const avgValuePerSubscriber = uniqueSubscribers > 0
       ? Math.round((totalEarningsInRange / uniqueSubscribers) * 100) / 100
