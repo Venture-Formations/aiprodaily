@@ -477,6 +477,9 @@ export function generateCombinedFeedXml(
 
     if (item.sourceLabel) categories.push({ name: item.sourceLabel })
     if (item.sourceName) categories.push({ name: `source:${item.sourceName}` })
+    if (item.tradeMeta?.ticker) categories.push({ name: `ticker:${item.tradeMeta.ticker}` })
+    if (item.tradeMeta?.name) categories.push({ name: `member:${item.tradeMeta.name}` })
+    if (item.tradeMeta?.transaction) categories.push({ name: `transaction:${item.tradeMeta.transaction}` })
 
     // Build custom XML extensions for trade metadata
     const extensions: { name: string; objects: Record<string, unknown> }[] = []

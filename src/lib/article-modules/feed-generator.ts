@@ -90,7 +90,7 @@ export class ModuleFeedGenerator {
     const { data: articles, error: articlesError } = await supabaseAdmin
       .from('module_articles')
       .select(`
-        id, headline, content, rank, trade_image_url, trade_image_alt, ticker,
+        id, headline, content, rank, trade_image_url, trade_image_alt, ticker, member_name, transaction_type,
         rss_post:rss_posts(
           source_url, title
         )
@@ -149,10 +149,16 @@ export class ModuleFeedGenerator {
           : plain
       }
 
-      // Category: ticker
+      // Categories: ticker, member, transaction type
       const categories: { name: string }[] = []
       if (article.ticker) {
         categories.push({ name: article.ticker })
+      }
+      if (article.member_name) {
+        categories.push({ name: `member:${article.member_name}` })
+      }
+      if (article.transaction_type) {
+        categories.push({ name: `transaction:${article.transaction_type}` })
       }
       if (categories.length > 0) {
         itemData.category = categories
