@@ -81,6 +81,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const businessName = settings.business_name || 'Newsletter'
   const currentYear = new Date().getFullYear()
   const siteUrl = `https://${host}`
+  const showToolsLink = settings.tools_directory_enabled !== 'false'
 
   // Parse date as local date to avoid timezone offset issues
   const [year, month, day] = newsletter.issue_date.split('-').map(Number)
@@ -229,7 +230,7 @@ export default async function NewsletterPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleSchema) }}
       />
-      <Header logoUrl={headerImageUrl} />
+      <Header logoUrl={headerImageUrl} showToolsLink={showToolsLink} />
 
       {/* Page Header - Full width blue section with cloud effect */}
       <section className="relative overflow-hidden bg-blue-600 py-8">
@@ -921,7 +922,7 @@ export default async function NewsletterPage({ params }: PageProps) {
         </Container>
       </section>
 
-      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} showToolsLink={showToolsLink} />
     </main>
   )
 }

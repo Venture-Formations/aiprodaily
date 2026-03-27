@@ -3,7 +3,7 @@ import { Hero } from "@/components/salient/Hero"
 import { Footer } from "@/components/salient/Footer"
 import { LatestNewsList } from "@/components/website/latest-news-list"
 import { supabaseAdmin } from "@/lib/supabase"
-import { resolvePublicationFromRequest } from '@/lib/publication-settings'
+import { resolvePublicationFromRequest, getPublicationSettings } from '@/lib/publication-settings'
 import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 // Force dynamic rendering to fetch fresh data
@@ -34,6 +34,14 @@ export default async function WebsiteHome() {
   const businessName = settings.business_name || 'Newsletter'
   const currentYear = new Date().getFullYear()
   const siteUrl = `https://${host}`
+  const showToolsLink = settings.tools_directory_enabled !== 'false'
+
+  // Fetch website-specific settings for the hero
+  const websiteSettings = await getPublicationSettings(publicationId, [
+    'website_callout_text',
+    'website_heading',
+    'website_subheading',
+  ])
 
   // Newsletter cover image
   const newsletterCoverImage = `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
@@ -119,14 +127,18 @@ export default async function WebsiteHome() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
       />
-      <Header logoUrl={headerImageUrl} />
-      <Hero />
+      <Header logoUrl={headerImageUrl} showToolsLink={showToolsLink} />
+      <Hero
+        calloutText={websiteSettings.website_callout_text || undefined}
+        heading={websiteSettings.website_heading || undefined}
+        subheading={websiteSettings.website_subheading || undefined}
+      />
       {/* Latest News Content */}
       <LatestNewsList
         newsItems={latestNews}
         newsletterName={newsletterName}
       />
-      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} showToolsLink={showToolsLink} />
     </main>
   )
 }

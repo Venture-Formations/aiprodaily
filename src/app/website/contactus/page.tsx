@@ -21,7 +21,8 @@ export default async function ContactUsPage() {
     'website_header_url',
     'logo_url',
     'newsletter_name',
-    'business_name'
+    'business_name',
+    'tools_directory_enabled',
   ])
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
@@ -29,10 +30,11 @@ export default async function ContactUsPage() {
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
   const businessName = settings.business_name || 'AI Accounting Daily'
   const currentYear = new Date().getFullYear()
+  const showToolsLink = settings.tools_directory_enabled !== 'false'
 
   return (
     <main className="min-h-screen">
-      <Header logoUrl={headerImageUrl} />
+      <Header logoUrl={headerImageUrl} showToolsLink={showToolsLink} />
 
       {/* Contact Form Section - Blue background with cloud effect */}
       <section className="relative overflow-hidden bg-blue-600 pt-24 pb-16">
@@ -78,7 +80,7 @@ export default async function ContactUsPage() {
         </Container>
       </section>
 
-      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} showToolsLink={showToolsLink} />
     </main>
   )
 }
