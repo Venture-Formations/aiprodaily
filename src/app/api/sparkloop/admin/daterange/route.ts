@@ -384,9 +384,13 @@ export const GET = withApiHandler(
       const beforeSnap = findSnapshot(refSnapshots, toLocalDateStr(snapStartDate))
       const afterSnap = findSnapshot(refSnapshots, end)
 
+      // Use actual SparkLoop earnings delta when both snapshots have earnings data.
+      // If beforeSnap has 0 earnings, it predates the column addition — the "delta"
+      // would be the entire all-time earnings, which is wrong. Fall back to confirms × CPA.
       const beforeEarnings = beforeSnap?.earnings ?? 0
-      const afterEarnings = afterSnap?.earnings ?? beforeEarnings
-      const earningsDelta = Math.max(0, afterEarnings - beforeEarnings)
+      const afterEarnings = afterSnap?.earnings ?? 0
+      const prevHasEarnings = beforeEarnings > 0
+      const earningsDelta = prevHasEarnings ? Math.max(0, afterEarnings - beforeEarnings) : 0
 
       if (earningsDelta > 0) {
         totalEarningsInRange += earningsDelta / 100
