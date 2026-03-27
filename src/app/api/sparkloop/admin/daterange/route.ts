@@ -446,7 +446,13 @@ export const GET = withApiHandler(
       })
     )
 
-    const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
+    // Unique subscribers = unique emails that saw the popup (newsletter subscribers in the range)
+    const uniqueSubscribers = new Set(
+      popupEvents
+        .filter(e => (e.raw_payload as Record<string, unknown>)?.source !== 'recs_page')
+        .map(e => e.subscriber_email)
+        .filter(Boolean)
+    ).size
     const maturedSubscribers = maturedSubEmails.size
     const avgValuePerSubscriber = maturedSubscribers > 0
       ? Math.round((totalEarningsInRange / maturedSubscribers) * 100) / 100
