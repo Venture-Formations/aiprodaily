@@ -370,58 +370,41 @@ export const GET = withApiHandler(
       }
     }
 
-    // Compute avg value per subscriber.
-    // Earnings that appear in the selected date range come from sends that matured
-    // (sent S days before). Use snapshot deltas from the ORIGINAL date range (not shifted)
-    // since confirms reported during [start, end] are the earnings for matured sends.
-    let totalEarningsInRange = 0
-    for (const refCode of snapshotRefCodes) {
-      const refSnapshots = snapshotsByRefCode[refCode] || {}
-
-      // Snapshot at start-1 (before range) vs snapshot at end (end of range)
-      const snapStartDate = new Date(start)
-      snapStartDate.setDate(snapStartDate.getDate() - 1)
-      const beforeSnap = findSnapshot(refSnapshots, toLocalDateStr(snapStartDate))
-      const afterSnap = findSnapshot(refSnapshots, end)
-
-      // Use actual SparkLoop earnings delta when both snapshots have earnings data.
-      // If beforeSnap has 0 earnings, it predates the column addition — the "delta"
-      // would be the entire all-time earnings, which is wrong. Fall back to confirms × CPA.
-      const beforeEarnings = beforeSnap?.earnings ?? 0
-      const afterEarnings = afterSnap?.earnings ?? 0
-      const prevHasEarnings = beforeEarnings > 0
-      const earningsDelta = prevHasEarnings ? Math.max(0, afterEarnings - beforeEarnings) : 0
-
-      if (earningsDelta > 0) {
-        totalEarningsInRange += earningsDelta / 100
-      } else {
-        // Fallback: use confirms in range × CPA
-        const beforeConfirmed = beforeSnap?.confirmed ?? 0
-        const afterConfirmed = afterSnap?.confirmed ?? beforeConfirmed
-        const confirmsDelta = Math.max(0, afterConfirmed - beforeConfirmed)
-        const cpaDollars = (recCpaMap[refCode] || 0) / 100
-        totalEarningsInRange += confirmsDelta * cpaDollars
-      }
-    }
-
-    // Count unique subscribers whose sends matured in this period, per rec.
-    // For each rec with confirms, query sparkloop_referrals shifted back by that rec's S.
-    // These are subscribers who were shown and subscribed to that specific rec.
-    const maturedPopupEmails = new Set<string>()
-
-    // Group recs with confirms by screening period
-    const screeningGroupsWithConfirms = new Map<number, string[]>()
-    for (const rec of recScreening || []) {
-      const s = rec.screening_period || 14
-      const rc = rec.ref_code
-      if ((refMetrics[rc]?.confirms || 0) > 0) {
-        if (!screeningGroupsWithConfirms.has(s)) screeningGroupsWithConfirms.set(s, [])
-        screeningGroupsWithConfirms.get(s)!.push(rc)
-      }
-    }
+    // Compute avg value per subscriber: per-rec (earnings / matured impressions), then sum.
+    // For each rec: get earnings in the range, get unique impressions that matured (shifted
+    // back by that rec's S), compute ratio, sum all ratios = avg value per subscriber.
+    let avgValuePerSubscriber = 0
 
     await Promise.all(
-      Array.from(screeningGroupsWithConfirms.entries()).map(async ([s, refCodes]) => {
+      (recScreening || []).map(async (rec) => {
+        const refCode = rec.ref_code
+        const s = rec.screening_period || 14
+        const refSnapshots = snapshotsByRefCode[refCode] || {}
+
+        // Get this rec's earnings in the range (unshifted snapshot delta)
+        const snapStartDate = new Date(start)
+        snapStartDate.setDate(snapStartDate.getDate() - 1)
+        const beforeSnap = findSnapshot(refSnapshots, toLocalDateStr(snapStartDate))
+        const afterSnap = findSnapshot(refSnapshots, end)
+
+        const beforeEarnings = beforeSnap?.earnings ?? 0
+        const afterEarnings = afterSnap?.earnings ?? 0
+        const prevHasEarnings = beforeEarnings > 0
+        const earningsDelta = prevHasEarnings ? Math.max(0, afterEarnings - beforeEarnings) : 0
+
+        let recEarnings: number
+        if (earningsDelta > 0) {
+          recEarnings = earningsDelta / 100
+        } else {
+          const beforeConfirmed = beforeSnap?.confirmed ?? 0
+          const afterConfirmed = afterSnap?.confirmed ?? beforeConfirmed
+          const confirmsDelta = Math.max(0, afterConfirmed - beforeConfirmed)
+          recEarnings = confirmsDelta * ((recCpaMap[refCode] || 0) / 100)
+        }
+
+        if (recEarnings <= 0) return
+
+        // Get unique impressions for this rec that matured (shifted back by S)
         const maturedStartDate = new Date(start)
         maturedStartDate.setDate(maturedStartDate.getDate() - s)
         const maturedEndDate = new Date(end)
@@ -432,37 +415,38 @@ export const GET = withApiHandler(
           tz
         )
 
+        const maturedEmails = new Set<string>()
         let offset = 0
         while (true) {
           const { data: page } = await supabaseAdmin
             .from('sparkloop_referrals')
             .select('subscriber_email')
             .eq('publication_id', PUBLICATION_ID)
-            .in('ref_code', refCodes)
+            .eq('ref_code', refCode)
             .gte('subscribed_at', bounds.startDate.toISOString())
             .lte('subscribed_at', bounds.endDate.toISOString())
             .range(offset, offset + PAGE_SIZE - 1)
           if (!page || page.length === 0) break
           for (const row of page) {
-            if (row.subscriber_email) maturedPopupEmails.add(row.subscriber_email)
+            if (row.subscriber_email) maturedEmails.add(row.subscriber_email)
           }
           if (page.length < PAGE_SIZE) break
           offset += PAGE_SIZE
         }
+
+        if (maturedEmails.size > 0) {
+          const netRecEarnings = recEarnings * (1 - 0.233)
+          avgValuePerSubscriber += netRecEarnings / maturedEmails.size
+        }
       })
     )
+
+    avgValuePerSubscriber = Math.round(avgValuePerSubscriber * 100) / 100
 
     // Unique subscribers = unique emails that saw the popup (newsletter subscribers in the range)
     const uniqueSubscribers = uniquePopupEmails.size
     // Unique sends = unique emails that subscribed to at least one SL recommendation
     const uniqueSends = new Set(referrals.map(r => r.subscriber_email)).size
-    const maturedSubscribers = maturedPopupEmails.size
-
-    // Apply SparkLoop's 23.3% fee to get net earnings
-    const netEarningsInRange = totalEarningsInRange * (1 - 0.233)
-    const avgValuePerSubscriber = maturedSubscribers > 0
-      ? Math.round((netEarningsInRange / maturedSubscribers) * 100) / 100
-      : 0
 
     logger.info({ start, end, popupEvents: popupEvents.length, referrals: referrals.length, uniqueIps }, 'Date range query completed')
 
