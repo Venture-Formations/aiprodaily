@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { SparkLoopService } from '@/lib/sparkloop-client'
+import { SparkLoopService, createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
 import { PUBLICATION_ID } from '@/lib/config'
 import axios from 'axios'
 
@@ -481,7 +481,10 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
         )
       }
 
-      const service = new SparkLoopService()
+      const service = await createSparkLoopServiceForPublication(PUBLICATION_ID)
+      if (!service) {
+        return NextResponse.json({ error: 'SparkLoop not configured' }, { status: 500 })
+      }
 
       logger.info({ email, refCodes }, '[SparkLoop Test] Testing subscription...')
 
@@ -500,7 +503,10 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       })
     },
     GET: async ({ logger }) => {
-      const service = new SparkLoopService()
+      const service = await createSparkLoopServiceForPublication(PUBLICATION_ID)
+      if (!service) {
+        return NextResponse.json({ error: 'SparkLoop not configured' }, { status: 500 })
+      }
       const stored = await service.getStoredRecommendations(PUBLICATION_ID)
 
       const active = stored.filter(r => r.status === 'active' && !(r as any).excluded)

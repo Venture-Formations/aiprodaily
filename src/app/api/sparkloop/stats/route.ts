@@ -33,6 +33,7 @@ export const maxDuration = 60
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/stats' },
   async ({ request, logger }) => {
+    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
     const { searchParams } = new URL(request.url)
     const days = Math.max(1, Math.min(365, parseInt(searchParams.get('days') || '30') || 30))
     const startDate = searchParams.get('start')
@@ -56,7 +57,7 @@ export const GET = withApiHandler(
     }
 
     // Load default RCR from publication_settings
-    const defaults = await getPublicationSettings(PUBLICATION_ID, [
+    const defaults = await getPublicationSettings(publicationId, [
       'sparkloop_default_rcr',
     ])
     const defaultRcr = defaults.sparkloop_default_rcr
@@ -67,7 +68,7 @@ export const GET = withApiHandler(
     const { data: recommendations } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('ref_code, publication_name, publication_logo, cpa, sparkloop_rcr, override_rcr, override_slip, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings, screening_period')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
 
     // --- Compute AT Slip % per recommendation (same logic as admin route) ---
     const today = new Date()
@@ -96,7 +97,7 @@ export const GET = withApiHandler(
           const { data: page, error: pageErr } = await supabaseAdmin
             .from('sparkloop_referrals')
             .select('ref_code, subscribed_at')
-            .eq('publication_id', PUBLICATION_ID)
+            .eq('publication_id', publicationId)
             .in('ref_code', refCodes)
             .lte('subscribed_at', cutoffStr)
             .order('subscribed_at', { ascending: true })
@@ -136,7 +137,7 @@ export const GET = withApiHandler(
       const { data: page, error: snapErr } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .gte('snapshot_date', snapLowerBound)
         .order('snapshot_date', { ascending: true })
         .range(snapOffset, snapOffset + slipPageSize - 1)
@@ -223,7 +224,7 @@ export const GET = withApiHandler(
       const { data: page, error: refErr } = await supabaseAdmin
         .from('sparkloop_referrals')
         .select('ref_code, subscribed_at')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .in('source', ['custom_popup', 'recs_page', 'newsletter_module'])
         .gte('subscribed_at', fromDate.toISOString())
         .lte('subscribed_at', toDate.toISOString())
@@ -264,7 +265,7 @@ export const GET = withApiHandler(
       const { data: snapPage, error: chartSnapErr } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected, sparkloop_earnings')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .gte('snapshot_date', toDateStr(snapshotFromDate))
         .lte('snapshot_date', toDateStr(toDate))
         .order('snapshot_date', { ascending: true })

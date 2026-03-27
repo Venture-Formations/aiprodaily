@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
-import { SparkLoopService } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { PUBLICATION_ID } from '@/lib/config'
@@ -38,7 +38,13 @@ export const POST = withApiHandler(
       )
     }
 
-    const service = new SparkLoopService()
+    // Resolve publication from server-side default (no trust anchor available)
+    const publicationId = PUBLICATION_ID
+
+    const service = await createSparkLoopServiceForPublication(publicationId)
+    if (!service) {
+      return NextResponse.json({ error: 'SparkLoop not configured' }, { status: 500 })
+    }
 
     // Detect country from Vercel geo header (fallback: 'US')
     const countryCode = request.headers.get('x-vercel-ip-country') || 'US'
@@ -52,7 +58,7 @@ export const POST = withApiHandler(
     const { data: activeRecs } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('ref_code')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .eq('status', 'active')
       .or('excluded.is.null,excluded.eq.false')
       .in('ref_code', refCodes)
@@ -102,7 +108,7 @@ export const POST = withApiHandler(
     // Record the SparkLoop API confirmation as a server-side event
     try {
       await supabaseAdmin.from('sparkloop_events').insert({
-        publication_id: PUBLICATION_ID,
+        publication_id: publicationId,
         event_type: 'api_subscribe_confirmed',
         subscriber_email: email,
         raw_payload: {
@@ -129,7 +135,7 @@ export const POST = withApiHandler(
         ? 'increment_sparkloop_page_submissions'
         : 'increment_sparkloop_submissions'
       await supabaseAdmin.rpc(submissionRpc, {
-        p_publication_id: PUBLICATION_ID,
+        p_publication_id: publicationId,
         p_ref_codes: activeRefCodes,
       })
       console.log(`[SparkLoop Subscribe] Recorded ${activeRefCodes.length} ${submissionSource === 'recs_page' ? 'page' : 'popup'} submissions`)
@@ -141,7 +147,7 @@ export const POST = withApiHandler(
     // Record referral rows in sparkloop_referrals (one per ref_code)
     try {
       const referralRows = activeRefCodes.map((refCode: string) => ({
-        publication_id: PUBLICATION_ID,
+        publication_id: publicationId,
         subscriber_email: email,
         ref_code: refCode,
         source: submissionSource,
@@ -158,7 +164,7 @@ export const POST = withApiHandler(
       } else {
         // Increment our_total_subscribes and our_pending on recommendations
         const { error: aggError } = await supabaseAdmin.rpc('increment_our_subscribes', {
-          p_publication_id: PUBLICATION_ID,
+          p_publication_id: publicationId,
           p_ref_codes: activeRefCodes,
         })
         if (aggError) {
