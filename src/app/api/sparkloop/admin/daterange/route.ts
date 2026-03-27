@@ -415,20 +415,29 @@ export const GET = withApiHandler(
           tz
         )
 
+        // Count unique popup impressions for this rec (subscribers who SAW it, not just subscribed)
         const maturedEmails = new Set<string>()
         let offset = 0
         while (true) {
           const { data: page } = await supabaseAdmin
-            .from('sparkloop_referrals')
-            .select('subscriber_email')
+            .from('sparkloop_events')
+            .select('subscriber_email, raw_payload')
             .eq('publication_id', PUBLICATION_ID)
-            .eq('ref_code', refCode)
-            .gte('subscribed_at', bounds.startDate.toISOString())
-            .lte('subscribed_at', bounds.endDate.toISOString())
+            .eq('event_type', 'popup_opened')
+            .gte('event_timestamp', bounds.startDate.toISOString())
+            .lte('event_timestamp', bounds.endDate.toISOString())
             .range(offset, offset + PAGE_SIZE - 1)
           if (!page || page.length === 0) break
-          for (const row of page) {
-            if (row.subscriber_email) maturedEmails.add(row.subscriber_email)
+          for (const evt of page) {
+            if (!evt.subscriber_email) continue
+            const payload = evt.raw_payload as Record<string, unknown> | null
+            const source = payload?.source as string | null
+            if (source === 'recs_page') continue
+            // Check if this popup showed our ref_code
+            const refCodes = payload?.ref_codes as string[] | null
+            if (refCodes?.includes(refCode)) {
+              maturedEmails.add(evt.subscriber_email)
+            }
           }
           if (page.length < PAGE_SIZE) break
           offset += PAGE_SIZE
