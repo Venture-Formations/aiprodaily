@@ -22,7 +22,8 @@ export default async function PrivacyPolicyPage() {
     'newsletter_name',
     'business_name',
     'business_address',
-    'contact_email'
+    'contact_email',
+    'tools_directory_enabled',
   ])
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
@@ -32,6 +33,7 @@ export default async function PrivacyPolicyPage() {
   const businessAddress = settings.business_address || ''
   const contactEmail = settings.contact_email || process.env.CONTACT_EMAIL || ''
   const currentYear = new Date().getFullYear()
+  const showToolsLink = settings.tools_directory_enabled !== 'false'
 
   // Parse address parts for contact section
   const addressParts = businessAddress.split(',').map((p: string) => p.trim())
@@ -41,7 +43,7 @@ export default async function PrivacyPolicyPage() {
 
   return (
     <main className="min-h-screen bg-white">
-      <Header logoUrl={headerImageUrl} />
+      <Header logoUrl={headerImageUrl} showToolsLink={showToolsLink} />
 
       {/* Privacy Policy Content */}
       <section className="pt-28 pb-20">
@@ -371,7 +373,7 @@ export default async function PrivacyPolicyPage() {
         </Container>
       </section>
 
-      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} showToolsLink={showToolsLink} />
     </main>
   )
 }

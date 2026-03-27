@@ -230,6 +230,7 @@ export async function resolvePublicationFromRequest(): Promise<{
     'logo_url',
     'newsletter_name',
     'business_name',
+    'tools_directory_enabled',
   ])
 
   return { publicationId, host, settings }

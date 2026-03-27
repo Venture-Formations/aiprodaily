@@ -77,6 +77,7 @@ export default async function ArticlePage({ params }: PageProps) {
   const businessName = settings.business_name || 'Newsletter'
   const siteUrl = `https://${host}`
   const currentYear = new Date().getFullYear()
+  const showToolsLink = settings.tools_directory_enabled !== 'false'
 
   // Format date
   const [year, month, day] = article.publish_date.split('-').map(Number)
@@ -178,7 +179,7 @@ export default async function ArticlePage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+      <Header logoUrl={headerImageUrl} showToolsLink={showToolsLink} />
 
       <main>
         {/* Hero Section */}
@@ -352,7 +353,7 @@ export default async function ArticlePage({ params }: PageProps) {
         </Container>
       </main>
 
-      <Footer />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} showToolsLink={showToolsLink} />
 
       {/* JSON-LD */}
       <script

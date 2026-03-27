@@ -67,7 +67,8 @@ export default async function NewsArchivePage({
     'website_header_url',
     'logo_url',
     'newsletter_name',
-    'business_name'
+    'business_name',
+    'tools_directory_enabled',
   ])
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
@@ -75,6 +76,7 @@ export default async function NewsArchivePage({
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
   const businessName = settings.business_name || 'AI Accounting Daily'
   const currentYear = new Date().getFullYear()
+  const showToolsLink = settings.tools_directory_enabled !== 'false'
 
   // Fetch categories for filter
   const { data: categoriesData } = await supabaseAdmin
@@ -194,7 +196,7 @@ export default async function NewsArchivePage({
 
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+      <Header logoUrl={headerImageUrl} showToolsLink={showToolsLink} />
 
       {/* Hero Section - Blue background with cloud effect */}
       <section className="relative overflow-hidden bg-blue-600 pt-16 pb-12">
@@ -417,7 +419,7 @@ export default async function NewsArchivePage({
         </Container>
       </main>
 
-      <Footer />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} showToolsLink={showToolsLink} />
     </div>
   )
 }

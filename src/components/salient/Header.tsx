@@ -55,7 +55,7 @@ function MobileNavIcon({ open }: { open: boolean }) {
   )
 }
 
-function MobileNavigation() {
+function MobileNavigation({ showToolsLink = true }: { showToolsLink?: boolean }) {
   return (
     <Popover>
       <PopoverButton
@@ -74,7 +74,7 @@ function MobileNavigation() {
       >
         <MobileNavLink href="/">Home</MobileNavLink>
         <MobileNavLink href="/news">News</MobileNavLink>
-        <MobileNavLink href="/tools">AI Tools</MobileNavLink>
+        {showToolsLink && <MobileNavLink href="/tools">AI Tools</MobileNavLink>}
         <MobileNavLink href="/contactus">Contact</MobileNavLink>
       </PopoverPanel>
     </Popover>
@@ -83,9 +83,10 @@ function MobileNavigation() {
 
 interface HeaderProps {
   logoUrl?: string
+  showToolsLink?: boolean
 }
 
-export function Header({ logoUrl = '/logo.png' }: HeaderProps) {
+export function Header({ logoUrl = '/logo.png', showToolsLink = true }: HeaderProps) {
   return (
     <header className="py-10 bg-slate-50">
       <Container>
@@ -103,7 +104,7 @@ export function Header({ logoUrl = '/logo.png' }: HeaderProps) {
             <div className="hidden md:flex md:gap-x-6">
               <NavLink href="/">Home</NavLink>
               <NavLink href="/news">News</NavLink>
-              <NavLink href="/tools">AI Tools</NavLink>
+              {showToolsLink && <NavLink href="/tools">AI Tools</NavLink>}
               <NavLink href="/contactus">Contact</NavLink>
             </div>
           </div>
@@ -114,7 +115,7 @@ export function Header({ logoUrl = '/logo.png' }: HeaderProps) {
               </span>
             </Button>
             <div className="-mr-1 md:hidden">
-              <MobileNavigation />
+              <MobileNavigation showToolsLink={showToolsLink} />
             </div>
           </div>
         </nav>

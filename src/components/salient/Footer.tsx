@@ -10,6 +10,7 @@ interface FooterProps {
   newsletterName?: string
   businessName?: string
   currentYear?: number
+  showToolsLink?: boolean
 }
 
 export function Footer({
@@ -17,6 +18,7 @@ export function Footer({
   newsletterName = 'AI Accounting Daily',
   businessName = 'AI Accounting Daily',
   currentYear = new Date().getFullYear(),
+  showToolsLink = true,
 }: FooterProps) {
   return (
     <footer className="bg-slate-50">
@@ -35,7 +37,7 @@ export function Footer({
             <div className="-my-1 flex justify-center gap-x-6">
               <NavLink href="/">Home</NavLink>
               <NavLink href="/news">News</NavLink>
-              <NavLink href="/tools">AI Tools</NavLink>
+              {showToolsLink && <NavLink href="/tools">AI Tools</NavLink>}
               <NavLink href="/contactus">Contact</NavLink>
             </div>
           </nav>
