@@ -370,41 +370,43 @@ export const GET = withApiHandler(
       }
     }
 
-    // Compute avg value per subscriber: per-rec (earnings / matured impressions), then sum.
-    // For each rec: get earnings in the range, get unique impressions that matured (shifted
-    // back by that rec's S), compute ratio, sum all ratios = avg value per subscriber.
-    let avgValuePerSubscriber = 0
+    // Compute avg value per subscriber:
+    // Total net earnings from S=14/15 recs / unique matured impressions from S=14 and S=15 windows.
+    // Only include S=14 and S=15 recs (vast majority) to avoid noise from long-screening recs.
+    const INCLUDED_SCREENINGS = [14, 15]
 
+    // Sum earnings from included recs
+    let totalNetEarnings = 0
+    for (const rec of recScreening || []) {
+      const s = rec.screening_period || 14
+      if (!INCLUDED_SCREENINGS.includes(s)) continue
+      const refCode = rec.ref_code
+      const refSnapshots = snapshotsByRefCode[refCode] || {}
+
+      const snapStartDate = new Date(start)
+      snapStartDate.setDate(snapStartDate.getDate() - 1)
+      const beforeSnap = findSnapshot(refSnapshots, toLocalDateStr(snapStartDate))
+      const afterSnap = findSnapshot(refSnapshots, end)
+
+      const beforeEarnings = beforeSnap?.earnings ?? 0
+      const afterEarnings = afterSnap?.earnings ?? 0
+      const prevHasEarnings = beforeEarnings > 0
+      const earningsDelta = prevHasEarnings ? Math.max(0, afterEarnings - beforeEarnings) : 0
+
+      if (earningsDelta > 0) {
+        totalNetEarnings += (earningsDelta / 100) * (1 - 0.233)
+      } else {
+        const beforeConfirmed = beforeSnap?.confirmed ?? 0
+        const afterConfirmed = afterSnap?.confirmed ?? beforeConfirmed
+        const confirmsDelta = Math.max(0, afterConfirmed - beforeConfirmed)
+        totalNetEarnings += confirmsDelta * ((recCpaMap[refCode] || 0) / 100) * (1 - 0.233)
+      }
+    }
+
+    // Count unique matured impressions across S=14 and S=15 windows (deduped)
+    const maturedImpressionEmails = new Set<string>()
     await Promise.all(
-      (recScreening || []).map(async (rec) => {
-        const refCode = rec.ref_code
-        const s = rec.screening_period || 14
-        const refSnapshots = snapshotsByRefCode[refCode] || {}
-
-        // Get this rec's earnings in the range (unshifted snapshot delta)
-        const snapStartDate = new Date(start)
-        snapStartDate.setDate(snapStartDate.getDate() - 1)
-        const beforeSnap = findSnapshot(refSnapshots, toLocalDateStr(snapStartDate))
-        const afterSnap = findSnapshot(refSnapshots, end)
-
-        const beforeEarnings = beforeSnap?.earnings ?? 0
-        const afterEarnings = afterSnap?.earnings ?? 0
-        const prevHasEarnings = beforeEarnings > 0
-        const earningsDelta = prevHasEarnings ? Math.max(0, afterEarnings - beforeEarnings) : 0
-
-        let recEarnings: number
-        if (earningsDelta > 0) {
-          recEarnings = earningsDelta / 100
-        } else {
-          const beforeConfirmed = beforeSnap?.confirmed ?? 0
-          const afterConfirmed = afterSnap?.confirmed ?? beforeConfirmed
-          const confirmsDelta = Math.max(0, afterConfirmed - beforeConfirmed)
-          recEarnings = confirmsDelta * ((recCpaMap[refCode] || 0) / 100)
-        }
-
-        if (recEarnings <= 0) return
-
-        // Get unique impressions for this rec that matured (shifted back by S)
+      INCLUDED_SCREENINGS.map(async (s) => {
         const maturedStartDate = new Date(start)
         maturedStartDate.setDate(maturedStartDate.getDate() - s)
         const maturedEndDate = new Date(end)
@@ -415,8 +417,6 @@ export const GET = withApiHandler(
           tz
         )
 
-        // Count unique popup impressions for this rec (subscribers who SAW it, not just subscribed)
-        const maturedEmails = new Set<string>()
         let offset = 0
         while (true) {
           const { data: page } = await supabaseAdmin
@@ -433,24 +433,17 @@ export const GET = withApiHandler(
             const payload = evt.raw_payload as Record<string, unknown> | null
             const source = payload?.source as string | null
             if (source === 'recs_page') continue
-            // Check if this popup showed our ref_code
-            const refCodes = payload?.ref_codes as string[] | null
-            if (refCodes?.includes(refCode)) {
-              maturedEmails.add(evt.subscriber_email)
-            }
+            maturedImpressionEmails.add(evt.subscriber_email)
           }
           if (page.length < PAGE_SIZE) break
           offset += PAGE_SIZE
         }
-
-        if (maturedEmails.size > 0) {
-          const netRecEarnings = recEarnings * (1 - 0.233)
-          avgValuePerSubscriber += netRecEarnings / maturedEmails.size
-        }
       })
     )
 
-    avgValuePerSubscriber = Math.round(avgValuePerSubscriber * 100) / 100
+    const avgValuePerSubscriber = maturedImpressionEmails.size > 0
+      ? Math.round((totalNetEarnings / maturedImpressionEmails.size) * 100) / 100
+      : 0
 
     // Unique subscribers = unique emails that saw the popup (newsletter subscribers in the range)
     const uniqueSubscribers = uniquePopupEmails.size
