@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { SparkLoopService } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
 import { PUBLICATION_ID } from '@/lib/config'
 
 /**
@@ -12,9 +12,14 @@ import { PUBLICATION_ID } from '@/lib/config'
  */
 export const POST = withApiHandler(
   { authTier: 'system', logContext: 'sparkloop/sync' },
-  async () => {
-    const service = new SparkLoopService()
-    const result = await service.syncRecommendationsToDatabase(PUBLICATION_ID)
+  async ({ request }) => {
+    const { searchParams } = new URL(request.url)
+    const publicationId = searchParams.get('publicationId') || PUBLICATION_ID
+    const service = await createSparkLoopServiceForPublication(publicationId)
+    if (!service) {
+      return NextResponse.json({ error: 'SparkLoop not configured for this publication' }, { status: 400 })
+    }
+    const result = await service.syncRecommendationsToDatabase(publicationId)
 
     return NextResponse.json({
       success: true,
@@ -31,9 +36,14 @@ export const POST = withApiHandler(
  */
 export const GET = withApiHandler(
   { authTier: 'system', logContext: 'sparkloop/sync' },
-  async () => {
-    const service = new SparkLoopService()
-    const stored = await service.getStoredRecommendations(PUBLICATION_ID)
+  async ({ request }) => {
+    const { searchParams } = new URL(request.url)
+    const publicationId = searchParams.get('publicationId') || PUBLICATION_ID
+    const service = await createSparkLoopServiceForPublication(publicationId)
+    if (!service) {
+      return NextResponse.json({ error: 'SparkLoop not configured for this publication' }, { status: 400 })
+    }
+    const stored = await service.getStoredRecommendations(publicationId)
 
     // Find oldest sync time
     const lastSyncTimes = stored

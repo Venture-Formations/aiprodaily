@@ -63,6 +63,9 @@ setInterval(() => {
 export const POST = withApiHandler(
   { authTier: 'public', logContext: 'sparkloop-track', inputSchema: trackEventSchema },
   async ({ input, request, logger }) => {
+    // Resolve publication from server-side default (no trust anchor available)
+    const publicationId = PUBLICATION_ID
+
     const eventType = input.event_type
 
     // Extract IP hash for rate limiting and subscription events
@@ -91,7 +94,7 @@ export const POST = withApiHandler(
     const { error } = await supabaseAdmin
       .from('sparkloop_events')
       .insert({
-        publication_id: PUBLICATION_ID,
+        publication_id: publicationId,
         event_type: eventType,
         subscriber_email: input.subscriber_email,
         raw_payload: metadata,
@@ -112,7 +115,7 @@ export const POST = withApiHandler(
             ? 'increment_sparkloop_page_impressions'
             : 'increment_sparkloop_impressions'
           await supabaseAdmin.rpc(rpcName, {
-            p_publication_id: PUBLICATION_ID,
+            p_publication_id: publicationId,
             p_ref_codes: input.ref_codes,
           })
           logger.info({ count: input.ref_codes.length, source: isRecsPage ? 'page' : 'popup' }, 'Recorded impressions')
@@ -123,7 +126,7 @@ export const POST = withApiHandler(
           const { data: openEvent } = await supabaseAdmin
             .from('sparkloop_events')
             .select('raw_payload')
-            .eq('publication_id', PUBLICATION_ID)
+            .eq('publication_id', publicationId)
             .eq('event_type', 'popup_opened')
             .eq('subscriber_email', input.subscriber_email)
             .order('event_timestamp', { ascending: false })
@@ -136,7 +139,7 @@ export const POST = withApiHandler(
             const { data: validRecs } = await supabaseAdmin
               .from('sparkloop_recommendations')
               .select('ref_code')
-              .eq('publication_id', PUBLICATION_ID)
+              .eq('publication_id', publicationId)
               .in('ref_code', shownRefCodes)
 
             const validRefCodes = (validRecs ?? []).map(r => r.ref_code)
@@ -145,7 +148,7 @@ export const POST = withApiHandler(
                 ? 'increment_sparkloop_confirmed_page_impressions'
                 : 'increment_sparkloop_confirmed_impressions'
               const { error: rpcErr } = await supabaseAdmin.rpc(rpcName, {
-                p_publication_id: PUBLICATION_ID,
+                p_publication_id: publicationId,
                 p_ref_codes: validRefCodes,
               })
               if (rpcErr) {
@@ -157,7 +160,7 @@ export const POST = withApiHandler(
         } else if (eventType === 'recommendation_selected') {
           // Record selection for the selected recommendation
           await supabaseAdmin.rpc('increment_sparkloop_selections', {
-            p_publication_id: PUBLICATION_ID,
+            p_publication_id: publicationId,
             p_ref_codes: input.ref_codes,
           })
           logger.info({ refCode: input.ref_codes[0] }, 'Recorded selection')

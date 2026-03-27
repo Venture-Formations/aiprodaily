@@ -5,4 +5,4 @@
  * subscriber management, and referral tracking.
  */
 
-export { SparkLoopService, createSparkLoopService } from './sparkloop-client'
+export { SparkLoopService, createSparkLoopService, createSparkLoopServiceForPublication } from './sparkloop-client'

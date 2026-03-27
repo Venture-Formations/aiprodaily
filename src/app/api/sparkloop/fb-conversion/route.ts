@@ -19,6 +19,9 @@ import { PUBLICATION_ID } from '@/lib/config'
 export const POST = withApiHandler(
   { authTier: 'system', logContext: 'sparkloop/fb-conversion' },
   async ({ request }) => {
+    // Resolve publication from server-side default (no trust anchor available)
+    const publicationId = PUBLICATION_ID
+
     // Additional auth: verify MAKE_WEBHOOK_SECRET (kept inside handler per migration notes)
     const authHeader = request.headers.get('authorization')
     const expectedSecret = process.env.MAKE_WEBHOOK_SECRET
@@ -44,7 +47,7 @@ export const POST = withApiHandler(
     const { data, error } = await supabaseAdmin
       .from('sparkloop_referrals')
       .update({ fb_conversion_sent_at: now, updated_at: now })
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .eq('subscriber_email', email)
       .is('fb_conversion_sent_at', null)
       .select('id, ref_code')

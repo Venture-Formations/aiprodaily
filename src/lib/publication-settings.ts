@@ -235,6 +235,36 @@ export async function resolvePublicationFromRequest(): Promise<{
   return { publicationId, host, settings }
 }
 
+// ==================== SPARKLOOP CREDENTIALS ====================
+
+/**
+ * Get SparkLoop credentials for a publication.
+ *
+ * IMPORTANT: Queries publication_settings directly — does NOT fall through
+ * to app_settings. This prevents cross-tenant credential leakage where one
+ * publication's SparkLoop API key could be returned for another tenant.
+ * Falls back to environment variables only.
+ */
+export async function getSparkLoopCredentials(publicationId: string): Promise<{
+  apiKey: string
+  upscribeId: string
+  webhookSecret: string
+}> {
+  const { data } = await supabaseAdmin
+    .from('publication_settings')
+    .select('key, value')
+    .eq('publication_id', publicationId)
+    .in('key', ['sparkloop_api_key', 'sparkloop_upscribe_id', 'sparkloop_webhook_secret'])
+
+  const map = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
+
+  return {
+    apiKey: map['sparkloop_api_key'] || process.env.SPARKLOOP_API_KEY || '',
+    upscribeId: map['sparkloop_upscribe_id'] || process.env.SPARKLOOP_UPSCRIBE_ID || '',
+    webhookSecret: map['sparkloop_webhook_secret'] || process.env.SPARKLOOP_WEBHOOK_SECRET || '',
+  }
+}
+
 // ==================== TYPED HELPER FUNCTIONS ====================
 
 /**
