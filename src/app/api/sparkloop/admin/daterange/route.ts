@@ -403,43 +403,43 @@ export const GET = withApiHandler(
       }
     }
 
-    // Count unique matured impressions across S=14 and S=15 windows (deduped)
-    const maturedImpressionEmails = new Set<string>()
-    await Promise.all(
-      INCLUDED_SCREENINGS.map(async (s) => {
-        const maturedStartDate = new Date(start)
-        maturedStartDate.setDate(maturedStartDate.getDate() - s)
-        const maturedEndDate = new Date(end)
-        maturedEndDate.setDate(maturedEndDate.getDate() - s)
-        const bounds = buildDateRangeBoundaries(
-          toLocalDateStr(maturedStartDate),
-          toLocalDateStr(maturedEndDate),
-          tz
-        )
-
-        let offset = 0
-        while (true) {
-          const { data: page } = await supabaseAdmin
-            .from('sparkloop_events')
-            .select('subscriber_email, raw_payload')
-            .eq('publication_id', PUBLICATION_ID)
-            .eq('event_type', 'popup_opened')
-            .gte('event_timestamp', bounds.startDate.toISOString())
-            .lte('event_timestamp', bounds.endDate.toISOString())
-            .range(offset, offset + PAGE_SIZE - 1)
-          if (!page || page.length === 0) break
-          for (const evt of page) {
-            if (!evt.subscriber_email) continue
-            const payload = evt.raw_payload as Record<string, unknown> | null
-            const source = payload?.source as string | null
-            if (source === 'recs_page') continue
-            maturedImpressionEmails.add(evt.subscriber_email)
-          }
-          if (page.length < PAGE_SIZE) break
-          offset += PAGE_SIZE
-        }
-      })
+    // Count unique matured impressions: subscribers who saw the popup in the matured window.
+    // Use a single window from (start - maxS) to (end - minS) to cover all S=14/15 sends
+    // that could have matured into confirms during the selected range.
+    const maxS = Math.max(...INCLUDED_SCREENINGS)
+    const minS = Math.min(...INCLUDED_SCREENINGS)
+    const maturedStartDate = new Date(start)
+    maturedStartDate.setDate(maturedStartDate.getDate() - maxS)
+    const maturedEndDate = new Date(end)
+    maturedEndDate.setDate(maturedEndDate.getDate() - minS)
+    const maturedBounds = buildDateRangeBoundaries(
+      toLocalDateStr(maturedStartDate),
+      toLocalDateStr(maturedEndDate),
+      tz
     )
+
+    const maturedImpressionEmails = new Set<string>()
+    let maturedOffset = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('subscriber_email, raw_payload')
+        .eq('publication_id', PUBLICATION_ID)
+        .eq('event_type', 'popup_opened')
+        .gte('event_timestamp', maturedBounds.startDate.toISOString())
+        .lte('event_timestamp', maturedBounds.endDate.toISOString())
+        .range(maturedOffset, maturedOffset + PAGE_SIZE - 1)
+      if (!page || page.length === 0) break
+      for (const evt of page) {
+        if (!evt.subscriber_email) continue
+        const payload = evt.raw_payload as Record<string, unknown> | null
+        const source = payload?.source as string | null
+        if (source === 'recs_page') continue
+        maturedImpressionEmails.add(evt.subscriber_email)
+      }
+      if (page.length < PAGE_SIZE) break
+      maturedOffset += PAGE_SIZE
+    }
 
     const avgValuePerSubscriber = maturedImpressionEmails.size > 0
       ? Math.round((totalNetEarnings / maturedImpressionEmails.size) * 100) / 100
