@@ -155,10 +155,10 @@ export class ModuleFeedGenerator {
         categories.push({ name: article.ticker })
       }
       if (article.member_name) {
-        categories.push({ name: `member:${article.member_name}` })
+        categories.push({ name: article.member_name })
       }
       if (article.transaction_type) {
-        categories.push({ name: `transaction:${article.transaction_type}` })
+        categories.push({ name: article.transaction_type })
       }
       if (categories.length > 0) {
         itemData.category = categories
