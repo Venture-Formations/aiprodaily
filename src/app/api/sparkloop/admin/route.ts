@@ -312,43 +312,45 @@ export const GET = withApiHandler(
       .select('status, excluded')
       .eq('publication_id', PUBLICATION_ID)
 
-    // Query unique IPs and avg offers from sparkloop_events
-    let uniqueIpsByRefCode: Record<string, number> = {}
-    let globalUniqueIps = 0
+    // Query unique newsletter subscribers (popup opens) and avg offers from sparkloop_events
+    let uniqueSubsByRefCode: Record<string, number> = {}
+    let globalUniqueSubs = 0
     let avgOffersSelected = 0
 
     try {
-      const { data: subscribeEvents } = await supabaseAdmin
-        .from('sparkloop_events')
-        .select('raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
-        .eq('event_type', 'api_subscribe_confirmed')
-
-      if (subscribeEvents && subscribeEvents.length > 0) {
-        const globalIps = new Set<string>()
-        const refCodeIps: Record<string, Set<string>> = {}
-
-        for (const evt of subscribeEvents) {
+      // Count unique newsletter subscribers from popup_opened events (all-time)
+      const POPUP_PAGE = 1000
+      const globalEmails = new Set<string>()
+      const refCodeEmails: Record<string, Set<string>> = {}
+      let popupOffset = 0
+      while (true) {
+        const { data: page } = await supabaseAdmin
+          .from('sparkloop_events')
+          .select('subscriber_email, raw_payload')
+          .eq('publication_id', PUBLICATION_ID)
+          .eq('event_type', 'popup_opened')
+          .range(popupOffset, popupOffset + POPUP_PAGE - 1)
+        if (!page || page.length === 0) break
+        for (const evt of page) {
           const payload = evt.raw_payload as Record<string, unknown> | null
-          if (!payload) continue
-          const ipHash = payload.ip_hash as string | null
-          const refCodes = payload.ref_codes as string[] | null
-
-          if (ipHash) {
-            globalIps.add(ipHash)
-            if (refCodes) {
-              for (const rc of refCodes) {
-                if (!refCodeIps[rc]) refCodeIps[rc] = new Set()
-                refCodeIps[rc].add(ipHash)
-              }
+          const source = payload?.source as string | null
+          if (source === 'recs_page' || !evt.subscriber_email) continue
+          globalEmails.add(evt.subscriber_email)
+          const refCodes = payload?.ref_codes as string[] | null
+          if (refCodes) {
+            for (const rc of refCodes) {
+              if (!refCodeEmails[rc]) refCodeEmails[rc] = new Set()
+              refCodeEmails[rc].add(evt.subscriber_email)
             }
           }
         }
+        if (page.length < POPUP_PAGE) break
+        popupOffset += POPUP_PAGE
+      }
 
-        globalUniqueIps = globalIps.size
-        for (const [rc, ips] of Object.entries(refCodeIps)) {
-          uniqueIpsByRefCode[rc] = ips.size
-        }
+      globalUniqueSubs = globalEmails.size
+      for (const [rc, emails] of Object.entries(refCodeEmails)) {
+        uniqueSubsByRefCode[rc] = emails.size
       }
 
       const { data: successEvents } = await supabaseAdmin
@@ -379,7 +381,7 @@ export const GET = withApiHandler(
     // Add unique_ips to each recommendation
     const withIpStats = withScores.map(rec => ({
       ...rec,
-      unique_ips: uniqueIpsByRefCode[rec.ref_code] || 0,
+      unique_ips: uniqueSubsByRefCode[rec.ref_code] || 0,
     }))
 
     // Calculate rolling window metrics (14D and 30D) in parallel
@@ -435,7 +437,7 @@ export const GET = withApiHandler(
         archived: allData?.filter(r => (r.status === 'archived' || r.status === 'awaiting_approval') && !r.excluded).length || 0,
       },
       globalStats: {
-        uniqueIps: globalUniqueIps,
+        uniqueIps: globalUniqueSubs,
         avgOffersSelected: Math.round(avgOffersSelected * 100) / 100,
       },
       defaults: {

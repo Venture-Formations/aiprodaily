@@ -307,34 +307,16 @@ export const GET = withApiHandler(
       }
     }
 
-    // 3. Unique IPs from api_subscribe_confirmed events in range - paginated
-    let subscribeEvents: { raw_payload: Record<string, unknown> | null }[] = []
-    pageFrom = 0
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_events')
-        .select('raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
-        .eq('event_type', 'api_subscribe_confirmed')
-        .gte('event_timestamp', startDate)
-        .lte('event_timestamp', endDate)
-        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
-      if (!page || page.length === 0) break
-      subscribeEvents = subscribeEvents.concat(page)
-      if (page.length < PAGE_SIZE) break
-      pageFrom += PAGE_SIZE
-    }
-
-    let uniqueIps = 0
-    if (subscribeEvents.length > 0) {
-      const ips = new Set<string>()
-      for (const evt of subscribeEvents) {
-        const payload = evt.raw_payload
-        const ipHash = payload?.ip_hash as string | null
-        if (ipHash) ips.add(ipHash)
+    // 3. Unique newsletter subscribers (unique emails from popup_opened, excluding recs_page)
+    // Already computed from popupEvents — reuse the deduped popup email set
+    const uniquePopupEmails = new Set<string>()
+    for (const evt of popupEvents) {
+      const source = (evt.raw_payload as Record<string, unknown>)?.source as string | null
+      if (source !== 'recs_page' && evt.subscriber_email) {
+        uniquePopupEmails.add(evt.subscriber_email)
       }
-      uniqueIps = ips.size
     }
+    const uniqueIps = uniquePopupEmails.size
 
     // 4. Avg offers selected — computed from successEvents already fetched in step 1a
     let avgOffersSelected = 0
