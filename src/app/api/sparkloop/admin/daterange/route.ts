@@ -371,21 +371,32 @@ export const GET = withApiHandler(
     }
 
     // Compute avg value per subscriber.
-    // Earnings in date range come from sends that matured (subscribed S days before).
-    // So the matching subscribers are those who subscribed between (start - S) and (end - S).
-    // Since S varies per recommendation, we query per screening group.
-
-    // Total earnings from the date range (snapshot deltas already shifted by S)
+    // Earnings that appear in the selected date range come from sends that matured
+    // (sent S days before). Use snapshot deltas from the ORIGINAL date range (not shifted)
+    // since confirms reported during [start, end] are the earnings for matured sends.
     let totalEarningsInRange = 0
-    for (const rc of Object.keys(refMetrics)) {
-      const earningsCents = refMetrics[rc]?.earningsCents || 0
-      if (earningsCents > 0) {
-        totalEarningsInRange += earningsCents / 100
+    for (const refCode of snapshotRefCodes) {
+      const refSnapshots = snapshotsByRefCode[refCode] || {}
+
+      // Snapshot at start-1 (before range) vs snapshot at end (end of range)
+      const snapStartDate = new Date(start)
+      snapStartDate.setDate(snapStartDate.getDate() - 1)
+      const beforeSnap = findSnapshot(refSnapshots, toLocalDateStr(snapStartDate))
+      const afterSnap = findSnapshot(refSnapshots, end)
+
+      const beforeEarnings = beforeSnap?.earnings ?? 0
+      const afterEarnings = afterSnap?.earnings ?? beforeEarnings
+      const earningsDelta = Math.max(0, afterEarnings - beforeEarnings)
+
+      if (earningsDelta > 0) {
+        totalEarningsInRange += earningsDelta / 100
       } else {
-        // Fallback for historical data without earnings in snapshots
-        const confirms = refMetrics[rc]?.confirms || 0
-        const cpaDollars = (recCpaMap[rc] || 0) / 100
-        totalEarningsInRange += confirms * cpaDollars
+        // Fallback: use confirms in range × CPA
+        const beforeConfirmed = beforeSnap?.confirmed ?? 0
+        const afterConfirmed = afterSnap?.confirmed ?? beforeConfirmed
+        const confirmsDelta = Math.max(0, afterConfirmed - beforeConfirmed)
+        const cpaDollars = (recCpaMap[refCode] || 0) / 100
+        totalEarningsInRange += confirmsDelta * cpaDollars
       }
     }
 
@@ -438,6 +449,8 @@ export const GET = withApiHandler(
 
     // Unique subscribers = unique emails that saw the popup (newsletter subscribers in the range)
     const uniqueSubscribers = uniquePopupEmails.size
+    // Unique sends = unique emails that subscribed to at least one SL recommendation
+    const uniqueSends = new Set(referrals.map(r => r.subscriber_email)).size
     const maturedSubscribers = maturedPopupEmails.size
 
     // Apply SparkLoop's 23.3% fee to get net earnings
@@ -457,6 +470,7 @@ export const GET = withApiHandler(
         avgOffersSelected,
         avgValuePerSubscriber,
         uniqueSubscribers,
+        uniqueSends,
       },
     })
   }
