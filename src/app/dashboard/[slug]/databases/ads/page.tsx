@@ -111,10 +111,10 @@ export default function AdsManagementPage() {
   }, [activeStatusTab, selectedSection])
 
   const fetchCompanyGroups = async () => {
-    if (!selectedSection) return
+    if (!selectedSection || !publicationId) return
     setLoading(true)
     try {
-      const response = await fetch(`/api/ad-modules/${selectedSection}/companies`)
+      const response = await fetch(`/api/ad-modules/${selectedSection}/companies?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setCompanyGroups(data.companies || [])

@@ -1066,13 +1066,16 @@ export class SparkLoopService {
       refOffset += REF_PAGE
     }
 
-    // Group referrals by ref_code with their dates
+    // Group referrals by ref_code with their dates, and build send date sets for attribution filtering
     const referralsByRefCode = new Map<string, Date[]>()
+    const sendDatesByRefCode = new Map<string, Set<string>>()
     for (const ref of allReferrals || []) {
       if (!referralsByRefCode.has(ref.ref_code)) {
         referralsByRefCode.set(ref.ref_code, [])
+        sendDatesByRefCode.set(ref.ref_code, new Set())
       }
       referralsByRefCode.get(ref.ref_code)!.push(new Date(ref.subscribed_at))
+      sendDatesByRefCode.get(ref.ref_code)!.add(ref.subscribed_at.split('T')[0])
     }
 
     // Calculate metrics for each recommendation
@@ -1117,10 +1120,13 @@ export class SparkLoopService {
         const sendDate = new Date(confirmDate)
         sendDate.setDate(sendDate.getDate() - screeningDays)
 
-        // Only count if the attributed send date falls within our sends window.
-        // sendDate is at midnight (constructed from date parts), sendsFrom is at
-        // midnight, sendsTo is at 23:59:59 — so this comparison is date-aligned.
-        if (sendDate >= sendsFrom && sendDate <= sendsTo) {
+        // Only count if the attributed send date falls within our sends window
+        // AND we actually had sends on that date. The second check filters out
+        // pre-existing SparkLoop referrals that attribute to dates in the window
+        // range but where we had no actual sends.
+        const sendDateStr = toDateString(sendDate)
+        const sendDates = sendDatesByRefCode.get(rec.ref_code)
+        if (sendDate >= sendsFrom && sendDate <= sendsTo && sendDates?.has(sendDateStr)) {
           confirmsGained += dailyConfirms
           rejectionsGained += dailyRejects
         }

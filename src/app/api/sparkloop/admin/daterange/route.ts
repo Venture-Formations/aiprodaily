@@ -307,34 +307,16 @@ export const GET = withApiHandler(
       }
     }
 
-    // 3. Unique IPs from api_subscribe_confirmed events in range - paginated
-    let subscribeEvents: { raw_payload: Record<string, unknown> | null }[] = []
-    pageFrom = 0
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_events')
-        .select('raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
-        .eq('event_type', 'api_subscribe_confirmed')
-        .gte('event_timestamp', startDate)
-        .lte('event_timestamp', endDate)
-        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
-      if (!page || page.length === 0) break
-      subscribeEvents = subscribeEvents.concat(page)
-      if (page.length < PAGE_SIZE) break
-      pageFrom += PAGE_SIZE
-    }
-
-    let uniqueIps = 0
-    if (subscribeEvents.length > 0) {
-      const ips = new Set<string>()
-      for (const evt of subscribeEvents) {
-        const payload = evt.raw_payload
-        const ipHash = payload?.ip_hash as string | null
-        if (ipHash) ips.add(ipHash)
+    // 3. Unique newsletter subscribers (unique emails from popup_opened, excluding recs_page)
+    // Already computed from popupEvents — reuse the deduped popup email set
+    const uniquePopupEmails = new Set<string>()
+    for (const evt of popupEvents) {
+      const source = (evt.raw_payload as Record<string, unknown>)?.source as string | null
+      if (source !== 'recs_page' && evt.subscriber_email) {
+        uniquePopupEmails.add(evt.subscriber_email)
       }
-      uniqueIps = ips.size
     }
+    const uniqueIps = uniquePopupEmails.size
 
     // 4. Avg offers selected — computed from successEvents already fetched in step 1a
     let avgOffersSelected = 0
@@ -407,9 +389,9 @@ export const GET = withApiHandler(
       }
     }
 
-    // Count unique subscribers whose sends matured in this period.
-    // For each screening group, the send window is (start - S) to (end - S).
-    const maturedSubEmails = new Set<string>()
+    // Count unique newsletter subscribers whose popup opens matured in this period.
+    // For each screening group, the popup_opened window is (start - S) to (end - S).
+    const maturedPopupEmails = new Set<string>()
     const screeningGroupsForAvg = new Map<number, string[]>()
     for (const rec of recScreening || []) {
       const s = rec.screening_period || 14
@@ -417,39 +399,51 @@ export const GET = withApiHandler(
       screeningGroupsForAvg.get(s)!.push(rec.ref_code)
     }
 
-    await Promise.all(
-      Array.from(screeningGroupsForAvg.entries()).map(async ([s, refCodes]) => {
-        const sendStart = new Date(start)
-        sendStart.setDate(sendStart.getDate() - s)
-        const sendEnd = new Date(end)
-        sendEnd.setDate(sendEnd.getDate() - s)
-        const sendStartStr = sendStart.toISOString().split('T')[0] + 'T00:00:00.000Z'
-        const sendEndStr = sendEnd.toISOString().split('T')[0] + 'T23:59:59.999Z'
-
-        let offset = 0
-        while (true) {
-          const { data: page } = await supabaseAdmin
-            .from('sparkloop_referrals')
-            .select('subscriber_email')
-            .eq('publication_id', PUBLICATION_ID)
-            .in('ref_code', refCodes)
-            .gte('subscribed_at', sendStartStr)
-            .lte('subscribed_at', sendEndStr)
-            .range(offset, offset + PAGE_SIZE - 1)
-          if (!page || page.length === 0) break
-          for (const row of page) {
-            if (row.subscriber_email) maturedSubEmails.add(row.subscriber_email)
-          }
-          if (page.length < PAGE_SIZE) break
-          offset += PAGE_SIZE
-        }
-      })
+    // Use the most common screening period to query popup_opened events shifted back
+    const commonScreening = screeningGroupsForAvg.size > 0
+      ? Array.from(screeningGroupsForAvg.entries()).sort((a, b) => b[1].length - a[1].length)[0][0]
+      : 14
+    const maturedStartDate = new Date(start)
+    maturedStartDate.setDate(maturedStartDate.getDate() - commonScreening)
+    const maturedEndDate = new Date(end)
+    maturedEndDate.setDate(maturedEndDate.getDate() - commonScreening)
+    const maturedBounds = buildDateRangeBoundaries(
+      toLocalDateStr(maturedStartDate),
+      toLocalDateStr(maturedEndDate),
+      tz
     )
+    const maturedStartStr = maturedBounds.startDate.toISOString()
+    const maturedEndStr = maturedBounds.endDate.toISOString()
 
-    const uniqueSubscribers = new Set(referrals.map(r => r.subscriber_email)).size
-    const maturedSubscribers = maturedSubEmails.size
+    let maturedPopupOffset = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('subscriber_email, raw_payload')
+        .eq('publication_id', PUBLICATION_ID)
+        .eq('event_type', 'popup_opened')
+        .gte('event_timestamp', maturedStartStr)
+        .lte('event_timestamp', maturedEndStr)
+        .range(maturedPopupOffset, maturedPopupOffset + PAGE_SIZE - 1)
+      if (!page || page.length === 0) break
+      for (const evt of page) {
+        const source = (evt.raw_payload as Record<string, unknown>)?.source as string | null
+        if (source !== 'recs_page' && evt.subscriber_email) {
+          maturedPopupEmails.add(evt.subscriber_email)
+        }
+      }
+      if (page.length < PAGE_SIZE) break
+      maturedPopupOffset += PAGE_SIZE
+    }
+
+    // Unique subscribers = unique emails that saw the popup (newsletter subscribers in the range)
+    const uniqueSubscribers = uniquePopupEmails.size
+    const maturedSubscribers = maturedPopupEmails.size
+
+    // Apply SparkLoop's 23.3% fee to get net earnings
+    const netEarningsInRange = totalEarningsInRange * (1 - 0.233)
     const avgValuePerSubscriber = maturedSubscribers > 0
-      ? Math.round((totalEarningsInRange / maturedSubscribers) * 100) / 100
+      ? Math.round((netEarningsInRange / maturedSubscribers) * 100) / 100
       : 0
 
     logger.info({ start, end, popupEvents: popupEvents.length, referrals: referrals.length, uniqueIps }, 'Date range query completed')
