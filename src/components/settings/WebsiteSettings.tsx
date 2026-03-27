@@ -99,10 +99,10 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
             type="text"
             value={settings.website_heading}
             onChange={(e) => setSettings(prev => ({ ...prev, website_heading: e.target.value }))}
-            placeholder="Stay Ahead of AI Trends in Accounting and Finance"
+            placeholder="Stay Ahead of **AI Trends** in Accounting and Finance"
             className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-          <p className="text-xs text-gray-400 mt-1">The main heading on the home page.</p>
+          <p className="text-xs text-gray-400 mt-1">Wrap text in **double asterisks** to apply the gradient underline style. Example: Stay Ahead of **AI Trends** in Accounting</p>
         </div>
 
         <div>
