@@ -35,7 +35,7 @@ export interface Recommendation {
   effective_rcr: number
   cr_source: string
   rcr_source: string
-  unique_ips: number
+  unique_subs: number
   override_cr: number | null
   override_rcr: number | null
   override_slip: number | null

@@ -1124,7 +1124,7 @@ export class SparkLoopService {
         // AND we actually had sends on that date. The second check filters out
         // pre-existing SparkLoop referrals that attribute to dates in the window
         // range but where we had no actual sends.
-        const sendDateStr = `${sendDate.getFullYear()}-${String(sendDate.getMonth() + 1).padStart(2, '0')}-${String(sendDate.getDate()).padStart(2, '0')}`
+        const sendDateStr = toDateString(sendDate)
         const sendDates = sendDatesByRefCode.get(rec.ref_code)
         if (sendDate >= sendsFrom && sendDate <= sendsTo && sendDates?.has(sendDateStr)) {
           confirmsGained += dailyConfirms

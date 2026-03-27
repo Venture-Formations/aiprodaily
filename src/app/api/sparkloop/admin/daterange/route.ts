@@ -403,12 +403,17 @@ export const GET = withApiHandler(
     const commonScreening = screeningGroupsForAvg.size > 0
       ? Array.from(screeningGroupsForAvg.entries()).sort((a, b) => b[1].length - a[1].length)[0][0]
       : 14
-    const maturedStart = new Date(start)
-    maturedStart.setDate(maturedStart.getDate() - commonScreening)
-    const maturedEnd = new Date(end)
-    maturedEnd.setDate(maturedEnd.getDate() - commonScreening)
-    const maturedStartStr = maturedStart.toISOString().split('T')[0] + 'T00:00:00.000Z'
-    const maturedEndStr = maturedEnd.toISOString().split('T')[0] + 'T23:59:59.999Z'
+    const maturedStartDate = new Date(start)
+    maturedStartDate.setDate(maturedStartDate.getDate() - commonScreening)
+    const maturedEndDate = new Date(end)
+    maturedEndDate.setDate(maturedEndDate.getDate() - commonScreening)
+    const maturedBounds = buildDateRangeBoundaries(
+      toLocalDateStr(maturedStartDate),
+      toLocalDateStr(maturedEndDate),
+      tz
+    )
+    const maturedStartStr = maturedBounds.startDate.toISOString()
+    const maturedEndStr = maturedBounds.endDate.toISOString()
 
     let maturedPopupOffset = 0
     while (true) {

@@ -378,10 +378,10 @@ export const GET = withApiHandler(
       logger.error({ err: statsError }, 'Failed to compute IP/offer stats')
     }
 
-    // Add unique_ips to each recommendation
+    // Add unique_subs to each recommendation
     const withIpStats = withScores.map(rec => ({
       ...rec,
-      unique_ips: uniqueSubsByRefCode[rec.ref_code] || 0,
+      unique_subs: uniqueSubsByRefCode[rec.ref_code] || 0,
     }))
 
     // Calculate rolling window metrics (14D and 30D) in parallel
