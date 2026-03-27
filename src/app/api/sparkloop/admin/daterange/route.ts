@@ -384,9 +384,13 @@ export const GET = withApiHandler(
       const beforeSnap = findSnapshot(refSnapshots, toLocalDateStr(snapStartDate))
       const afterSnap = findSnapshot(refSnapshots, end)
 
+      // Use actual SparkLoop earnings delta when both snapshots have earnings data.
+      // If beforeSnap has 0 earnings, it predates the column addition — the "delta"
+      // would be the entire all-time earnings, which is wrong. Fall back to confirms × CPA.
       const beforeEarnings = beforeSnap?.earnings ?? 0
-      const afterEarnings = afterSnap?.earnings ?? beforeEarnings
-      const earningsDelta = Math.max(0, afterEarnings - beforeEarnings)
+      const afterEarnings = afterSnap?.earnings ?? 0
+      const prevHasEarnings = beforeEarnings > 0
+      const earningsDelta = prevHasEarnings ? Math.max(0, afterEarnings - beforeEarnings) : 0
 
       if (earningsDelta > 0) {
         totalEarningsInRange += earningsDelta / 100
@@ -401,7 +405,8 @@ export const GET = withApiHandler(
     }
 
     // Count unique newsletter subscribers whose popup opens matured in this period.
-    // For each screening group, the popup_opened window is (start - S) to (end - S).
+    // Query per screening group since S varies per rec — each group has a different
+    // shifted window. Deduplicate emails across all groups.
     const maturedPopupEmails = new Set<string>()
     const screeningGroupsForAvg = new Map<number, string[]>()
     for (const rec of recScreening || []) {
@@ -410,42 +415,45 @@ export const GET = withApiHandler(
       screeningGroupsForAvg.get(s)!.push(rec.ref_code)
     }
 
-    // Use the most common screening period to query popup_opened events shifted back
-    const commonScreening = screeningGroupsForAvg.size > 0
-      ? Array.from(screeningGroupsForAvg.entries()).sort((a, b) => b[1].length - a[1].length)[0][0]
-      : 14
-    const maturedStartDate = new Date(start)
-    maturedStartDate.setDate(maturedStartDate.getDate() - commonScreening)
-    const maturedEndDate = new Date(end)
-    maturedEndDate.setDate(maturedEndDate.getDate() - commonScreening)
-    const maturedBounds = buildDateRangeBoundaries(
-      toLocalDateStr(maturedStartDate),
-      toLocalDateStr(maturedEndDate),
-      tz
-    )
-    const maturedStartStr = maturedBounds.startDate.toISOString()
-    const maturedEndStr = maturedBounds.endDate.toISOString()
+    // Get unique screening periods and query popup_opened for each shifted window
+    const uniqueScreenings = Array.from(new Set(
+      (recScreening || []).map(r => r.screening_period || 14)
+    ))
 
-    let maturedPopupOffset = 0
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_events')
-        .select('subscriber_email, raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
-        .eq('event_type', 'popup_opened')
-        .gte('event_timestamp', maturedStartStr)
-        .lte('event_timestamp', maturedEndStr)
-        .range(maturedPopupOffset, maturedPopupOffset + PAGE_SIZE - 1)
-      if (!page || page.length === 0) break
-      for (const evt of page) {
-        const source = (evt.raw_payload as Record<string, unknown>)?.source as string | null
-        if (source !== 'recs_page' && evt.subscriber_email) {
-          maturedPopupEmails.add(evt.subscriber_email)
+    await Promise.all(
+      uniqueScreenings.map(async (s) => {
+        const maturedStartDate = new Date(start)
+        maturedStartDate.setDate(maturedStartDate.getDate() - s)
+        const maturedEndDate = new Date(end)
+        maturedEndDate.setDate(maturedEndDate.getDate() - s)
+        const bounds = buildDateRangeBoundaries(
+          toLocalDateStr(maturedStartDate),
+          toLocalDateStr(maturedEndDate),
+          tz
+        )
+
+        let offset = 0
+        while (true) {
+          const { data: page } = await supabaseAdmin
+            .from('sparkloop_events')
+            .select('subscriber_email, raw_payload')
+            .eq('publication_id', PUBLICATION_ID)
+            .eq('event_type', 'popup_opened')
+            .gte('event_timestamp', bounds.startDate.toISOString())
+            .lte('event_timestamp', bounds.endDate.toISOString())
+            .range(offset, offset + PAGE_SIZE - 1)
+          if (!page || page.length === 0) break
+          for (const evt of page) {
+            const source = (evt.raw_payload as Record<string, unknown>)?.source as string | null
+            if (source !== 'recs_page' && evt.subscriber_email) {
+              maturedPopupEmails.add(evt.subscriber_email)
+            }
+          }
+          if (page.length < PAGE_SIZE) break
+          offset += PAGE_SIZE
         }
-      }
-      if (page.length < PAGE_SIZE) break
-      maturedPopupOffset += PAGE_SIZE
-    }
+      })
+    )
 
     // Unique subscribers = unique emails that saw the popup (newsletter subscribers in the range)
     const uniqueSubscribers = uniquePopupEmails.size
