@@ -123,7 +123,7 @@ export class Scoring {
 
     const { data: moduleCriteria, error: moduleError } = await supabaseAdmin
       .from('article_module_criteria')
-      .select('criteria_number, name, weight, ai_prompt, is_active')
+      .select('criteria_number, name, weight, ai_prompt, is_active, enforce_minimum, minimum_score')
       .eq('article_module_id', moduleId)
       .eq('is_active', true)
       .order('criteria_number', { ascending: true })
@@ -141,7 +141,9 @@ export class Scoring {
       number: c.criteria_number,
       name: c.name,
       weight: c.weight,
-      ai_prompt: c.ai_prompt
+      ai_prompt: c.ai_prompt,
+      enforce_minimum: c.enforce_minimum ?? false,
+      minimum_score: c.minimum_score
     }))
 
     console.log(`[Score] Using ${criteria.length} criteria from mod ${moduleId}`)
@@ -189,12 +191,19 @@ export class Scoring {
           weight: criterion.weight
         })
 
+        // Early termination: if this criterion enforces a minimum and the score is below it,
+        // skip remaining criteria to save AI calls
+        if (criterion.enforce_minimum && criterion.minimum_score != null && score < criterion.minimum_score) {
+          console.log(`[Score] Early termination: "${criterion.name}" scored ${score} < minimum ${criterion.minimum_score} for post "${post.title?.slice(0, 60)}"`)
+          break
+        }
+
       } catch (error) {
         throw error
       }
     }
 
-    // Calculate weighted total score
+    // Calculate weighted total score (only over criteria that were evaluated)
     let totalWeightedScore = 0
     let totalWeight = 0
 
