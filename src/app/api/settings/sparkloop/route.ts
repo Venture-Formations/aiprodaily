@@ -1,0 +1,77 @@
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { getPublicationSetting, updatePublicationSetting } from '@/lib/publication-settings'
+
+/**
+ * GET /api/settings/sparkloop?publication_id=X
+ *
+ * Returns SparkLoop settings for a publication.
+ * Never exposes actual API key or webhook secret values.
+ */
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/sparkloop' },
+  async ({ request }) => {
+    const { searchParams } = new URL(request.url)
+    const publicationId = searchParams.get('publication_id')
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
+    }
+
+    const [apiKey, upscribeId, webhookSecret] = await Promise.all([
+      getPublicationSetting(publicationId, 'sparkloop_api_key'),
+      getPublicationSetting(publicationId, 'sparkloop_upscribe_id'),
+      getPublicationSetting(publicationId, 'sparkloop_webhook_secret'),
+    ])
+
+    return NextResponse.json({
+      hasApiKey: !!apiKey,
+      upscribeId: upscribeId || '',
+      hasWebhookSecret: !!webhookSecret,
+    })
+  }
+)
+
+/**
+ * POST /api/settings/sparkloop?publication_id=X
+ *
+ * Save SparkLoop credentials for a publication.
+ * Only updates fields that have non-empty values (to avoid clearing existing secrets).
+ */
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/sparkloop' },
+  async ({ request }) => {
+    const { searchParams } = new URL(request.url)
+    const publicationId = searchParams.get('publication_id')
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
+    }
+
+    const body = await request.json()
+    const results: string[] = []
+
+    if (body.apiKey) {
+      const { error } = await updatePublicationSetting(publicationId, 'sparkloop_api_key', body.apiKey)
+      if (error) throw new Error(`Failed to save API key: ${error}`)
+      results.push('API key updated')
+    }
+
+    if (body.upscribeId !== undefined) {
+      const { error } = await updatePublicationSetting(publicationId, 'sparkloop_upscribe_id', body.upscribeId)
+      if (error) throw new Error(`Failed to save Upscribe ID: ${error}`)
+      results.push('Upscribe ID updated')
+    }
+
+    if (body.webhookSecret) {
+      const { error } = await updatePublicationSetting(publicationId, 'sparkloop_webhook_secret', body.webhookSecret)
+      if (error) throw new Error(`Failed to save webhook secret: ${error}`)
+      results.push('Webhook secret updated')
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: results.length > 0 ? results.join(', ') : 'No changes',
+    })
+  }
+)

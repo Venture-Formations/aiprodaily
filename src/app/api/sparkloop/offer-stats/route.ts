@@ -7,6 +7,7 @@ const PAGE_SIZE = 1000
 export const GET = withApiHandler(
   { authTier: 'public', logContext: 'sparkloop-offer-stats' },
   async ({ request, logger }) => {
+    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
     const days = parseInt(request.nextUrl.searchParams.get('days') || '30', 10)
 
     const since = new Date()
@@ -20,7 +21,7 @@ export const GET = withApiHandler(
       const { data: page, error } = await supabaseAdmin
         .from('sparkloop_offer_events')
         .select('event_type, created_at, subscriber_email, ip_address')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .gte('created_at', sinceStr)
         .order('created_at', { ascending: false })
         .range(pageFrom, pageFrom + PAGE_SIZE - 1)

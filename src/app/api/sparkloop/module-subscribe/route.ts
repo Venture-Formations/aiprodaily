@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
-import { SparkLoopService } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { checkUserAgent } from '@/lib/bot-detection'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
@@ -21,6 +21,17 @@ export const GET = withApiHandler(
     const email = searchParams.get('email')
     const refCode = searchParams.get('ref_code')
     const issueId = searchParams.get('issue_id')
+
+    // Resolve publication from issue (trust anchor) or fall back to default
+    let publicationId = PUBLICATION_ID
+    if (issueId) {
+      const { data: issue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('publication_id')
+        .eq('id', issueId)
+        .single()
+      if (issue?.publication_id) publicationId = issue.publication_id
+    }
 
     // Validate required params
     if (!email || !refCode) {
@@ -50,7 +61,7 @@ export const GET = withApiHandler(
       const { data: exclusions } = await supabaseAdmin
         .from('excluded_ips')
         .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
 
       if (exclusions && ipAddress) {
         ipExcluded = isIPExcluded(ipAddress, exclusions as IPExclusion[])
@@ -67,7 +78,7 @@ export const GET = withApiHandler(
       .from('sparkloop_module_clicks')
       .insert({
         id: clickRecordId,
-        publication_id: PUBLICATION_ID,
+        publication_id: publicationId,
         subscriber_email: email,
         ref_code: refCode,
         issue_id: issueId || null,
@@ -92,7 +103,7 @@ export const GET = withApiHandler(
       const { data: rec } = await supabaseAdmin
         .from('sparkloop_recommendations')
         .select('publication_name')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('ref_code', refCode)
         .single()
 
@@ -105,7 +116,7 @@ export const GET = withApiHandler(
     const { data: rec } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('ref_code, publication_name, status, excluded')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .eq('ref_code', refCode)
       .single()
 
@@ -115,7 +126,10 @@ export const GET = withApiHandler(
       )
     }
 
-    const service = new SparkLoopService()
+    const service = await createSparkLoopServiceForPublication(publicationId)
+    if (!service) {
+      return NextResponse.json({ error: 'SparkLoop not configured' }, { status: 500 })
+    }
 
     // Step 2: Create or fetch subscriber (CRITICAL: need UUID for attribution)
     let subscriberUuid: string | null = null
@@ -155,7 +169,7 @@ export const GET = withApiHandler(
       await supabaseAdmin
         .from('sparkloop_referrals')
         .upsert({
-          publication_id: PUBLICATION_ID,
+          publication_id: publicationId,
           subscriber_email: email,
           ref_code: refCode,
           source: 'newsletter_module',
@@ -172,7 +186,7 @@ export const GET = withApiHandler(
     // Record event in sparkloop_events
     try {
       await supabaseAdmin.from('sparkloop_events').insert({
-        publication_id: PUBLICATION_ID,
+        publication_id: publicationId,
         event_type: 'newsletter_module_subscribe',
         subscriber_email: email,
         raw_payload: {
@@ -192,7 +206,7 @@ export const GET = withApiHandler(
     // Increment our_total_subscribes
     try {
       await supabaseAdmin.rpc('increment_our_subscribes', {
-        p_publication_id: PUBLICATION_ID,
+        p_publication_id: publicationId,
         p_ref_codes: [refCode],
       })
     } catch (aggErr) {

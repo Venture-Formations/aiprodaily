@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { SparkLoopService } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
 import { PUBLICATION_ID } from '@/lib/config'
@@ -21,11 +21,12 @@ const FALLBACK_DEFAULT_RCR = 0.25
 export const GET = withApiHandler(
   { authTier: 'public', logContext: 'sparkloop-recommendations' },
   async ({ request, logger }) => {
+    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
     // Fetch active, non-excluded recommendations from our database
     const { data: recommendations, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('*')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .eq('status', 'active')
       .or('excluded.is.null,excluded.eq.false') // Not excluded
       .not('cpa', 'is', null) // Must have CPA to be useful
@@ -36,14 +37,16 @@ export const GET = withApiHandler(
 
     if (!recommendations || recommendations.length === 0) {
       console.log('[SparkLoop] No active recommendations in database, syncing from API...')
-      const service = new SparkLoopService()
-      await service.syncRecommendationsToDatabase(PUBLICATION_ID)
+      const service = await createSparkLoopServiceForPublication(publicationId)
+      if (service) {
+        await service.syncRecommendationsToDatabase(publicationId)
+      }
 
       // Retry after sync
       const { data: refreshed } = await supabaseAdmin
         .from('sparkloop_recommendations')
         .select('*')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('status', 'active')
         .not('cpa', 'is', null)
 
@@ -68,7 +71,7 @@ export const GET = withApiHandler(
     })
 
     // Load configurable defaults from publication_settings
-    const defaults = await getPublicationSettings(PUBLICATION_ID, [
+    const defaults = await getPublicationSettings(publicationId, [
       'sparkloop_default_cr',
       'sparkloop_default_rcr',
     ])

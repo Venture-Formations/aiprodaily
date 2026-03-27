@@ -6,6 +6,9 @@ import { PUBLICATION_ID } from '@/lib/config'
 export const POST = withApiHandler(
   { authTier: 'public', logContext: 'sparkloop-offer-track' },
   async ({ request, logger }) => {
+    // Resolve publication from server-side default (no trust anchor available)
+    const publicationId = PUBLICATION_ID
+
     const body = await request.json()
     const { event_type, email, offer_id } = body
 
@@ -23,7 +26,7 @@ export const POST = withApiHandler(
     const { error } = await supabaseAdmin
       .from('sparkloop_offer_events')
       .insert({
-        publication_id: PUBLICATION_ID,
+        publication_id: publicationId,
         offer_recommendation_id: offer_id,
         event_type,
         subscriber_email: email || null,

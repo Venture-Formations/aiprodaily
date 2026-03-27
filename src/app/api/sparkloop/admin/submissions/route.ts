@@ -15,6 +15,7 @@ import { buildDateRangeBoundaries, type SupportedTz } from '@/lib/date-utils'
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin/submissions' },
   async ({ request, logger }) => {
+    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
     const { searchParams } = new URL(request.url)
     const refCode = searchParams.get('ref_code')
     const start = searchParams.get('start')
@@ -36,7 +37,7 @@ export const GET = withApiHandler(
     const { data: referrals, error } = await supabaseAdmin
       .from('sparkloop_referrals')
       .select('subscriber_email, subscribed_at, status, source')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .eq('ref_code', refCode)
       .gte('subscribed_at', startDate)
       .lte('subscribed_at', endDateFinal)

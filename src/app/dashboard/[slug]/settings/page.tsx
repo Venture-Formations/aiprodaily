@@ -11,6 +11,7 @@ import BlockedDomainsSettings from '@/components/settings/BlockedDomainsSettings
 import IPExclusionSettings from '@/components/settings/IPExclusionSettings'
 import Notifications from '@/components/settings/Notifications'
 import FacebookSettings from '@/components/settings/FacebookSettings'
+import SparkLoopSettings from '@/components/settings/SparkLoopSettings'
 import FeedHealthRules from '@/components/settings/FeedHealthRules'
 import Users from '@/components/settings/Users'
 import DangerZone from '@/components/settings/DangerZone'
@@ -53,6 +54,7 @@ export default function SettingsPage() {
                 { id: 'notifications', name: 'Notifications' },
                 { id: 'feed-health', name: 'Feed Health' },
                 { id: 'facebook', name: 'Facebook' },
+                { id: 'sparkloop', name: 'SparkLoop' },
                 { id: 'users', name: 'Users' },
                 { id: 'danger', name: 'Danger Zone' },
               ].map((tab) => (
@@ -85,6 +87,7 @@ export default function SettingsPage() {
           {activeTab === 'notifications' && publicationId && <Notifications publicationId={publicationId} />}
           {activeTab === 'feed-health' && <FeedHealthRules />}
           {activeTab === 'facebook' && publicationId && <FacebookSettings publicationId={publicationId} />}
+          {activeTab === 'sparkloop' && publicationId && <SparkLoopSettings publicationId={publicationId} />}
           {activeTab === 'users' && <Users />}
           {activeTab === 'danger' && publicationId && slug && (
             <DangerZone publicationId={publicationId} slug={slug} />

@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings, updatePublicationSetting } from '@/lib/publication-settings'
-import { SparkLoopService } from '@/lib/sparkloop-client'
+import { SparkLoopService, createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
 import { PUBLICATION_ID } from '@/lib/config'
+
+// Resolve publicationId from query params, falling back to default
+function resolvePublicationId(request: Request): string {
+  const { searchParams } = new URL(request.url)
+  return searchParams.get('publicationId') || PUBLICATION_ID
+}
 
 // Hardcoded fallbacks if no publication_settings exist
 const FALLBACK_DEFAULT_CR = 22
@@ -19,6 +25,7 @@ export const maxDuration = 60
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin' },
   async ({ request, logger }) => {
+    const publicationId = resolvePublicationId(request)
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'all' // all, active, excluded
 
@@ -41,7 +48,7 @@ export const GET = withApiHandler(
     let query = supabaseAdmin
       .from('sparkloop_recommendations')
       .select(REC_COLUMNS)
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
 
     if (filter === 'active') {
       query = query.eq('status', 'active').or('excluded.is.null,excluded.eq.false')
@@ -60,7 +67,7 @@ export const GET = withApiHandler(
     const data = rawData as unknown as any[] | null
 
     // Load configurable defaults from publication_settings
-    const defaults = await getPublicationSettings(PUBLICATION_ID, [
+    const defaults = await getPublicationSettings(publicationId, [
       'sparkloop_default_cr',
       'sparkloop_default_rcr',
       'sparkloop_min_conversions_budget',
@@ -105,7 +112,7 @@ export const GET = withApiHandler(
           const { data: page } = await supabaseAdmin
             .from('sparkloop_referrals')
             .select('ref_code, subscribed_at')
-            .eq('publication_id', PUBLICATION_ID)
+            .eq('publication_id', publicationId)
             .in('ref_code', refCodes)
             .lte('subscribed_at', cutoffStr)
             .range(offset, offset + PAGE - 1)
@@ -137,7 +144,7 @@ export const GET = withApiHandler(
       const { data: page } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .order('snapshot_date', { ascending: true })
         .range(snapOffset, snapOffset + SNAP_PAGE - 1)
       if (!page || page.length === 0) break
@@ -169,7 +176,7 @@ export const GET = withApiHandler(
       const { data: page } = await supabaseAdmin
         .from('sparkloop_referrals')
         .select('ref_code, subscribed_at')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .range(refPageOffset, refPageOffset + SNAP_PAGE - 1)
       if (!page || page.length === 0) break
       for (const row of page) {
@@ -310,7 +317,7 @@ export const GET = withApiHandler(
     const { data: allData } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('status, excluded')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
 
     // Query unique newsletter subscribers (popup opens) and avg offers from sparkloop_events
     let uniqueSubsByRefCode: Record<string, number> = {}
@@ -327,7 +334,7 @@ export const GET = withApiHandler(
         const { data: page } = await supabaseAdmin
           .from('sparkloop_events')
           .select('subscriber_email, raw_payload')
-          .eq('publication_id', PUBLICATION_ID)
+          .eq('publication_id', publicationId)
           .eq('event_type', 'popup_opened')
           .range(popupOffset, popupOffset + POPUP_PAGE - 1)
         if (!page || page.length === 0) break
@@ -356,7 +363,7 @@ export const GET = withApiHandler(
       const { data: successEvents } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('event_type', 'subscriptions_success')
 
       if (successEvents && successEvents.length > 0) {
@@ -400,8 +407,8 @@ export const GET = withApiHandler(
 
     try {
       const [metrics14d, metrics30d] = await Promise.all([
-        SparkLoopService.calculateRollingWindowMetrics(14, PUBLICATION_ID),
-        SparkLoopService.calculateRollingWindowMetrics(30, PUBLICATION_ID),
+        SparkLoopService.calculateRollingWindowMetrics(14, publicationId),
+        SparkLoopService.calculateRollingWindowMetrics(30, publicationId),
       ])
 
       withRollingMetrics = withIpStats.map(rec => {
@@ -457,6 +464,7 @@ export const GET = withApiHandler(
 export const PATCH = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin' },
   async ({ request, logger }) => {
+    const publicationId = resolvePublicationId(request)
     const body = await request.json()
     const { id, excluded, excluded_reason, action } = body
 
@@ -471,7 +479,7 @@ export const PATCH = withApiHandler(
             { status: 400 }
           )
         }
-        await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_default_cr', String(val))
+        await updatePublicationSetting(publicationId, 'sparkloop_default_cr', String(val))
         results.push(`CR=${val}%`)
       }
       if ('default_rcr' in body && body.default_rcr !== undefined) {
@@ -482,7 +490,7 @@ export const PATCH = withApiHandler(
             { status: 400 }
           )
         }
-        await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_default_rcr', String(val))
+        await updatePublicationSetting(publicationId, 'sparkloop_default_rcr', String(val))
         results.push(`RCR=${val}%`)
       }
       if ('min_conversions_budget' in body && body.min_conversions_budget !== undefined) {
@@ -493,7 +501,7 @@ export const PATCH = withApiHandler(
             { status: 400 }
           )
         }
-        await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_min_conversions_budget', String(val))
+        await updatePublicationSetting(publicationId, 'sparkloop_min_conversions_budget', String(val))
         results.push(`MCB=${val}`)
       }
       logger.info({ updated: results }, 'Updated defaults')
@@ -563,6 +571,7 @@ export const PATCH = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin' },
   async ({ request, logger }) => {
+    const publicationId = resolvePublicationId(request)
     const body = await request.json()
     const { action, ids, excluded_reason } = body
 

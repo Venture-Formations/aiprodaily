@@ -20,6 +20,7 @@ export const maxDuration = 60
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'sparkloop/admin/daterange' },
   async ({ request, logger }) => {
+    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
     const { searchParams } = new URL(request.url)
     const start = searchParams.get('start')
     const end = searchParams.get('end')
@@ -52,7 +53,7 @@ export const GET = withApiHandler(
       const { data: page, error: ceErr } = await supabaseAdmin
         .from('sparkloop_events')
         .select('subscriber_email, raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('event_type', 'subscriptions_success')
         .gte('event_timestamp', startDate)
         .lte('event_timestamp', endDate)
@@ -75,7 +76,7 @@ export const GET = withApiHandler(
       const { data: page, error } = await supabaseAdmin
         .from('sparkloop_events')
         .select('subscriber_email, raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('event_type', 'popup_opened')
         .gte('event_timestamp', startDate)
         .lte('event_timestamp', endDate)
@@ -127,7 +128,7 @@ export const GET = withApiHandler(
       const { data: page, error } = await supabaseAdmin
         .from('sparkloop_referrals')
         .select('ref_code, source, subscriber_email')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .in('source', ['custom_popup', 'recs_page', 'newsletter_module'])
         .gte('subscribed_at', startDate)
         .lte('subscribed_at', endDate)
@@ -156,7 +157,7 @@ export const GET = withApiHandler(
     const { data: recScreening } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('ref_code, screening_period, cpa, sparkloop_rcr, override_rcr')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
 
     const screeningByRef: Record<string, number> = {}
     const recCpaMap: Record<string, number> = {}
@@ -195,7 +196,7 @@ export const GET = withApiHandler(
       const { data: snapPage } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected, sparkloop_earnings')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .gte('snapshot_date', snapStartStr)
         .lte('snapshot_date', snapEndStr)
         .order('snapshot_date', { ascending: true })
@@ -424,7 +425,7 @@ export const GET = withApiHandler(
       const { data: page } = await supabaseAdmin
         .from('sparkloop_events')
         .select('subscriber_email, raw_payload')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('event_type', 'popup_opened')
         .gte('event_timestamp', maturedBounds.startDate.toISOString())
         .lte('event_timestamp', maturedBounds.endDate.toISOString())
@@ -440,6 +441,7 @@ export const GET = withApiHandler(
       if (page.length < PAGE_SIZE) break
       maturedOffset += PAGE_SIZE
     }
+
 
     const avgValuePerSubscriber = maturedImpressionEmails.size > 0
       ? Math.round((totalNetEarnings / maturedImpressionEmails.size) * 100) / 100
