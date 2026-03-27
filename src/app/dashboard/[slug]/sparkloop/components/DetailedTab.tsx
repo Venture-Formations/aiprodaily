@@ -48,6 +48,7 @@ interface RangeStats {
   avgOffersSelected: number
   avgValuePerSubscriber?: number
   uniqueSubscribers?: number
+  uniqueSends?: number
 }
 
 import { toLocalDateStr } from '@/lib/date-utils'
@@ -1044,6 +1045,9 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
               })()}
               {rangeStats.uniqueSubscribers !== undefined && (
                 <span className="text-purple-600">Unique Subs: <strong>{rangeStats.uniqueSubscribers}</strong></span>
+              )}
+              {rangeStats.uniqueSends !== undefined && (
+                <span className="text-purple-600">Unique Sends: <strong>{rangeStats.uniqueSends}</strong></span>
               )}
             </>
           )}

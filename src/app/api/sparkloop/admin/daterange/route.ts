@@ -449,6 +449,8 @@ export const GET = withApiHandler(
 
     // Unique subscribers = unique emails that saw the popup (newsletter subscribers in the range)
     const uniqueSubscribers = uniquePopupEmails.size
+    // Unique sends = unique emails that subscribed to at least one SL recommendation
+    const uniqueSends = new Set(referrals.map(r => r.subscriber_email)).size
     const maturedSubscribers = maturedPopupEmails.size
 
     // Apply SparkLoop's 23.3% fee to get net earnings
@@ -468,6 +470,7 @@ export const GET = withApiHandler(
         avgOffersSelected,
         avgValuePerSubscriber,
         uniqueSubscribers,
+        uniqueSends,
       },
     })
   }
