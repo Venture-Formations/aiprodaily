@@ -25,7 +25,8 @@
     "refresh-staging": "node scripts/refresh-staging.mjs",
     "refresh-staging:full": "node scripts/refresh-staging.mjs --full",
     "sync-staging": "node scripts/sync-staging.mjs",
-    "sync-staging:dry": "node scripts/sync-staging.mjs --dry-run"
+    "sync-staging:dry": "node scripts/sync-staging.mjs --dry-run",
+    "generate:dep-map": "node scripts/generate-dependency-map.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",

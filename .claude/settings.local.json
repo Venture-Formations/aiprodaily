@@ -176,7 +176,35 @@
       "Bash(do gh:*)",
       "Bash(test:*)",
       "Bash(sed:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(git reset:*)",
+      "Bash(2)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "mcp__producthunt__search_topics",
+      "mcp__producthunt__get_posts",
+      "mcp__producthunt__get_post_details",
+      "WebFetch(domain:agenticpost.com)",
+      "WebFetch(domain:sorell.co)",
+      "WebFetch(domain:distill.bot)",
+      "WebFetch(domain:www.distill.fyi)",
+      "WebFetch(domain:distill.fyi)",
+      "WebFetch(domain:agenticpost.io)",
+      "WebFetch(domain:www.distillintelligence.com)",
+      "WebFetch(domain:supaexplorer.com)",
+      "WebFetch(domain:www.thenile.dev)",
+      "WebFetch(domain:agnitestudio.com)",
+      "WebFetch(domain:dataegret.com)",
+      "WebFetch(domain:www.bytebase.com)",
+      "WebFetch(domain:www.instaclustr.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.permit.io)",
+      "WebFetch(domain:0xkishan.com)",
+      "WebFetch(domain:tapoueh.org)",
+      "WebFetch(domain:blog.sequinstream.com)",
+      "WebFetch(domain:bigdataboutique.com)",
+      "Bash(xargs -I {} basename {})"
     ],
     "deny": [],
     "ask": []
@@ -197,6 +225,10 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-activation-prompt.bat"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dependency-check.bat"
           }
         ]
       }
