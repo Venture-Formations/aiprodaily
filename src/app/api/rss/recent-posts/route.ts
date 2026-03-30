@@ -174,6 +174,83 @@ export const GET = withApiHandler(
       })
     }
 
+    // If source is 'pool', fetch recently ingested posts directly from rss_posts via rss_feeds
+    if (source === 'pool') {
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+      const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
+
+      logger.info(`[API] Fetching pool posts since: ${cutoffDateStr}`)
+
+      // Get feed IDs for this publication
+      const { data: pubFeeds, error: pubFeedsError } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id')
+        .eq('publication_id', newsletter.id)
+        .eq('active', true)
+
+      if (pubFeedsError) {
+        logger.error({ err: pubFeedsError }, '[API] Error fetching publication feeds')
+        return NextResponse.json(
+          { error: 'Failed to fetch feeds', details: pubFeedsError.message },
+          { status: 500 }
+        )
+      }
+
+      const pubFeedIds = pubFeeds?.map(f => f.id) || []
+      if (pubFeedIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          posts: [],
+          count: 0,
+          source: 'pool',
+          days,
+          message: 'No active feeds found for this publication'
+        })
+      }
+
+      // Get duplicate post IDs to exclude
+      const { data: poolDuplicates } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+
+      const poolDuplicateIds = poolDuplicates?.map(d => d.post_id) || []
+
+      // Query rss_posts directly via feed_id
+      let poolQuery = supabaseAdmin
+        .from('rss_posts')
+        .select('id, title, description, full_article_text, source_url, publication_date')
+        .in('feed_id', pubFeedIds)
+        .not('full_article_text', 'is', null)
+        .gte('publication_date', cutoffDateStr)
+
+      if (poolDuplicateIds.length > 0) {
+        poolQuery = poolQuery.not('id', 'in', `(${poolDuplicateIds.join(',')})`)
+      }
+
+      const { data: poolPosts, error: poolError } = await poolQuery
+        .order('publication_date', { ascending: false })
+        .limit(limit)
+
+      if (poolError) {
+        logger.error({ err: poolError }, '[API] Error fetching pool posts')
+        return NextResponse.json(
+          { error: 'Failed to fetch pool posts', details: poolError.message },
+          { status: 500 }
+        )
+      }
+
+      logger.info(`[API] Found ${poolPosts?.length || 0} pool posts`)
+
+      return NextResponse.json({
+        success: true,
+        posts: poolPosts || [],
+        count: poolPosts?.length || 0,
+        source: 'pool',
+        days
+      })
+    }
+
     // Get feeds for the specified section
     let feedIds: string[] | null = null
     if (section !== 'all') {

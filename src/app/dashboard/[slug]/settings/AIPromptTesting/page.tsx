@@ -94,6 +94,9 @@ export default function AIPromptTestingPage() {
   const [articleModules, setArticleModules] = useState<ArticleModule[]>([])
   const [loadingModules, setLoadingModules] = useState(true)
 
+  // Post source toggle
+  const [postSource, setPostSource] = useState<'sent' | 'pool'>('sent')
+
   // Data state
   const [recentPosts, setRecentPosts] = useState<RSSPost[]>([])
   const [loadingPosts, setLoadingPosts] = useState(false)
@@ -171,12 +174,12 @@ export default function AIPromptTestingPage() {
     }
   }, [slug])
 
-  // Load posts from sent issues when authenticated or when prompt type changes
+  // Load posts when authenticated, prompt type changes, or post source changes
   useEffect(() => {
     if (status === 'authenticated' && promptType) {
       loadRecentPosts()
     }
-  }, [slug, status, promptType])
+  }, [slug, status, promptType, postSource])
 
   // Load saved prompt or template when provider/promptType changes
   useEffect(() => {
@@ -196,10 +199,10 @@ export default function AIPromptTestingPage() {
     setLoadingPosts(true)
     try {
       const moduleId = getModuleIdFromPromptType(promptType)
-      console.log('[Frontend] Fetching posts from sent issues for newsletter:', slug, 'module_id:', moduleId)
+      console.log(`[Frontend] Fetching posts (source=${postSource}) for newsletter:`, slug, 'module_id:', moduleId)
 
       // Build URL with module_id filter if available
-      let url = `/api/rss/recent-posts?publication_id=${slug}&limit=50&source=sent&days=7`
+      let url = `/api/rss/recent-posts?publication_id=${slug}&limit=50&source=${postSource}&days=7`
       if (moduleId) {
         url += `&module_id=${moduleId}`
       }
@@ -562,6 +565,7 @@ export default function AIPromptTestingPage() {
           publication_id: slug,
           prompt_type: promptType,
           module_id: moduleId, // Pass module_id for module-specific post filtering
+          post_source: postSource, // 'sent' or 'pool'
           limit: 10,
           offset,
           isCustomFreeform: promptType === 'custom'
@@ -701,10 +705,36 @@ export default function AIPromptTestingPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Sample RSS Post
               </label>
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setPostSource('sent')}
+                  className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                    postSource === 'sent'
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  From Sent Issues
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostSource('pool')}
+                  className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                    postSource === 'pool'
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  From RSS Pool
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mb-3">
-                {promptType === 'custom'
-                  ? 'Posts from sent newsletters (last 7 days) - Optional for freeform testing'
-                  : 'Posts from sent newsletters (last 7 days)'}
+                {postSource === 'pool'
+                  ? 'Recently ingested posts from RSS feeds (last 7 days)'
+                  : promptType === 'custom'
+                    ? 'Posts from sent newsletters (last 7 days) - Optional for freeform testing'
+                    : 'Posts from sent newsletters (last 7 days)'}
               </p>
                 {status === 'loading' ? (
                   <p className="text-gray-500 text-sm">Authenticating...</p>
@@ -713,7 +743,11 @@ export default function AIPromptTestingPage() {
                 ) : recentPosts.length === 0 ? (
                   <div className="text-gray-500 text-sm bg-yellow-50 border border-yellow-200 rounded p-3">
                     <p className="font-medium text-yellow-800">No posts found</p>
-                    <p className="text-xs mt-1">No newsletters have been sent in the last 7 days.</p>
+                    <p className="text-xs mt-1">
+                      {postSource === 'pool'
+                        ? 'No RSS posts ingested in the last 7 days.'
+                        : 'No newsletters have been sent in the last 7 days.'}
+                    </p>
                   </div>
                 ) : (
                   <>

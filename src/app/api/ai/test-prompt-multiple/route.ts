@@ -68,7 +68,7 @@ export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'ai/test-prompt-multiple' },
   async ({ request }) => {
     const body = await request.json()
-    const { provider, promptJson, publication_id, prompt_type, module_id, limit = 10, offset = 0, isCustomFreeform } = body
+    const { provider, promptJson, publication_id, prompt_type, module_id, post_source = 'sent', limit = 10, offset = 0, isCustomFreeform } = body
 
     if (!provider || !promptJson || !publication_id || !prompt_type) {
       return NextResponse.json(
@@ -152,114 +152,180 @@ export const POST = withApiHandler(
     cutoffDate.setDate(cutoffDate.getDate() - 7)
     const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
-    // First get the issue IDs that match our criteria (sent, within date range, for this publication)
-    const { data: sentIssues, error: issuesError } = await supabaseAdmin
-      .from('publication_issues')
-      .select('id')
-      .eq('publication_id', newsletterUuid)
-      .eq('status', 'sent')
-      .gte('date', cutoffDateStr)
-      .order('date', { ascending: false })
-
-    if (issuesError) {
-      console.error('[AI Test Multiple] Error fetching sent issues:', issuesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch sent issues', details: issuesError.message },
-        { status: 500 }
-      )
-    }
-
-    const sentIssueIds = sentIssues?.map(i => i.id) || []
-    console.log('[AI Test Multiple] Found', sentIssueIds.length, 'sent issues in date range')
-
-    if (sentIssueIds.length === 0) {
-      return NextResponse.json(
-        { error: 'No sent issues found in the last 7 days' },
-        { status: 404 }
-      )
-    }
-
-    let usedPosts: any[] | null = null
-    let usedPostsError: any = null
-
-    // Always use module_articles table for sent issues
-    // If module_id is provided, filter by it; otherwise get all posts from all modules
-    console.log('[AI Test Multiple] Fetching posts from sent issues', module_id ? `for module_id: ${module_id}` : '(all modules)')
-
-    let query = supabaseAdmin
-      .from('module_articles')
-      .select(`
-        post_id,
-        issue_id,
-        headline,
-        article_module_id,
-        rss_posts (
-          id,
-          title,
-          description,
-          full_article_text,
-          source_url,
-          publication_date
-        )
-      `)
-      .in('issue_id', sentIssueIds)
-      .not('post_id', 'is', null)
-      .not('headline', 'is', null)
-      .not('final_position', 'is', null) // Only posts actually included in sent email
-
-    // Filter by module_id if provided
-    if (module_id) {
-      query = query.eq('article_module_id', module_id)
-    }
-
-    const result = await query.limit(500)
-
-    usedPosts = result.data
-    usedPostsError = result.error
-
-    if (usedPostsError) {
-      console.error('[AI Test Multiple] Error fetching posts from sent issues:', usedPostsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch posts from sent issues', details: usedPostsError.message },
-        { status: 500 }
-      )
-    }
-
-    console.log('[AI Test Multiple] Found', usedPosts?.length || 0, 'article records')
-
-    // Extract and deduplicate the RSS posts (already filtered by issue_id at database level)
-    const postsMap = new Map<string, {
+    let posts: Array<{
       id: string
       title: string
       description: string | null
       full_article_text: string | null
       source_url: string | null
       publication_date: string | null
-    }>()
+    }>
 
-    for (const article of usedPosts || []) {
-      const rssPost = article.rss_posts as unknown as {
+    if (post_source === 'pool') {
+      // Fetch posts directly from rss_posts via rss_feeds (no dependency on publication_issues)
+      console.log('[AI Test Multiple] Fetching pool posts via rss_feeds')
+
+      const { data: pubFeeds, error: pubFeedsError } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id')
+        .eq('publication_id', newsletterUuid)
+        .eq('active', true)
+
+      if (pubFeedsError) {
+        console.error('[AI Test Multiple] Error fetching publication feeds:', pubFeedsError)
+        return NextResponse.json(
+          { error: 'Failed to fetch feeds', details: pubFeedsError.message },
+          { status: 500 }
+        )
+      }
+
+      const pubFeedIds = pubFeeds?.map(f => f.id) || []
+      if (pubFeedIds.length === 0) {
+        return NextResponse.json(
+          { error: 'No active feeds found for this publication' },
+          { status: 404 }
+        )
+      }
+
+      // Get duplicate post IDs to exclude
+      const { data: poolDuplicates } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+
+      const poolDuplicateIds = poolDuplicates?.map(d => d.post_id) || []
+
+      let poolQuery = supabaseAdmin
+        .from('rss_posts')
+        .select('id, title, description, full_article_text, source_url, publication_date')
+        .in('feed_id', pubFeedIds)
+        .not('full_article_text', 'is', null)
+        .gte('publication_date', cutoffDateStr)
+
+      if (poolDuplicateIds.length > 0) {
+        poolQuery = poolQuery.not('id', 'in', `(${poolDuplicateIds.join(',')})`)
+      }
+
+      const { data: poolPosts, error: poolError } = await poolQuery
+        .order('publication_date', { ascending: false })
+        .limit(500)
+
+      if (poolError) {
+        console.error('[AI Test Multiple] Error fetching pool posts:', poolError)
+        return NextResponse.json(
+          { error: 'Failed to fetch pool posts', details: poolError.message },
+          { status: 500 }
+        )
+      }
+
+      const allPosts = poolPosts || []
+      posts = allPosts.slice(offset, offset + limit)
+
+      if (posts.length === 0) {
+        return NextResponse.json(
+          { error: `No RSS pool posts found in the last 7 days (offset: ${offset}, limit: ${limit}, total available: ${allPosts.length})` },
+          { status: 404 }
+        )
+      }
+    } else {
+      // Default: fetch posts from sent issues
+      const { data: sentIssues, error: issuesError } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id')
+        .eq('publication_id', newsletterUuid)
+        .eq('status', 'sent')
+        .gte('date', cutoffDateStr)
+        .order('date', { ascending: false })
+
+      if (issuesError) {
+        console.error('[AI Test Multiple] Error fetching sent issues:', issuesError)
+        return NextResponse.json(
+          { error: 'Failed to fetch sent issues', details: issuesError.message },
+          { status: 500 }
+        )
+      }
+
+      const sentIssueIds = sentIssues?.map(i => i.id) || []
+      console.log('[AI Test Multiple] Found', sentIssueIds.length, 'sent issues in date range')
+
+      if (sentIssueIds.length === 0) {
+        return NextResponse.json(
+          { error: 'No sent issues found in the last 7 days' },
+          { status: 404 }
+        )
+      }
+
+      console.log('[AI Test Multiple] Fetching posts from sent issues', module_id ? `for module_id: ${module_id}` : '(all modules)')
+
+      let query = supabaseAdmin
+        .from('module_articles')
+        .select(`
+          post_id,
+          issue_id,
+          headline,
+          article_module_id,
+          rss_posts (
+            id,
+            title,
+            description,
+            full_article_text,
+            source_url,
+            publication_date
+          )
+        `)
+        .in('issue_id', sentIssueIds)
+        .not('post_id', 'is', null)
+        .not('headline', 'is', null)
+        .not('final_position', 'is', null)
+
+      if (module_id) {
+        query = query.eq('article_module_id', module_id)
+      }
+
+      const result = await query.limit(500)
+
+      if (result.error) {
+        console.error('[AI Test Multiple] Error fetching posts from sent issues:', result.error)
+        return NextResponse.json(
+          { error: 'Failed to fetch posts from sent issues', details: result.error.message },
+          { status: 500 }
+        )
+      }
+
+      console.log('[AI Test Multiple] Found', result.data?.length || 0, 'article records')
+
+      const postsMap = new Map<string, {
         id: string
         title: string
         description: string | null
         full_article_text: string | null
         source_url: string | null
         publication_date: string | null
-      } | null
+      }>()
 
-      if (rssPost && !postsMap.has(rssPost.id)) {
-        postsMap.set(rssPost.id, rssPost)
+      for (const article of result.data || []) {
+        const rssPost = article.rss_posts as unknown as {
+          id: string
+          title: string
+          description: string | null
+          full_article_text: string | null
+          source_url: string | null
+          publication_date: string | null
+        } | null
+
+        if (rssPost && !postsMap.has(rssPost.id)) {
+          postsMap.set(rssPost.id, rssPost)
+        }
       }
-    }
 
-    const allPosts = Array.from(postsMap.values())
-    const posts = allPosts.slice(offset, offset + limit)
+      const allPosts = Array.from(postsMap.values())
+      posts = allPosts.slice(offset, offset + limit)
 
-    if (posts.length === 0) {
-      return NextResponse.json(
-        { error: `No posts found from sent issues in the last 7 days (offset: ${offset}, limit: ${limit}, total available: ${allPosts.length})` },
-        { status: 404 }
-      )
+      if (posts.length === 0) {
+        return NextResponse.json(
+          { error: `No posts found from sent issues in the last 7 days (offset: ${offset}, limit: ${limit}, total available: ${allPosts.length})` },
+          { status: 404 }
+        )
+      }
     }
 
     console.log(`[AI Test Multiple] Testing ${posts.length} posts`)
