@@ -565,6 +565,7 @@ export default function AIPromptTestingPage() {
           publication_id: slug,
           prompt_type: promptType,
           module_id: moduleId, // Pass module_id for module-specific post filtering
+          post_source: postSource, // 'sent' or 'pool'
           limit: 10,
           offset,
           isCustomFreeform: promptType === 'custom'
