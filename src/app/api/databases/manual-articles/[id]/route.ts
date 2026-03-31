@@ -101,7 +101,7 @@ export const PATCH = withApiHandler(
     }
 
     if (body.section_type !== undefined) {
-      if (!['primary_articles', 'secondary_articles'].includes(body.section_type)) {
+      if (!['primary_articles'].includes(body.section_type)) {
         return NextResponse.json({ error: 'Invalid section type' }, { status: 400 })
       }
       updateData.section_type = body.section_type

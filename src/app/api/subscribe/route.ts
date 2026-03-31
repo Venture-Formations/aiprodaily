@@ -130,6 +130,57 @@ export const POST = withApiHandler(
       }
 
       console.log(`[Subscribe] Successfully added ${email} to SendGrid list`)
+    } else if (providerSettings.provider === 'beehiiv') {
+      // Use Beehiiv
+      const beehiivPubId = providerSettings.beehiivPublicationId
+      const beehiivApiKey = providerSettings.beehiivApiKey
+
+      if (!beehiivPubId || !beehiivApiKey) {
+        console.error('[Subscribe] Beehiiv credentials not configured')
+        return NextResponse.json({
+          error: 'Subscription service not configured'
+        }, { status: 500 })
+      }
+
+      // Map custom fields to Beehiiv format [{ name, value }]
+      const beehiivCustomFields: Array<{ name: string; value: string }> = []
+      if (name) beehiivCustomFields.push({ name: 'first_name', value: name })
+      for (const [k, v] of Object.entries(customFields)) {
+        if (v) beehiivCustomFields.push({ name: k, value: String(v) })
+      }
+
+      console.log(`[Subscribe] Adding ${email} to Beehiiv publication ${beehiivPubId}`)
+
+      try {
+        await axios.post(
+          `https://api.beehiiv.com/v2/publications/${beehiivPubId}/subscriptions`,
+          {
+            email,
+            double_opt_override: 'off',
+            send_welcome_email: false,
+            reactivate_existing: true,
+            custom_fields: beehiivCustomFields.length > 0 ? beehiivCustomFields : undefined,
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${beehiivApiKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        console.log(`[Subscribe] Successfully added ${email} to Beehiiv`)
+      } catch (bhError: any) {
+        // Beehiiv returns 409 for existing subscribers — treat as success
+        if (bhError.response?.status === 409) {
+          console.log(`[Subscribe] Subscriber ${email} already exists in Beehiiv`)
+        } else {
+          console.error('[Subscribe] Beehiiv API error:', bhError.response?.data || bhError.message)
+          return NextResponse.json({
+            error: 'Subscription failed',
+            message: bhError.response?.data?.message || 'Failed to add subscriber'
+          }, { status: 500 })
+        }
+      }
     } else {
       // Use MailerLite (default)
       let groupId = await getPublicationSetting(publicationId, 'mailerlite_signup_group_id')

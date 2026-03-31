@@ -369,12 +369,14 @@ export async function getEmailSettings(publicationId: string): Promise<{
  * Returns 'mailerlite' or 'sendgrid' along with the appropriate group/list IDs
  */
 export async function getEmailProviderSettings(publicationId: string): Promise<{
-  provider: 'mailerlite' | 'sendgrid'
+  provider: 'mailerlite' | 'sendgrid' | 'beehiiv'
   reviewGroupId: string
   mainGroupId: string
   secondaryGroupId: string
   sendgridSenderId?: string
   sendgridUnsubscribeGroupId?: string
+  beehiivPublicationId?: string
+  beehiivApiKey?: string
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'email_provider',
@@ -391,9 +393,23 @@ export async function getEmailProviderSettings(publicationId: string): Promise<{
     'sendgrid_secondary_list_id',
     'sendgrid_sender_id',
     'sendgrid_unsubscribe_group_id',
+    // Beehiiv settings
+    'beehiiv_publication_id',
+    'beehiiv_api_key',
   ])
 
-  const provider = (settings.email_provider || 'mailerlite') as 'mailerlite' | 'sendgrid'
+  const provider = (settings.email_provider || 'mailerlite') as 'mailerlite' | 'sendgrid' | 'beehiiv'
+
+  if (provider === 'beehiiv') {
+    return {
+      provider: 'beehiiv',
+      reviewGroupId: '',
+      mainGroupId: '',
+      secondaryGroupId: '',
+      beehiivPublicationId: settings.beehiiv_publication_id || '',
+      beehiivApiKey: settings.beehiiv_api_key || '',
+    }
+  }
 
   if (provider === 'sendgrid') {
     return {

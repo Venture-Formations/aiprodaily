@@ -222,56 +222,5 @@ export class ArticleGenerator {
     return result as FactCheckResult
   }
 
-  async processArticleImages(issueId: string) {
-    try {
-      const { data: articles, error } = await supabaseAdmin
-        .from('articles')
-        .select(`
-          id,
-          rss_post:rss_posts(
-            id,
-            image_url,
-            title
-          )
-        `)
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-
-      if (error || !articles) {
-        return
-      }
-
-      for (const article of articles) {
-        try {
-          const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
-
-          if (!rssPost?.image_url) {
-            continue
-          }
-
-          const originalImageUrl = rssPost.image_url
-
-          try {
-            const host = new URL(originalImageUrl).hostname.toLowerCase()
-            if (host.endsWith('.supabase.co') || host === 'img.aiprodaily.com') continue
-          } catch { /* not a valid URL, proceed with upload */ }
-
-          const hostedUrl = await this.ctx.imageStorage.uploadImage(originalImageUrl, rssPost.title)
-
-          if (hostedUrl) {
-            await supabaseAdmin
-              .from('rss_posts')
-              .update({ image_url: hostedUrl })
-              .eq('id', rssPost.id)
-          }
-
-        } catch (error) {
-          // Silent failure
-        }
-      }
-
-    } catch (error) {
-      // Silent failure
-    }
-  }
+  // processArticleImages removed — was dead code referencing legacy articles table
 }

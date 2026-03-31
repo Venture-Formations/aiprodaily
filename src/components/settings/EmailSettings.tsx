@@ -7,7 +7,12 @@ import Link from 'next/link'
 export default function EmailSettings({ publicationId }: { publicationId: string }) {
   const [settings, setSettings] = useState({
     // Email Provider Toggle
-    emailProvider: 'mailerlite' as 'mailerlite' | 'sendgrid',
+    emailProvider: 'mailerlite' as 'mailerlite' | 'sendgrid' | 'beehiiv',
+
+    // Beehiiv Settings
+    beehiivPublicationId: '',
+    beehiivApiKey: '',
+    hasBeehiivApiKey: false,
 
     // MailerLite Settings
     mailerliteReviewGroupId: '',
@@ -539,6 +544,26 @@ export default function EmailSettings({ publicationId }: { publicationId: string
               <div className="text-xs mt-1 text-brand-primary">Active Provider</div>
             )}
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleChange('emailProvider', 'beehiiv')}
+            className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${
+              settings.emailProvider === 'beehiiv'
+                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary font-medium'
+                : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+              <span>Beehiiv</span>
+            </div>
+            {settings.emailProvider === 'beehiiv' && (
+              <div className="text-xs mt-1 text-brand-primary">Active Provider</div>
+            )}
+          </button>
         </div>
       </div>
 
@@ -728,6 +753,53 @@ export default function EmailSettings({ publicationId }: { publicationId: string
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Beehiiv Configuration */}
+      <div className={`bg-white shadow rounded-lg p-6 ${settings.emailProvider !== 'beehiiv' ? 'opacity-60' : ''}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Beehiiv Configuration</h3>
+          {settings.emailProvider === 'beehiiv' && (
+            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+              Active
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Publication ID
+            </label>
+            <input
+              type="text"
+              value={settings.beehiivPublicationId}
+              onChange={(e) => handleChange('beehiivPublicationId', e.target.value)}
+              placeholder="pub_xxxxxxxx-xxxx-xxxx"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              API Key
+            </label>
+            <input
+              type="password"
+              value={settings.beehiivApiKey}
+              onChange={(e) => handleChange('beehiivApiKey', e.target.value)}
+              placeholder={settings.hasBeehiivApiKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (key saved)' : 'Enter Beehiiv API key'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+            {settings.hasBeehiivApiKey && (
+              <p className="text-xs text-gray-500 mt-1">API key is saved. Enter a new value to replace it.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+          <strong>Required custom fields in Beehiiv:</strong> Create these custom fields in your Beehiiv publication settings before enabling: first_name, last_name, job_type, yearly_clients, fbp, fbc, fb_pixel_timestamp, fb_pixel_event_source_url, fb_pixel_user_agent, fb_pixel_ip, kb_status, kb_reason, kb_sendex, kb_free_email, kb_disposable, kb_role, kb_validation_timestamp.
         </div>
       </div>
 

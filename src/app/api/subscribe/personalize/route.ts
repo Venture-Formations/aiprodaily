@@ -110,6 +110,67 @@ export const POST = withApiHandler(
 
         console.log(`[Personalize] Successfully updated subscriber ${email}`)
       }
+    } else if (providerSettings.provider === 'beehiiv') {
+      // Use Beehiiv
+      const beehiivPubId = providerSettings.beehiivPublicationId
+      const beehiivApiKey = providerSettings.beehiivApiKey
+
+      if (!beehiivPubId || !beehiivApiKey) {
+        throw new Error('Beehiiv credentials not configured')
+      }
+
+      const beehiivHeaders = {
+        'Authorization': `Bearer ${beehiivApiKey}`,
+        'Content-Type': 'application/json',
+      }
+
+      // Build custom fields array
+      const beehiivCustomFields: Array<{ name: string; value: string }> = []
+      if (name) beehiivCustomFields.push({ name: 'first_name', value: name })
+      if (last_name) beehiivCustomFields.push({ name: 'last_name', value: last_name })
+      if (job_type) beehiivCustomFields.push({ name: 'job_type', value: job_type })
+      if (yearly_clients) beehiivCustomFields.push({ name: 'yearly_clients', value: yearly_clients })
+
+      console.log(`[Personalize] Updating Beehiiv subscriber ${email} with ${beehiivCustomFields.length} fields`)
+
+      // Step 1: Look up subscriber by email to get subscription ID
+      let subscriptionId: string | null = null
+      try {
+        const lookupResp = await axios.get(
+          `https://api.beehiiv.com/v2/publications/${beehiivPubId}/subscriptions/by_email/${encodeURIComponent(email)}`,
+          { headers: beehiivHeaders }
+        )
+        subscriptionId = lookupResp.data?.data?.id
+      } catch (lookupErr: any) {
+        if (lookupErr.response?.status === 404) {
+          // Subscriber not found — create with fields
+          console.log(`[Personalize] Subscriber ${email} not found in Beehiiv, creating...`)
+          await axios.post(
+            `https://api.beehiiv.com/v2/publications/${beehiivPubId}/subscriptions`,
+            {
+              email,
+              double_opt_override: 'off',
+              send_welcome_email: false,
+              reactivate_existing: true,
+              custom_fields: beehiivCustomFields,
+            },
+            { headers: beehiivHeaders }
+          )
+          console.log(`[Personalize] Created subscriber ${email} in Beehiiv with personalization fields`)
+        } else {
+          throw new Error(lookupErr.response?.data?.message || 'Failed to look up subscriber in Beehiiv')
+        }
+      }
+
+      // Step 2: Update existing subscriber if found
+      if (subscriptionId) {
+        await axios.put(
+          `https://api.beehiiv.com/v2/publications/${beehiivPubId}/subscriptions/${subscriptionId}`,
+          { custom_fields: beehiivCustomFields },
+          { headers: beehiivHeaders }
+        )
+        console.log(`[Personalize] Successfully updated subscriber ${email} in Beehiiv`)
+      }
     } else {
       // Use MailerLite (default)
       // Prepare fields to update

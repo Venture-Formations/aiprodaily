@@ -2,6 +2,8 @@ import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { getEmailProviderSettings } from '@/lib/publication-settings'
+import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 import type { Logger } from '@/lib/logger'
 
 const BATCH_SIZE = 100 // Process up to 100 updates per run
@@ -336,13 +338,28 @@ async function processMailerLiteUpdates(log: Logger) {
       .update({ status: 'processing' })
       .in('id', updateIds)
 
+    // Determine provider for this publication
+    const providerSettings = await getEmailProviderSettings(updates[0].publication_id)
+
     // Process each field update (could batch but keeping simple for now)
     for (const update of updates) {
-      const result = await updateMailerLiteField(
-        email,
-        update.field_name,
-        update.field_value
-      )
+      let result: { success: boolean; error?: string; rateLimited?: boolean }
+
+      if (providerSettings.provider === 'beehiiv' && providerSettings.beehiivPublicationId && providerSettings.beehiivApiKey) {
+        result = await updateBeehiivSubscriberField(
+          email,
+          update.field_name,
+          update.field_value ? 'true' : 'false',
+          providerSettings.beehiivPublicationId,
+          providerSettings.beehiivApiKey
+        )
+      } else {
+        result = await updateMailerLiteField(
+          email,
+          update.field_name,
+          update.field_value
+        )
+      }
 
       if (result.success) {
         await supabaseAdmin

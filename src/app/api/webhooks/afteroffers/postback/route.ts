@@ -118,28 +118,46 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
     'Recorded AfterOffers postback event'
   )
 
-  // Update MailerLite subscriber field for conversion events
+  // Update email provider subscriber field for conversion events
   if (email && eventType === 'conversion') {
     try {
-      const { MailerLiteService } = await import('@/lib/mailerlite/mailerlite-service')
-      const mailerlite = new MailerLiteService()
-      let result = await mailerlite.updateSubscriberField(email, 'afteroffers_conversion', 'true')
+      const { getEmailProviderSettings } = await import('@/lib/publication-settings')
+      const providerSettings = await getEmailProviderSettings(PUBLICATION_ID)
 
-      // Retry if subscriber not found yet (timing issue)
-      if (!result.success && result.error === 'Subscriber not found') {
-        logger.info({ email: maskEmail(email) }, 'Subscriber not found, retrying in 2s')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        result = await mailerlite.updateSubscriberField(email, 'afteroffers_conversion', 'true')
-      }
-
-      if (result.success) {
-        logger.info({ email: maskEmail(email) }, 'Updated MailerLite afteroffers_conversion field')
+      if (providerSettings.provider === 'beehiiv') {
+        const { updateBeehiivSubscriberField } = await import('@/lib/beehiiv')
+        const { beehiivPublicationId, beehiivApiKey } = providerSettings
+        if (beehiivPublicationId && beehiivApiKey) {
+          let result = await updateBeehiivSubscriberField(email, 'afteroffers_conversion', 'true', beehiivPublicationId, beehiivApiKey)
+          if (!result.success && result.error === 'Subscriber not found') {
+            logger.info({ email: maskEmail(email) }, 'Subscriber not found in Beehiiv, retrying in 2s')
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            result = await updateBeehiivSubscriberField(email, 'afteroffers_conversion', 'true', beehiivPublicationId, beehiivApiKey)
+          }
+          if (result.success) {
+            logger.info({ email: maskEmail(email) }, 'Updated Beehiiv afteroffers_conversion field')
+          } else {
+            logger.warn({ error: result.error }, 'Failed to update Beehiiv afteroffers_conversion field')
+          }
+        }
       } else {
-        logger.warn({ error: result.error }, 'Failed to update MailerLite afteroffers_conversion field')
+        const { MailerLiteService } = await import('@/lib/mailerlite/mailerlite-service')
+        const mailerlite = new MailerLiteService()
+        let result = await mailerlite.updateSubscriberField(email, 'afteroffers_conversion', 'true')
+        if (!result.success && result.error === 'Subscriber not found') {
+          logger.info({ email: maskEmail(email) }, 'Subscriber not found, retrying in 2s')
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          result = await mailerlite.updateSubscriberField(email, 'afteroffers_conversion', 'true')
+        }
+        if (result.success) {
+          logger.info({ email: maskEmail(email) }, 'Updated MailerLite afteroffers_conversion field')
+        } else {
+          logger.warn({ error: result.error }, 'Failed to update MailerLite afteroffers_conversion field')
+        }
       }
     } catch (mlError: unknown) {
       const errMsg = mlError instanceof Error ? mlError.message : 'Unknown error'
-      logger.error({ error: errMsg, clickId, maskedEmail: maskEmail(email) }, 'MailerLite afteroffers_conversion update error (non-fatal)')
+      logger.error({ error: errMsg, clickId, maskedEmail: maskEmail(email) }, 'Email provider afteroffers_conversion update error (non-fatal)')
     }
   }
 
