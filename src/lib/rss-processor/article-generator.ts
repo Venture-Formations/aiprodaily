@@ -16,13 +16,27 @@ export class ArticleGenerator {
   }
 
   /**
-   * Public method to generate newsletter articles - used by step-based processing
+   * @deprecated Article generation now handled by module-articles.ts pipeline.
+   * This method is a no-op kept for backward compatibility.
    */
   async generateArticlesForSection(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
-    return await this.generateNewsletterArticles(issueId, section, limit)
+    console.warn(`[DEPRECATED] ArticleGenerator.generateArticlesForSection called for ${section} — this is now handled by module-articles.ts`)
+    return
   }
 
+  /**
+   * @deprecated Legacy article generation that wrote to articles/secondary_articles tables.
+   * Now a no-op. Module pipeline uses generateNewsletterContent/factCheckContent directly.
+   */
   async generateNewsletterArticles(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
+    console.warn(`[DEPRECATED] ArticleGenerator.generateNewsletterArticles called for ${section} — this is now handled by module-articles.ts`)
+    return
+  }
+
+  /**
+   * @deprecated Legacy method — kept as dead code reference. No longer called.
+   */
+  async _legacyGenerateNewsletterArticles(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
     const newsletterId = await getNewsletterIdFromIssue(issueId)
 
     // Get feeds for this section

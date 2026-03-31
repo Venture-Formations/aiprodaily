@@ -90,22 +90,8 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
       const { data: issue, error } = await supabaseAdmin
         .from('publication_issues')
         .select(`
-          *,
-          articles:articles(
-            *,
-            rss_post:rss_posts(
-              *,
-              rss_feed:rss_feeds(*)
-            )
-          ),
-          secondary_articles:secondary_articles(
-            *,
-            rss_post:rss_posts(
-              *,
-              rss_feed:rss_feeds(*)
-            )
-          ),
-          manual_articles:manual_articles(*)
+          id, date, status, subject_line, secondary_sent_at, publication_id, created_at, metrics,
+          manual_articles:manual_articles(id, title, body, rank, is_active, section_type)
         `)
         .eq('publication_id', publicationId)
         .in('status', ['in_review', 'changes_made', 'sent'])
@@ -130,8 +116,18 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
         }
       }
 
-      // Check if we have any active articles
-      const activeArticles = issue.articles.filter((article: any) => article.is_active && article.final_position)
+      // Get active articles with final positions from module_articles
+      const { data: activeModuleArticles } = await supabaseAdmin
+        .from('module_articles')
+        .select('id, headline, content, rank, is_active, final_position, article_module_id, post_id')
+        .eq('issue_id', issue.id)
+        .eq('is_active', true)
+        .not('final_position', 'is', null)
+
+      const activeArticles = activeModuleArticles || []
+
+      // Attach for downstream compatibility
+      ;(issue as any).articles = activeArticles
       if (activeArticles.length === 0) {
         results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'No active articles with final positions' })
         continue
@@ -145,14 +141,14 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
 
       if (providerSettings.provider === 'sendgrid') {
         const sendGridService = new SendGridService()
-        result = await sendGridService.createFinalCampaign(issue, true) // true = isSecondary
+        result = await sendGridService.createFinalCampaign(issue as any, true) // true = isSecondary
 
         if (!result.success) {
           throw new Error(result.error || 'Failed to create secondary SendGrid campaign')
         }
       } else {
         const mailerliteService = new MailerLiteService()
-        const mlResult = await mailerliteService.createFinalissue(issue, providerSettings.secondaryGroupId, true) // true = isSecondary
+        const mlResult = await mailerliteService.createFinalissue(issue as any, providerSettings.secondaryGroupId, true) // true = isSecondary
 
         result = {
           success: mlResult.success,

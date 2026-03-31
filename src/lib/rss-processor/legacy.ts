@@ -62,14 +62,9 @@ export class Legacy {
         }, 'rss_processor')
       }
 
-      // Clear previous articles and posts
+      // Clear previous module articles and posts
       await supabaseAdmin
-        .from('articles')
-        .delete()
-        .eq('issue_id', issueId)
-
-      await supabaseAdmin
-        .from('secondary_articles')
+        .from('module_articles')
         .delete()
         .eq('issue_id', issueId)
 
@@ -163,7 +158,7 @@ export class Legacy {
 
       // Get final article count
       const { data: finalArticles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id')
         .eq('issue_id', issueId)
 
@@ -204,7 +199,7 @@ export class Legacy {
         .single()
 
       const { data: articlesCheck } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id')
         .eq('issue_id', issueId)
         .limit(1)

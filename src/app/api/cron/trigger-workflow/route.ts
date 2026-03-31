@@ -45,11 +45,10 @@ export const GET = withApiHandler(
       for (const campaign of stuckCampaigns) {
         // Check if articles were actually generated despite OIDC error
         const { count: articleCount } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .select('id', { count: 'exact' })
-          .eq('campaign_id', campaign.id)
-          .not('content', 'is', null)
-          .not('headline', 'is', null)
+          .eq('issue_id', campaign.id)
+          .eq('is_active', true)
 
         // If sufficient articles exist, the work completed but OIDC failed - manually finalize
         if (articleCount && articleCount >= 3) {

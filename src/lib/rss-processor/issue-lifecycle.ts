@@ -117,34 +117,23 @@ export class IssueLifecycle {
       const groupsCount = duplicateGroups ? duplicateGroups.length : 0
       console.log(`[Step 4/10] ✓ Deduplicated: ${groupsCount} duplicate groups`)
 
-      // STEP 5: Generate articles from top 6 remaining posts per section
-      console.log('[Step 5/10] Generating articles from top 6 posts per section...')
-      await this.articleGenerator.generateArticlesForSection(issueId, 'primary', 6)
-      await this.articleGenerator.generateArticlesForSection(issueId, 'secondary', 6)
-      const { data: generatedPrimary } = await supabaseAdmin
-        .from('articles')
+      // STEP 5: Article generation now handled by process-rss-workflow.ts -> module-articles.ts
+      console.log('[Step 5/10] Counting module articles (generation handled by workflow)...')
+      const { data: generatedArticles } = await supabaseAdmin
+        .from('module_articles')
         .select('id')
         .eq('issue_id', issueId)
-      const { data: generatedSecondary } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id')
-        .eq('issue_id', issueId)
-      console.log(`[Step 5/10] ✓ Generated ${generatedPrimary?.length || 0} primary, ${generatedSecondary?.length || 0} secondary`)
+      console.log(`[Step 5/10] ✓ Generated ${generatedArticles?.length || 0} module articles`)
 
-      // STEP 6: Auto-select top 3 articles per section
-      console.log('[Step 6/10] Auto-selecting top 3 articles per section...')
+      // STEP 6: Article selection now handled by module pipeline (ArticleModuleSelector)
+      console.log('[Step 6/10] Counting active module articles (selection handled by workflow)...')
       await this.articleSelector.selectTopArticlesForIssue(issueId)
-      const { data: activeArticles } = await supabaseAdmin
-        .from('articles')
+      const { data: activeModuleArticles } = await supabaseAdmin
+        .from('module_articles')
         .select('id')
         .eq('issue_id', issueId)
         .eq('is_active', true)
-      const { data: activeSecondary } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id')
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-      console.log(`[Step 6/10] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
+      console.log(`[Step 6/10] ✓ Selected ${activeModuleArticles?.length || 0} active module articles`)
 
       // STEP 7: Initialize and generate text box modules
       console.log('[Step 7/10] Generating text box modules...')
@@ -398,25 +387,12 @@ export class IssueLifecycle {
       return { unassigned: 0 }
     }
 
-    const { data: primaryArticles } = await supabaseAdmin
-      .from('articles')
-      .select('post_id')
-      .eq('issue_id', issueId)
-
-    const { data: secondaryArticles } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('post_id')
-      .eq('issue_id', issueId)
-
     const { data: moduleArticlesUsed } = await supabaseAdmin
       .from('module_articles')
       .select('post_id')
       .eq('issue_id', issueId)
-      .eq('is_active', true)
 
     const usedPostIds = [
-      ...(primaryArticles?.map(a => a.post_id) || []),
-      ...(secondaryArticles?.map(a => a.post_id) || []),
       ...(moduleArticlesUsed?.map(a => a.post_id).filter(Boolean) || [])
     ]
 
