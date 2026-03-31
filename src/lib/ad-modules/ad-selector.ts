@@ -117,37 +117,39 @@ export class ModuleAdSelector {
   private static async getRecentUsedWeekdays(
     moduleId: string,
     advertiserId: string,
+    publicationId: string,
     issueDate: Date,
     lookbackWeeks: number
-  ): Promise<Set<number>> {
+  ): Promise<Set<number> | null> {
     const cutoff = new Date(issueDate)
     cutoff.setDate(cutoff.getDate() - lookbackWeeks * 7)
-    const cutoffIso = cutoff.toISOString()
+    const cutoffStr = toLocalDateStr(cutoff)
 
     // Query sent selections for this module+advertiser within lookback window
     const { data, error } = await supabaseAdmin
       .from('issue_module_ads')
       .select(`
         used_at,
-        advertisement:advertisements!inner(advertiser_id)
+        advertisement:advertisements!inner(advertiser_id, publication_id)
       `)
       .eq('ad_module_id', moduleId)
       .not('used_at', 'is', null)
-      .gte('used_at', cutoffIso)
+      .gte('used_at', cutoffStr)
 
     if (error || !data) {
-      console.error('[AdSelector] Error fetching recent weekday history:', error)
-      return new Set()
+      console.error(`[AdSelector] Error fetching recent weekday history for module ${moduleId}, advertiser ${advertiserId}:`, error)
+      return null
     }
 
     const days = new Set<number>()
     for (const row of data) {
       const ad = row.advertisement as any
       if (ad?.advertiser_id !== advertiserId) continue
+      if (ad?.publication_id !== publicationId) continue
       if (!row.used_at) continue
-      // Parse used_at to get the day of the week (UTC to match issueDate construction)
-      const d = new Date(row.used_at)
-      days.add(d.getUTCDay())
+      const parts = String(row.used_at).split('T')[0].split('-')
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+      days.add(d.getDay())
     }
 
     return days
@@ -407,7 +409,7 @@ export class ModuleAdSelector {
     // so being in the pool means they haven't run yet this period and have remaining paid slots.
     // Constraints: weekdays only, and day-of-week diversification (no repeating a weekday
     // used in the prior 2 weeks).
-    const issueDayOfWeek = issueDate.getUTCDay()
+    const issueDayOfWeek = issueDate.getDay()
     const isWeekday = issueDayOfWeek >= 1 && issueDayOfWeek <= 5
     const scheduledCandidates = isWeekday
       ? candidatePool.filter(c => c.junction.frequency === 'weekly' || c.junction.frequency === 'monthly')
@@ -415,15 +417,22 @@ export class ModuleAdSelector {
 
     // Filter out candidates whose recent history blocks today's day of the week
     const scheduledDue: EligibleCompany[] = []
+    const blockedNames: string[] = []
     for (const company of scheduledCandidates) {
       const recentDays = await this.getRecentUsedWeekdays(
-        mod.id, company.junction.advertiser_id, issueDate, 2
+        mod.id, company.junction.advertiser_id, publicationId, issueDate, 2
       )
+      // If history lookup failed (null), skip this company's override to avoid
+      // accidentally double-running — they'll go through normal rotation instead.
+      if (recentDays === null) continue
       if (!recentDays.has(issueDayOfWeek)) {
         scheduledDue.push(company)
       } else {
-        console.log(`[AdSelector] Scheduled company "${company.advertiser.company_name}" blocked on day ${issueDayOfWeek} (used that weekday in prior 2 weeks)`)
+        blockedNames.push(company.advertiser.company_name)
       }
+    }
+    if (blockedNames.length > 0) {
+      console.log(`[AdSelector] Scheduled companies blocked on day ${issueDayOfWeek} (weekday used in prior 2 weeks): ${blockedNames.join(', ')}`)
     }
 
     let selectedCompany: EligibleCompany | null = null
