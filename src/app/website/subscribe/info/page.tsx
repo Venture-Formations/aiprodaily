@@ -39,21 +39,31 @@ export default async function SubscribeInfoPage() {
   let jobOptions: { value: string; label: string }[] | undefined
   if (settings.subscribe_info_job_options) {
     try {
-      const parsed = typeof settings.subscribe_info_job_options === 'string'
-        ? JSON.parse(settings.subscribe_info_job_options)
-        : settings.subscribe_info_job_options
+      const raw = settings.subscribe_info_job_options
+      console.log('[SubscribeInfo] Raw job options from DB:', typeof raw, raw)
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
       if (Array.isArray(parsed)) jobOptions = parsed
-    } catch { /* use defaults */ }
+      console.log('[SubscribeInfo] Parsed job options:', jobOptions?.length, 'items')
+    } catch (e) {
+      console.error('[SubscribeInfo] Failed to parse job options:', e)
+    }
+  } else {
+    console.log('[SubscribeInfo] No job options in settings, using defaults')
   }
 
   let clientsOptions: { value: string; label: string }[] | undefined
   if (settings.subscribe_info_clients_options) {
     try {
-      const parsed = typeof settings.subscribe_info_clients_options === 'string'
-        ? JSON.parse(settings.subscribe_info_clients_options)
-        : settings.subscribe_info_clients_options
+      const raw = settings.subscribe_info_clients_options
+      console.log('[SubscribeInfo] Raw clients options from DB:', typeof raw, raw)
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
       if (Array.isArray(parsed)) clientsOptions = parsed
-    } catch { /* use defaults */ }
+      console.log('[SubscribeInfo] Parsed clients options:', clientsOptions?.length, 'items')
+    } catch (e) {
+      console.error('[SubscribeInfo] Failed to parse clients options:', e)
+    }
+  } else {
+    console.log('[SubscribeInfo] No clients options in settings, using defaults')
   }
 
   return (
