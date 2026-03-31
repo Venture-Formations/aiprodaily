@@ -35,22 +35,24 @@ export default async function SubscribeInfoPage() {
   const headingStyled = settings.subscribe_info_heading_styled || 'Personalize Your Experience'
   const subheading = settings.subscribe_info_subheading || 'Help us tailor your newsletter to your needs.\nThis only takes 30 seconds!'
 
-  // Parse JSON option arrays if stored as strings
+  // Parse JSON option arrays (stored as JSON strings in publication_settings)
   let jobOptions: { value: string; label: string }[] | undefined
   if (settings.subscribe_info_job_options) {
     try {
-      jobOptions = typeof settings.subscribe_info_job_options === 'string'
+      const parsed = typeof settings.subscribe_info_job_options === 'string'
         ? JSON.parse(settings.subscribe_info_job_options)
-        : undefined
+        : settings.subscribe_info_job_options
+      if (Array.isArray(parsed)) jobOptions = parsed
     } catch { /* use defaults */ }
   }
 
   let clientsOptions: { value: string; label: string }[] | undefined
   if (settings.subscribe_info_clients_options) {
     try {
-      clientsOptions = typeof settings.subscribe_info_clients_options === 'string'
+      const parsed = typeof settings.subscribe_info_clients_options === 'string'
         ? JSON.parse(settings.subscribe_info_clients_options)
-        : undefined
+        : settings.subscribe_info_clients_options
+      if (Array.isArray(parsed)) clientsOptions = parsed
     } catch { /* use defaults */ }
   }
 
