@@ -401,11 +401,13 @@ export async function getEmailProviderSettings(publicationId: string): Promise<{
   const provider = (settings.email_provider || 'mailerlite') as 'mailerlite' | 'sendgrid' | 'beehiiv'
 
   if (provider === 'beehiiv') {
+    // Beehiiv handles subscribers only — sending still uses MailerLite,
+    // so we pass through the MailerLite group IDs for send routes.
     return {
       provider: 'beehiiv',
-      reviewGroupId: '',
-      mainGroupId: '',
-      secondaryGroupId: '',
+      reviewGroupId: settings.mailerlite_review_group_id || settings.email_reviewGroupId || '',
+      mainGroupId: settings.mailerlite_main_group_id || settings.mailerlite_group_id || '',
+      secondaryGroupId: settings.mailerlite_secondary_group_id || '',
       beehiivPublicationId: settings.beehiiv_publication_id || '',
       beehiivApiKey: settings.beehiiv_api_key || '',
     }
