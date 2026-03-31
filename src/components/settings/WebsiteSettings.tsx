@@ -105,7 +105,10 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
       {/* Home Page Hero Section */}
       <div className="border rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-gray-900">Home Page Hero</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-gray-900">Home Page Hero</h3>
+          <a href="/" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -177,7 +180,10 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
       {/* Subscribe Page */}
       <div className="border rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-gray-900">Subscribe Page (/subscribe)</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-gray-900">Subscribe Page</h3>
+          <a href="/subscribe" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Heading</label>
@@ -228,7 +234,10 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
       {/* Subscribe Info Page */}
       <div className="border rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-gray-900">Subscribe Info Page (/subscribe/info)</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-gray-900">Subscribe Info Page</h3>
+          <a href="/subscribe/info" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Heading</label>
@@ -264,7 +273,7 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Job Type Question Label</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Question 1 Label</label>
           <input
             type="text"
             value={settings.subscribe_info_job_label}
@@ -275,11 +284,20 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Job Type Option Labels</label>
-          <p className="text-xs text-gray-400 mb-2">Edit the display labels for each option. The stored values remain the same.</p>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Question 1 Options</label>
           {settings.subscribe_info_job_options.map((opt, i) => (
-            <div key={opt.value} className="flex items-center gap-2 mb-2">
-              <span className="text-xs text-gray-400 w-28 shrink-0">{opt.value}</span>
+            <div key={i} className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={opt.value}
+                onChange={(e) => {
+                  const updated = [...settings.subscribe_info_job_options]
+                  updated[i] = { ...updated[i], value: e.target.value }
+                  setSettings(prev => ({ ...prev, subscribe_info_job_options: updated }))
+                }}
+                placeholder="Stored value"
+                className="w-32 border rounded-md px-3 py-1.5 text-sm text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
               <input
                 type="text"
                 value={opt.label}
@@ -288,14 +306,38 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
                   updated[i] = { ...updated[i], label: e.target.value }
                   setSettings(prev => ({ ...prev, subscribe_info_job_options: updated }))
                 }}
+                placeholder="Display label"
                 className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = settings.subscribe_info_job_options.filter((_, idx) => idx !== i)
+                  setSettings(prev => ({ ...prev, subscribe_info_job_options: updated }))
+                }}
+                className="text-red-400 hover:text-red-600 text-sm px-1"
+                title="Remove option"
+              >
+                &times;
+              </button>
             </div>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              setSettings(prev => ({
+                ...prev,
+                subscribe_info_job_options: [...prev.subscribe_info_job_options, { value: '', label: '' }]
+              }))
+            }}
+            className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+          >
+            + Add option
+          </button>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Yearly Clients Question Label</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Question 2 Label</label>
           <input
             type="text"
             value={settings.subscribe_info_clients_label}
@@ -306,11 +348,20 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Yearly Clients Option Labels</label>
-          <p className="text-xs text-gray-400 mb-2">Edit the display labels for each option. The stored values remain the same.</p>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Question 2 Options</label>
           {settings.subscribe_info_clients_options.map((opt, i) => (
-            <div key={opt.value} className="flex items-center gap-2 mb-2">
-              <span className="text-xs text-gray-400 w-28 shrink-0">{opt.value}</span>
+            <div key={i} className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={opt.value}
+                onChange={(e) => {
+                  const updated = [...settings.subscribe_info_clients_options]
+                  updated[i] = { ...updated[i], value: e.target.value }
+                  setSettings(prev => ({ ...prev, subscribe_info_clients_options: updated }))
+                }}
+                placeholder="Stored value"
+                className="w-32 border rounded-md px-3 py-1.5 text-sm text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
               <input
                 type="text"
                 value={opt.label}
@@ -319,10 +370,34 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
                   updated[i] = { ...updated[i], label: e.target.value }
                   setSettings(prev => ({ ...prev, subscribe_info_clients_options: updated }))
                 }}
+                placeholder="Display label"
                 className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = settings.subscribe_info_clients_options.filter((_, idx) => idx !== i)
+                  setSettings(prev => ({ ...prev, subscribe_info_clients_options: updated }))
+                }}
+                className="text-red-400 hover:text-red-600 text-sm px-1"
+                title="Remove option"
+              >
+                &times;
+              </button>
             </div>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              setSettings(prev => ({
+                ...prev,
+                subscribe_info_clients_options: [...prev.subscribe_info_clients_options, { value: '', label: '' }]
+              }))
+            }}
+            className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+          >
+            + Add option
+          </button>
         </div>
 
         <div>
