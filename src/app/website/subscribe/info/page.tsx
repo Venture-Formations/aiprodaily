@@ -1,19 +1,13 @@
 import { Container } from "@/components/salient/Container"
 import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 import { PersonalizationForm } from "./personalization-form"
-import { headers } from 'next/headers'
-import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
+import { resolvePublicationFromRequest, getPublicationSettings } from '@/lib/publication-settings'
 
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
 
 export default async function SubscribeInfoPage() {
-  // Get domain from headers (Next.js 15 requires await)
-  const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
-
-  // Get publication ID from domain
-  const publicationId = await getPublicationByDomain(host) || 'accounting'
+  const { publicationId } = await resolvePublicationFromRequest()
 
   // Fetch settings from publication_settings
   const settings = await getPublicationSettings(publicationId, [
