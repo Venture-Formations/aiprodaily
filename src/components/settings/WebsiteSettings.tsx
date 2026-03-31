@@ -289,24 +289,12 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
             <div key={i} className="flex items-center gap-2 mb-2">
               <input
                 type="text"
-                value={opt.value}
-                onChange={(e) => {
-                  const updated = [...settings.subscribe_info_job_options]
-                  updated[i] = { ...updated[i], value: e.target.value }
-                  setSettings(prev => ({ ...prev, subscribe_info_job_options: updated }))
-                }}
-                placeholder="Stored value"
-                className="w-32 border rounded-md px-3 py-1.5 text-sm text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <input
-                type="text"
                 value={opt.label}
                 onChange={(e) => {
                   const updated = [...settings.subscribe_info_job_options]
-                  updated[i] = { ...updated[i], label: e.target.value }
+                  updated[i] = { value: e.target.value, label: e.target.value }
                   setSettings(prev => ({ ...prev, subscribe_info_job_options: updated }))
                 }}
-                placeholder="Display label"
                 className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <button
@@ -353,24 +341,12 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
             <div key={i} className="flex items-center gap-2 mb-2">
               <input
                 type="text"
-                value={opt.value}
-                onChange={(e) => {
-                  const updated = [...settings.subscribe_info_clients_options]
-                  updated[i] = { ...updated[i], value: e.target.value }
-                  setSettings(prev => ({ ...prev, subscribe_info_clients_options: updated }))
-                }}
-                placeholder="Stored value"
-                className="w-32 border rounded-md px-3 py-1.5 text-sm text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <input
-                type="text"
                 value={opt.label}
                 onChange={(e) => {
                   const updated = [...settings.subscribe_info_clients_options]
-                  updated[i] = { ...updated[i], label: e.target.value }
+                  updated[i] = { value: e.target.value, label: e.target.value }
                   setSettings(prev => ({ ...prev, subscribe_info_clients_options: updated }))
                 }}
-                placeholder="Display label"
                 className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <button
