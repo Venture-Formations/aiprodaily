@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 
-const JOB_TYPE_OPTIONS = [
+const DEFAULT_JOB_OPTIONS = [
   { value: 'partner_owner', label: 'Partner/Owner' },
   { value: 'cfo', label: 'CFO' },
   { value: 'accountant', label: 'Accountant' },
@@ -11,7 +11,7 @@ const JOB_TYPE_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 
-const YEARLY_CLIENTS_OPTIONS = [
+const DEFAULT_CLIENTS_OPTIONS = [
   { value: '1', label: '1 (just my employer\'s or my own company)' },
   { value: '2-20', label: '2-20' },
   { value: '21-100', label: '21-100' },
@@ -19,7 +19,21 @@ const YEARLY_CLIENTS_OPTIONS = [
   { value: '300+', label: '300+' },
 ]
 
-export function PersonalizationForm() {
+interface PersonalizationFormProps {
+  jobLabel?: string
+  jobOptions?: { value: string; label: string }[]
+  clientsLabel?: string
+  clientsOptions?: { value: string; label: string }[]
+  submitText?: string
+}
+
+export function PersonalizationForm({
+  jobLabel = 'What best describes your role?',
+  jobOptions = DEFAULT_JOB_OPTIONS,
+  clientsLabel = "How many clients' books/tax returns/financials do you handle yearly?",
+  clientsOptions = DEFAULT_CLIENTS_OPTIONS,
+  submitText = 'Complete Sign Up',
+}: PersonalizationFormProps) {
   const searchParams = useSearchParams()
   const urlEmail = searchParams.get('email') || ''
 
@@ -174,7 +188,7 @@ export function PersonalizationForm() {
         {/* Job Type Dropdown */}
         <div>
           <label htmlFor="jobType" className="block text-sm font-medium text-slate-700 text-left mb-1">
-            What best describes your role? <span className="text-red-500">*</span>
+            {jobLabel} <span className="text-red-500">*</span>
           </label>
           <select
             id="jobType"
@@ -185,7 +199,7 @@ export function PersonalizationForm() {
             className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
           >
             <option value="">Select your role...</option>
-            {JOB_TYPE_OPTIONS.map((option) => (
+            {jobOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -196,7 +210,7 @@ export function PersonalizationForm() {
         {/* Yearly Clients Dropdown */}
         <div>
           <label htmlFor="yearlyClients" className="block text-sm font-medium text-slate-700 text-left mb-1">
-            How many clients&apos; books/tax returns/financials do you handle yearly? <span className="text-red-500">*</span>
+            {clientsLabel} <span className="text-red-500">*</span>
           </label>
           <select
             id="yearlyClients"
@@ -207,7 +221,7 @@ export function PersonalizationForm() {
             className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
           >
             <option value="">Select an option...</option>
-            {YEARLY_CLIENTS_OPTIONS.map((option) => (
+            {clientsOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -221,7 +235,7 @@ export function PersonalizationForm() {
           disabled={isSubmitting || !email}
           className="w-full rounded-full bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-lg hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isSubmitting ? 'Submitting...' : 'Complete Sign Up'}
+          {isSubmitting ? 'Submitting...' : submitText}
         </button>
       </form>
 
