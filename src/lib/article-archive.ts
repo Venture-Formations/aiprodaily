@@ -15,18 +15,19 @@ export class ArticleArchiveService {
     console.log(`Archive reason: ${archiveReason}`)
 
     try {
-      // Get issue info for denormalized data
+      // Get issue info for denormalized data (including publication_id for tenant scoping)
       const { data: issue } = await supabaseAdmin
         .from('publication_issues')
-        .select('date, status')
+        .select('date, status, publication_id')
         .eq('id', issueId)
         .single()
 
       const issueDate = issue?.date || null
       const campaignStatus = issue?.status || null
+      const publicationId = issue?.publication_id || null
 
       // Step 1: Archive articles with their position data
-      const archivedArticlesCount = await this.archiveArticles(issueId, archiveReason, issueDate, campaignStatus)
+      const archivedArticlesCount = await this.archiveArticles(issueId, archiveReason, issueDate, campaignStatus, publicationId)
 
       // Step 2: Archive RSS posts and their ratings
       const { archivedPostsCount, archivedRatingsCount } = await this.archiveRssPosts(issueId, archiveReason, issueDate)
@@ -52,30 +53,32 @@ export class ArticleArchiveService {
     issueId: string,
     archiveReason: string,
     issueDate: string | null,
-    campaignStatus: string | null
+    campaignStatus: string | null,
+    publicationId: string | null = null
   ): Promise<number> {
-    // Get articles to archive
+    // Get articles from module_articles (explicit column list — no select('*'))
     const { data: articles, error: articlesError } = await supabaseAdmin
-      .from('articles')
-      .select('*')
+      .from('module_articles')
+      .select('id, post_id, issue_id, article_module_id, headline, content, rank, is_active, fact_check_score, fact_check_details, word_count, review_position, final_position, ai_image_url, image_alt, trade_image_url, trade_image_alt, ticker, member_name, transaction_type, created_at, updated_at')
       .eq('issue_id', issueId)
 
     if (articlesError) {
-      throw new Error(`Failed to fetch articles: ${articlesError.message}`)
+      throw new Error(`Failed to fetch module articles: ${articlesError.message}`)
     }
 
     if (!articles || articles.length === 0) {
-      console.log('No articles found to archive')
+      console.log('No module articles found to archive')
       return 0
     }
 
-    console.log(`Found ${articles.length} articles to archive`)
+    console.log(`Found ${articles.length} module articles to archive`)
 
-    // Transform articles for archiving
+    // Transform articles for archiving (includes module-specific fields)
     const archiveData = articles.map(article => ({
       original_article_id: article.id,
       post_id: article.post_id,
       issue_id: article.issue_id,
+      publication_id: publicationId,
       headline: article.headline,
       content: article.content,
       rank: article.rank,
@@ -83,8 +86,16 @@ export class ArticleArchiveService {
       fact_check_score: article.fact_check_score,
       fact_check_details: article.fact_check_details,
       word_count: article.word_count,
-      review_position: article.review_position, // PRESERVE POSITION DATA
-      final_position: article.final_position,   // PRESERVE POSITION DATA
+      review_position: article.review_position,
+      final_position: article.final_position,
+      article_module_id: article.article_module_id,
+      ai_image_url: article.ai_image_url,
+      image_alt: article.image_alt,
+      trade_image_url: article.trade_image_url,
+      trade_image_alt: article.trade_image_alt,
+      ticker: article.ticker,
+      member_name: article.member_name,
+      transaction_type: article.transaction_type,
       archive_reason: archiveReason,
       issue_date: issueDate,
       issue_status: campaignStatus,
@@ -223,7 +234,7 @@ export class ArticleArchiveService {
   async getArchivedArticles(issueId: string): Promise<ArchivedArticle[]> {
     const { data, error } = await supabaseAdmin
       .from('archived_articles')
-      .select('*')
+      .select('id, original_article_id, post_id, issue_id, publication_id, headline, content, rank, is_active, skipped, fact_check_score, fact_check_details, word_count, review_position, final_position, article_module_id, ai_image_url, image_alt, trade_image_url, trade_image_alt, ticker, member_name, transaction_type, archive_reason, issue_date, issue_status, original_created_at, original_updated_at, archived_at, created_at')
       .eq('issue_id', issueId)
       .order('archived_at', { ascending: false })
 
@@ -240,7 +251,7 @@ export class ArticleArchiveService {
   async getArchivedArticlesByDateRange(startDate: string, endDate: string): Promise<ArchivedArticle[]> {
     const { data, error } = await supabaseAdmin
       .from('archived_articles')
-      .select('*')
+      .select('id, original_article_id, post_id, issue_id, publication_id, headline, content, rank, is_active, skipped, fact_check_score, fact_check_details, word_count, review_position, final_position, article_module_id, ai_image_url, image_alt, trade_image_url, trade_image_alt, ticker, member_name, transaction_type, archive_reason, issue_date, issue_status, original_created_at, original_updated_at, archived_at, created_at')
       .gte('issue_date', startDate)
       .lte('issue_date', endDate)
       .order('issue_date', { ascending: false })
@@ -262,29 +273,40 @@ export class ArticleArchiveService {
     oldestArchive: string | null;
     newestArchive: string | null;
   }> {
-    const { data: articleStats } = await supabaseAdmin
+    // Use database-side aggregates (DBA review: was unbounded full-table JS fetch)
+    const { count: totalArchivedArticles } = await supabaseAdmin
       .from('archived_articles')
-      .select('archived_at, review_position, final_position')
+      .select('id', { count: 'exact', head: true })
 
-    const { data: postStats } = await supabaseAdmin
+    const { count: totalArchivedPosts } = await supabaseAdmin
       .from('archived_rss_posts')
+      .select('id', { count: 'exact', head: true })
+
+    const { count: articlesWithPositions } = await supabaseAdmin
+      .from('archived_articles')
+      .select('id', { count: 'exact', head: true })
+      .not('review_position', 'is', null)
+
+    const { data: oldest } = await supabaseAdmin
+      .from('archived_articles')
       .select('archived_at')
+      .order('archived_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
 
-    const articlesWithPositions = articleStats?.filter(a =>
-      a.review_position !== null || a.final_position !== null
-    ).length || 0
-
-    const allDates = [
-      ...(articleStats?.map(a => a.archived_at) || []),
-      ...(postStats?.map(p => p.archived_at) || [])
-    ].sort()
+    const { data: newest } = await supabaseAdmin
+      .from('archived_articles')
+      .select('archived_at')
+      .order('archived_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     return {
-      totalArchivedArticles: articleStats?.length || 0,
-      totalArchivedPosts: postStats?.length || 0,
-      articlesWithPositions,
-      oldestArchive: allDates.length > 0 ? allDates[0] : null,
-      newestArchive: allDates.length > 0 ? allDates[allDates.length - 1] : null
+      totalArchivedArticles: totalArchivedArticles || 0,
+      totalArchivedPosts: totalArchivedPosts || 0,
+      articlesWithPositions: articlesWithPositions || 0,
+      oldestArchive: oldest?.archived_at || null,
+      newestArchive: newest?.archived_at || null
     }
   }
 }

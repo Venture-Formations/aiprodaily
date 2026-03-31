@@ -32,54 +32,8 @@ export class NewsletterArchiver {
         return { success: false, error: `Failed to fetch issue: ${issueError.message}` }
       }
 
-      // 2. Fetch all articles for this issue
-      const { data: articles, error: articlesError } = await supabaseAdmin
-        .from('articles')
-        .select(`
-          id,
-          headline,
-          content,
-          word_count,
-          rank,
-          final_position,
-          created_at,
-          rss_post:rss_posts(
-            title,
-            source_url,
-            image_url,
-            publication_date
-          )
-        `)
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-        .order('rank', { ascending: true })
-
-      if (articlesError) {
-        console.error('Error fetching articles:', articlesError)
-        return { success: false, error: `Failed to fetch articles: ${articlesError.message}` }
-      }
-
-      // Fetch secondary articles
-      const { data: secondaryArticles } = await supabaseAdmin
-        .from('secondary_articles')
-        .select(`
-          id,
-          headline,
-          content,
-          word_count,
-          rank,
-          final_position,
-          created_at,
-          rss_post:rss_posts(
-            title,
-            source_url,
-            image_url,
-            publication_date
-          )
-        `)
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-        .order('rank', { ascending: true })
+      // 2. Module articles are fetched per-module below (line ~407)
+      // Legacy articles/secondary_articles queries removed — module_articles is the sole source
 
       // 3. Fetch additional sections data
       const sections: Record<string, any> = {}
@@ -534,8 +488,8 @@ export class NewsletterArchiver {
 
       // 4. Gather metadata
       const metadata = {
-        total_articles: articles?.length || 0,
-        total_secondary_articles: secondaryArticles?.length || 0,
+        total_articles: 0, // Legacy field — module articles counted via article_modules_count
+        total_secondary_articles: 0, // Legacy field — no longer applicable
         has_text_box_modules: !!sections.text_box_modules && Array.isArray(sections.text_box_modules) && sections.text_box_modules.length > 0,
         text_box_modules_count: sections.text_box_modules?.length || 0,
         has_road_work: !!roadWork,
@@ -566,8 +520,8 @@ export class NewsletterArchiver {
         recipient_count: recipientCount,
         html_backup: htmlContent || null,
         metadata,
-        articles: articles || [],
-        secondary_articles: secondaryArticles || [],
+        articles: [], // Legacy field — module articles stored in sections.article_modules
+        secondary_articles: [], // Legacy field — no longer applicable
         events: [], // No events support for AI Accounting Daily
         sections
       }
