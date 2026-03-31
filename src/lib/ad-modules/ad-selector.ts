@@ -11,6 +11,7 @@ import type {
 interface AdSelectionResult {
   ad: AdvertisementWithAdvertiser | null
   reason: string
+  scheduledOverride?: boolean
 }
 
 interface EligibleCompany {
@@ -105,6 +106,53 @@ export class ModuleAdSelector {
     }
 
     return true
+  }
+
+  /**
+   * Get the set of weekday numbers (0=Sun..6=Sat) this advertiser was used on
+   * in the given module within the last `lookbackWeeks` weeks.
+   * Used for day-of-week diversification so scheduled advertisers don't repeat
+   * the same weekday across consecutive weeks.
+   */
+  private static async getRecentUsedWeekdays(
+    moduleId: string,
+    advertiserId: string,
+    publicationId: string,
+    issueDate: Date,
+    lookbackWeeks: number
+  ): Promise<Set<number> | null> {
+    const cutoff = new Date(issueDate)
+    cutoff.setDate(cutoff.getDate() - lookbackWeeks * 7)
+    const cutoffStr = toLocalDateStr(cutoff)
+
+    // Query sent selections for this module+advertiser within lookback window
+    const { data, error } = await supabaseAdmin
+      .from('issue_module_ads')
+      .select(`
+        used_at,
+        advertisement:advertisements!inner(advertiser_id, publication_id)
+      `)
+      .eq('ad_module_id', moduleId)
+      .not('used_at', 'is', null)
+      .gte('used_at', cutoffStr)
+
+    if (error || !data) {
+      console.error(`[AdSelector] Error fetching recent weekday history for module ${moduleId}, advertiser ${advertiserId}:`, error)
+      return null
+    }
+
+    const days = new Set<number>()
+    for (const row of data) {
+      const ad = row.advertisement as any
+      if (ad?.advertiser_id !== advertiserId) continue
+      if (ad?.publication_id !== publicationId) continue
+      if (!row.used_at) continue
+      const parts = String(row.used_at).split('T')[0].split('-')
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+      days.add(d.getDay())
+    }
+
+    return days
   }
 
   /**
@@ -355,21 +403,65 @@ export class ModuleAdSelector {
     const candidatePool = paidCompanies.length > 0 ? paidCompanies : eligibleCompanies
     const poolLabel = paidCompanies.length > 0 ? 'paid-first' : 'all-eligible'
 
-    // Tier 1: Select company based on mod's selection mode
+    // Scheduled-frequency override: weekly/monthly advertisers that are due this period
+    // get priority over the normal rotation so they don't get skipped by sequential cycling.
+    // These companies already passed the eligibility check in getEligibleCompanies(),
+    // so being in the pool means they haven't run yet this period and have remaining paid slots.
+    // Constraints: weekdays only, and day-of-week diversification (no repeating a weekday
+    // used in the prior 2 weeks).
+    const issueDayOfWeek = issueDate.getDay()
+    const isWeekday = issueDayOfWeek >= 1 && issueDayOfWeek <= 5
+    const scheduledCandidates = isWeekday
+      ? candidatePool.filter(c => c.junction.frequency === 'weekly' || c.junction.frequency === 'monthly')
+      : []
+
+    // Filter out candidates whose recent history blocks today's day of the week
+    const scheduledDue: EligibleCompany[] = []
+    const blockedNames: string[] = []
+    for (const company of scheduledCandidates) {
+      const recentDays = await this.getRecentUsedWeekdays(
+        mod.id, company.junction.advertiser_id, publicationId, issueDate, 2
+      )
+      // If history lookup failed (null), skip this company's override to avoid
+      // accidentally double-running — they'll go through normal rotation instead.
+      if (recentDays === null) continue
+      if (!recentDays.has(issueDayOfWeek)) {
+        scheduledDue.push(company)
+      } else {
+        blockedNames.push(company.advertiser.company_name)
+      }
+    }
+    if (blockedNames.length > 0) {
+      console.log(`[AdSelector] Scheduled companies blocked on day ${issueDayOfWeek} (weekday used in prior 2 weeks): ${blockedNames.join(', ')}`)
+    }
+
     let selectedCompany: EligibleCompany | null = null
 
-    switch (selectionMode) {
-      case 'sequential':
-        selectedCompany = this.selectCompanySequential(candidatePool, mod.next_position || 1)
-        break
-      case 'random':
-        selectedCompany = this.selectCompanyRandom(candidatePool)
-        break
-      case 'priority':
-        selectedCompany = this.selectCompanyPriority(candidatePool)
-        break
-      default:
-        selectedCompany = this.selectCompanySequential(candidatePool, mod.next_position || 1)
+    if (scheduledDue.length > 0) {
+      // Among multiple due scheduled companies, pick the one with fewest times_used (fairness)
+      const sorted = [...scheduledDue].sort((a, b) => {
+        if (a.junction.times_used !== b.junction.times_used) {
+          return a.junction.times_used - b.junction.times_used
+        }
+        return a.junction.display_order - b.junction.display_order
+      })
+      selectedCompany = sorted[0]
+      console.log(`[AdSelector] Scheduled-frequency override: "${sorted[0].advertiser.company_name}" (${sorted[0].junction.frequency}, due this period)`)
+    } else {
+      // Tier 1: Select company based on mod's selection mode
+      switch (selectionMode) {
+        case 'sequential':
+          selectedCompany = this.selectCompanySequential(candidatePool, mod.next_position || 1)
+          break
+        case 'random':
+          selectedCompany = this.selectCompanyRandom(candidatePool)
+          break
+        case 'priority':
+          selectedCompany = this.selectCompanyPriority(candidatePool)
+          break
+        default:
+          selectedCompany = this.selectCompanySequential(candidatePool, mod.next_position || 1)
+      }
     }
 
     if (!selectedCompany) {
@@ -383,9 +475,15 @@ export class ModuleAdSelector {
       return { ad: null, reason: `Company "${selectedCompany.advertiser.company_name}" has no eligible ads` }
     }
 
+    const isScheduledOverride = scheduledDue.some(c => c.junction.id === selectedCompany!.junction.id)
+    const modeLabel = isScheduledOverride
+      ? `scheduled-${selectedCompany.junction.frequency}/${poolLabel}`
+      : `${selectionMode}/${poolLabel}`
+
     return {
       ad: selectedAd,
-      reason: `Selected via ${selectionMode}/${poolLabel} mode: company "${selectedCompany.advertiser.company_name}" (pos ${selectedCompany.junction.display_order}), ad "${selectedAd.title}" (pos ${selectedAd.display_order}) from ${candidatePool.length}/${eligibleCompanies.length} companies`
+      reason: `Selected via ${modeLabel} mode: company "${selectedCompany.advertiser.company_name}" (pos ${selectedCompany.junction.display_order}), ad "${selectedAd.title}" (pos ${selectedAd.display_order}) from ${candidatePool.length}/${eligibleCompanies.length} companies`,
+      scheduledOverride: isScheduledOverride
     }
   }
 
@@ -439,13 +537,17 @@ export class ModuleAdSelector {
       }
 
       // Store selection in database (using advertisement_id) — idempotent upsert
+      // Mark scheduled overrides so recordUsageSimple knows not to advance next_position
+      const storedMode = result.scheduledOverride
+        ? `scheduled-${mod.selection_mode}`
+        : mod.selection_mode
       const { error: insertError } = await supabaseAdmin
         .from('issue_module_ads')
         .upsert({
           issue_id: issueId,
           ad_module_id: mod.id,
           advertisement_id: result.ad?.id || null,
-          selection_mode: mod.selection_mode
+          selection_mode: storedMode
         }, {
           onConflict: 'issue_id,ad_module_id',
           ignoreDuplicates: true
@@ -573,8 +675,11 @@ export class ModuleAdSelector {
           await this.advanceAdPositionWithinCompany(ad.ad_module_id, ad.advertiser_id, ad.display_order, issueDateStr)
         }
 
-        // Advance company position for sequential modules
-        if (adModule && adModule.selection_mode === 'sequential' && ad.advertiser_id) {
+        // Advance company position for sequential modules — but NOT for scheduled overrides,
+        // because the override jumped ahead of the normal rotation and the company at
+        // next_position should still get its turn on the next non-scheduled day.
+        const wasScheduledOverride = selection.selection_mode?.startsWith('scheduled-')
+        if (adModule && adModule.selection_mode === 'sequential' && ad.advertiser_id && !wasScheduledOverride) {
           await this.advanceCompanyPosition(adModule.id, ad.advertiser_id)
         }
 

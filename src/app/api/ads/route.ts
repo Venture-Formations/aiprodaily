@@ -66,7 +66,7 @@ const createAdSchema = z.object({
   times_paid: z.number().int().optional().default(1),
   status: z.enum(['pending', 'approved', 'active', 'paused', 'completed', 'rejected']).optional().default('approved'),
   useInNextNewsletter: z.boolean().optional().default(false),
-  payment_status: z.enum(['paid', 'pending', 'free']).optional().default('paid'),
+  payment_status: z.enum(['paid', 'pending', 'free', 'manual']).optional().default('paid'),
   paid: z.boolean().optional().default(true),
   image_url: z.string().url().nullable().optional(),
   image_alt: z.string().nullable().optional(),
