@@ -96,7 +96,11 @@ export class RSSProcessor {
 
   // === Article Generation ===
 
+  /**
+   * @deprecated Use module-articles.ts pipeline instead. This is now a no-op.
+   */
   generateArticlesForSection(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
+    console.warn('[DEPRECATED] RSSProcessor.generateArticlesForSection() — use module-articles.ts pipeline instead')
     return this.articleGenerator.generateArticlesForSection(issueId, section, limit)
   }
 

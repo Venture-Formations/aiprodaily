@@ -14,7 +14,7 @@ export const GET = withApiHandler(
       .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletter.id)
-      .or('key.like.email_%,key.like.sendgrid_%,key.like.mailerlite_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position,key.eq.secondary_send_days')
+      .or('key.like.email_%,key.like.sendgrid_%,key.like.mailerlite_%,key.like.beehiiv_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position,key.eq.secondary_send_days')
 
     if (error) {
       console.error('BACKEND GET: Database error:', error)
@@ -76,6 +76,17 @@ export const GET = withApiHandler(
           // New key - always use (overwrite legacy value if present)
           savedSettings[uiKey] = cleanValue
         }
+      } else if (row.key.startsWith('beehiiv_')) {
+        if (row.key === 'beehiiv_api_key') {
+          // Never send actual key to frontend — only a boolean
+          savedSettings.hasBeehiivApiKey = !!cleanValue && cleanValue.length > 0
+        } else {
+          const keyMap: Record<string, string> = {
+            'beehiiv_publication_id': 'beehiivPublicationId',
+          }
+          const uiKey = keyMap[row.key] || row.key
+          savedSettings[uiKey] = cleanValue
+        }
       } else if (row.key.startsWith('email_')) {
         const settingKey = row.key.replace('email_', '')
         savedSettings[settingKey] = cleanValue
@@ -102,6 +113,10 @@ export const GET = withApiHandler(
       mailerliteMainGroupId: '',
       mailerliteSecondaryGroupId: '',
       mailerliteTestGroupId: '',
+
+      // Beehiiv Settings
+      beehiivPublicationId: '',
+      hasBeehiivApiKey: false,
 
       // SendGrid Settings
       sendgridReviewListId: '',
@@ -371,6 +386,9 @@ export const POST = withApiHandler(
       { key: 'mailerlite_secondary_group_id', value: settings.mailerliteSecondaryGroupId || '' },
       { key: 'mailerlite_test_group_id', value: settings.mailerliteTestGroupId || '' },
 
+      // Beehiiv Settings
+      { key: 'beehiiv_publication_id', value: settings.beehiivPublicationId || '' },
+
       // SendGrid Settings
       { key: 'sendgrid_review_list_id', value: settings.sendgridReviewListId || '' },
       { key: 'sendgrid_main_list_id', value: settings.sendgridMainListId || '' },
@@ -383,6 +401,11 @@ export const POST = withApiHandler(
       { key: 'email_fromEmail', value: settings.fromEmail },
       { key: 'email_senderName', value: settings.senderName },
     ]
+
+    // Beehiiv API key: only save if a new value was explicitly provided
+    if (settings.beehiivApiKey && settings.beehiivApiKey.trim().length > 0) {
+      nonScheduleSettings.push({ key: 'beehiiv_api_key', value: settings.beehiivApiKey.trim() })
+    }
 
     // Upsert non-schedule settings
     console.log('BACKEND: Saving non-schedule settings to database')

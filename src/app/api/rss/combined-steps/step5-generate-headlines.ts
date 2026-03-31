@@ -12,21 +12,15 @@ export async function executeStep5(issueId: string) {
   await processor.generateArticlesForSection(issueId, 'primary')
   await processor.generateArticlesForSection(issueId, 'secondary')
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
+  const { data: moduleArticles } = await supabaseAdmin
+    .from('module_articles')
     .select('id')
     .eq('issue_id', issueId)
 
-  const { data: secondaryArticles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id')
-    .eq('issue_id', issueId)
+  const articlesCount = moduleArticles ? moduleArticles.length : 0
 
-  const articlesCount = articles ? articles.length : 0
-  const secondaryCount = secondaryArticles ? secondaryArticles.length : 0
-  
   // Log batch stats if available from processor
-  console.log(`[Step 5/8] Complete: ${articlesCount} primary articles, ${secondaryCount} secondary articles`)
-  return { articlesCount, secondaryCount }
+  console.log(`[Step 5/8] Complete: ${articlesCount} module articles`)
+  return { articlesCount }
 }
 

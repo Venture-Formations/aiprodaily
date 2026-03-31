@@ -440,12 +440,12 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         // Get recent articles with their RSS post images
         const { data: articles, error: articlesError } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .select(`
             id,
             headline,
             is_active,
-            issueId,
+            issue_id,
             rss_post:rss_posts(
               id,
               title,
@@ -522,7 +522,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         // Get articles
         const { data: articles, count: totalArticles } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .select('id', { count: 'exact' })
           .eq('issue_id', issueId)
 
@@ -700,8 +700,8 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         // 4. Check for articles
         const { data: articles, error: articlesError } = await supabaseAdmin
-          .from('articles')
-          .select('*')
+          .from('module_articles')
+          .select('id, post_id, headline, content, rank, is_active, skipped, article_module_id, created_at')
           .eq('issue_id', issue.id)
 
         console.log(`Found ${articles?.length || 0} articles for issue ${issue.id}`)

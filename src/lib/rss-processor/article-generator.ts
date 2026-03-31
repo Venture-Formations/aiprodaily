@@ -16,149 +16,21 @@ export class ArticleGenerator {
   }
 
   /**
-   * Public method to generate newsletter articles - used by step-based processing
+   * @deprecated Article generation now handled by module-articles.ts pipeline.
+   * This method is a no-op kept for backward compatibility.
    */
   async generateArticlesForSection(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
-    return await this.generateNewsletterArticles(issueId, section, limit)
+    console.warn(`[DEPRECATED] ArticleGenerator.generateArticlesForSection called for ${section} — this is now handled by module-articles.ts`)
+    return
   }
 
+  /**
+   * @deprecated Legacy article generation that wrote to articles/secondary_articles tables.
+   * Now a no-op. Module pipeline uses generateNewsletterContent/factCheckContent directly.
+   */
   async generateNewsletterArticles(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
-    const newsletterId = await getNewsletterIdFromIssue(issueId)
-
-    // Get feeds for this section
-    const { data: feeds, error: feedsError } = await supabaseAdmin
-      .from('rss_feeds')
-      .select('id')
-      .eq('active', true)
-      .eq('publication_id', newsletterId)
-      .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
-
-    if (feedsError || !feeds || feeds.length === 0) {
-      return
-    }
-
-    const feedIds = feeds.map(f => f.id)
-
-    // Get posts with ratings and check for duplicates
-    const { data: topPosts, error: queryError } = await supabaseAdmin
-      .from('rss_posts')
-      .select(`
-        *,
-        post_ratings(*)
-      `)
-      .eq('issue_id', issueId)
-      .in('feed_id', feedIds)
-
-    // Get duplicate post IDs to exclude
-    const { data: duplicateGroups } = await supabaseAdmin
-      .from('duplicate_groups')
-      .select('id')
-      .eq('issue_id', issueId)
-
-    const groupIds = duplicateGroups?.map(g => g.id) || []
-
-    let duplicatePostIds = new Set<string>()
-    if (groupIds.length > 0) {
-      const { data: duplicatePosts } = await supabaseAdmin
-        .from('duplicate_posts')
-        .select('post_id')
-        .in('group_id', groupIds)
-
-      duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
-    }
-
-    if (queryError) {
-      return
-    }
-
-    if (!topPosts || topPosts.length === 0) {
-      return
-    }
-
-    const postsWithRatings = topPosts
-      .filter(post =>
-        post.post_ratings?.[0] &&
-        !duplicatePostIds.has(post.id) &&
-        post.full_article_text
-      )
-      .sort((a, b) => {
-        const scoreA = a.post_ratings?.[0]?.total_score || 0
-        const scoreB = b.post_ratings?.[0]?.total_score || 0
-        return scoreB - scoreA
-      })
-      .slice(0, limit)
-
-    if (postsWithRatings.length === 0) {
-      // Try a simpler query to get posts with ratings
-      const { data: allRatedPosts } = await supabaseAdmin
-        .from('rss_posts')
-        .select(`
-          *,
-          post_ratings(*)
-        `)
-        .eq('issue_id', issueId)
-        .not('post_ratings', 'is', null)
-
-      if (allRatedPosts && allRatedPosts.length > 0) {
-        const filteredPosts = allRatedPosts
-          .filter(post =>
-            !duplicatePostIds.has(post.id) &&
-            post.full_article_text
-          )
-          .sort((a, b) => {
-            const scoreA = a.post_ratings?.[0]?.total_score || 0
-            const scoreB = b.post_ratings?.[0]?.total_score || 0
-            return scoreB - scoreA
-          })
-          .slice(0, limit)
-
-        const limitedPosts = filteredPosts
-        const BATCH_SIZE = 2
-        for (let i = 0; i < limitedPosts.length; i += BATCH_SIZE) {
-          const batch = limitedPosts.slice(i, i + BATCH_SIZE)
-          const batchPromises = batch.map(async (post) => {
-            try {
-              await this.processPostIntoArticle(post, issueId, section)
-            } catch (error) {
-              // Silent failure
-            }
-          })
-          await Promise.all(batchPromises)
-
-          if (i + BATCH_SIZE < limitedPosts.length) {
-            await new Promise(resolve => setTimeout(resolve, 3000))
-          }
-        }
-      }
-      return
-    }
-
-    // Process articles in batches
-    const BATCH_SIZE = 2
-    let processedCount = 0
-    let errorCount = 0
-
-    for (let i = 0; i < postsWithRatings.length; i += BATCH_SIZE) {
-      const batch = postsWithRatings.slice(i, i + BATCH_SIZE)
-
-      const batchPromises = batch.map(async (post) => {
-        try {
-          await this.processPostIntoArticle(post, issueId, section)
-          processedCount++
-        } catch (error) {
-          errorCount++
-        }
-      })
-
-      await Promise.all(batchPromises)
-
-      if (i + BATCH_SIZE < postsWithRatings.length) {
-        await new Promise(resolve => setTimeout(resolve, 3000))
-      }
-    }
-
-    // Download and store images for articles
-    await this.processArticleImages(issueId)
+    console.warn(`[DEPRECATED] ArticleGenerator.generateNewsletterArticles called for ${section} — this is now handled by module-articles.ts`)
+    return
   }
 
   async processPostIntoArticle(post: any, issueId: string, section: 'primary' | 'secondary' = 'primary') {
@@ -350,56 +222,5 @@ export class ArticleGenerator {
     return result as FactCheckResult
   }
 
-  async processArticleImages(issueId: string) {
-    try {
-      const { data: articles, error } = await supabaseAdmin
-        .from('articles')
-        .select(`
-          id,
-          rss_post:rss_posts(
-            id,
-            image_url,
-            title
-          )
-        `)
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-
-      if (error || !articles) {
-        return
-      }
-
-      for (const article of articles) {
-        try {
-          const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
-
-          if (!rssPost?.image_url) {
-            continue
-          }
-
-          const originalImageUrl = rssPost.image_url
-
-          try {
-            const host = new URL(originalImageUrl).hostname.toLowerCase()
-            if (host.endsWith('.supabase.co') || host === 'img.aiprodaily.com') continue
-          } catch { /* not a valid URL, proceed with upload */ }
-
-          const hostedUrl = await this.ctx.imageStorage.uploadImage(originalImageUrl, rssPost.title)
-
-          if (hostedUrl) {
-            await supabaseAdmin
-              .from('rss_posts')
-              .update({ image_url: hostedUrl })
-              .eq('id', rssPost.id)
-          }
-
-        } catch (error) {
-          // Silent failure
-        }
-      }
-
-    } catch (error) {
-      // Silent failure
-    }
-  }
+  // processArticleImages removed — was dead code referencing legacy articles table
 }

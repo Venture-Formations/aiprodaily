@@ -86,7 +86,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         // Get articles for this issue
         const { data: articles } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .select(`
             id,
             headline,
@@ -133,7 +133,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
       // Get active articles with their RSS post image URLs
       const { data: articles, error } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select(`
           id,
           rss_post:rss_posts(

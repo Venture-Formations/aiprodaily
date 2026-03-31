@@ -16,8 +16,7 @@ export async function executeStep1(issueId: string) {
   }
 
   // Clear previous data
-  await supabaseAdmin.from('articles').delete().eq('issue_id', issueId)
-  await supabaseAdmin.from('secondary_articles').delete().eq('issue_id', issueId)
+  await supabaseAdmin.from('module_articles').delete().eq('issue_id', issueId)
   await supabaseAdmin.from('rss_posts').delete().eq('issue_id', issueId)
 
   console.log(`[Step 1/8] Complete: Archive`)

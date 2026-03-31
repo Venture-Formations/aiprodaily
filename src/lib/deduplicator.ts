@@ -257,22 +257,7 @@ export class Deduplicator {
       const issueIds = recentCampaigns.map(c => c.id)
       const allHistoricalPostIds: string[] = []
 
-      // Check LEGACY tables (articles, secondary_articles)
-      const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
-      const { data: legacyArticles, error: legacyError } = await supabaseAdmin
-        .from(tableName)
-        .select('id, post_id, headline')
-        .in('issue_id', issueIds)
-        .eq('is_active', true)
-        .eq('skipped', false)
-
-      if (!legacyError && legacyArticles) {
-        const legacyPostIds = legacyArticles.map(a => a.post_id).filter(Boolean)
-        allHistoricalPostIds.push(...legacyPostIds)
-        console.log(`[DEDUP] Found ${legacyPostIds.length} historical posts from legacy ${tableName} table`)
-      }
-
-      // Check NEW module_articles table (for module-based system)
+      // Check module_articles table
       const { data: moduleArticles, error: moduleError } = await supabaseAdmin
         .from('module_articles')
         .select('id, post_id, headline')
@@ -289,7 +274,7 @@ export class Deduplicator {
       const uniquePostIds = Array.from(new Set(allHistoricalPostIds))
 
       if (uniquePostIds.length === 0) {
-        console.log(`[DEDUP] No historical ${section} posts found in either table`)
+        console.log(`[DEDUP] No historical ${section} posts found in module_articles`)
         return []
       }
 

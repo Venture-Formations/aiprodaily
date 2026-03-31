@@ -6,7 +6,7 @@ import { isIPExcluded, IPExclusion } from '@/lib/ip-utils';
 export const maxDuration = 600;
 
 export const GET = withApiHandler(
-  { authTier: 'public', logContext: 'databases-articles' },
+  { authTier: 'authenticated', logContext: 'databases-articles' },
   async ({ request, logger }) => {
     // Use the shared supabaseAdmin client for consistent behavior
     const supabase = supabaseAdmin;
@@ -173,106 +173,46 @@ export const GET = withApiHandler(
       }
     });
 
-    // Fetch primary articles - filter by issue_id if we have issues
-    let primaryQuery = supabase
-      .from('articles')
-      .select(`
-        id,
-        post_id,
-        issue_id,
-        headline,
-        content,
-        rank,
-        fact_check_score,
-        word_count,
-        created_at
-      `);
-
-    if (issueIds.length > 0) {
-      primaryQuery = primaryQuery.in('issue_id', issueIds);
-    }
-
-    const { data: primaryArticles, error: primaryError } = await primaryQuery;
-
-    if (primaryError) {
-      console.error('[API] Primary articles error:', primaryError.message);
-      throw primaryError;
-    }
-
-    console.log('[API] Found primary articles:', primaryArticles?.length || 0);
-    if (primaryArticles && primaryArticles.length > 0) {
-      console.log('[API] Sample primary article:', { id: primaryArticles[0].id, post_id: primaryArticles[0].post_id, issue_id: primaryArticles[0].issue_id });
-    }
-
-    // Fetch secondary articles - filter by issue_id if we have issues
-    let secondaryQuery = supabase
-      .from('secondary_articles')
-      .select(`
-        id,
-        post_id,
-        issue_id,
-        headline,
-        content,
-        rank,
-        fact_check_score,
-        word_count,
-        created_at
-      `);
-
-    if (issueIds.length > 0) {
-      secondaryQuery = secondaryQuery.in('issue_id', issueIds);
-    }
-
-    const { data: secondaryArticles, error: secondaryError } = await secondaryQuery;
-
-    if (secondaryError) {
-      console.error('[API] Secondary articles error:', secondaryError.message);
-      throw secondaryError;
-    }
-
-    console.log('[API] Found secondary articles:', secondaryArticles?.length || 0);
-
-    // Fetch module articles (from the new article modules system)
+    // Fetch module articles (from the article modules system)
+    // Defense-in-depth: only fetch when issueIds exist (already scoped by publication_id)
     // Use pagination to handle more than 1000 module articles (Supabase default limit)
     let allModuleArticles: any[] = [];
-    let moduleArticlesOffset = 0;
-    const moduleArticlesBatchSize = 1000;
-    let hasMoreModuleArticles = true;
 
-    while (hasMoreModuleArticles) {
-      let moduleArticlesQuery = supabase
-        .from('module_articles')
-        .select(`
-          id,
-          post_id,
-          issue_id,
-          article_module_id,
-          headline,
-          content,
-          rank,
-          fact_check_score,
-          word_count,
-          created_at
-        `)
-        .range(moduleArticlesOffset, moduleArticlesOffset + moduleArticlesBatchSize - 1);
+    if (issueIds.length > 0) {
+      let moduleArticlesOffset = 0;
+      const moduleArticlesBatchSize = 1000;
+      let hasMoreModuleArticles = true;
 
-      if (issueIds.length > 0) {
-        moduleArticlesQuery = moduleArticlesQuery.in('issue_id', issueIds);
-      }
+      while (hasMoreModuleArticles) {
+        const { data: moduleArticlesBatch, error: moduleArticlesError } = await supabase
+          .from('module_articles')
+          .select(`
+            id,
+            post_id,
+            issue_id,
+            article_module_id,
+            headline,
+            content,
+            rank,
+            fact_check_score,
+            word_count,
+            created_at
+          `)
+          .in('issue_id', issueIds)
+          .range(moduleArticlesOffset, moduleArticlesOffset + moduleArticlesBatchSize - 1);
 
-      const { data: moduleArticlesBatch, error: moduleArticlesError } = await moduleArticlesQuery;
+        if (moduleArticlesError) {
+          console.error('[API] Module articles fetch error:', moduleArticlesError.message);
+          break;
+        }
 
-      if (moduleArticlesError) {
-        console.error('[API] Module articles fetch error:', moduleArticlesError.message);
-        break;
-      }
-
-      if (!moduleArticlesBatch || moduleArticlesBatch.length === 0) {
-        hasMoreModuleArticles = false;
-      } else {
-        allModuleArticles = allModuleArticles.concat(moduleArticlesBatch);
-        moduleArticlesOffset += moduleArticlesBatchSize;
-        hasMoreModuleArticles = moduleArticlesBatch.length === moduleArticlesBatchSize;
+        if (!moduleArticlesBatch || moduleArticlesBatch.length === 0) {
+          hasMoreModuleArticles = false;
+        } else {
+          allModuleArticles = allModuleArticles.concat(moduleArticlesBatch);
+          moduleArticlesOffset += moduleArticlesBatchSize;
+          hasMoreModuleArticles = moduleArticlesBatch.length === moduleArticlesBatchSize;
+        }
       }
     }
 
@@ -290,6 +230,7 @@ export const GET = withApiHandler(
       const { data: articleModules } = await supabase
         .from('article_modules')
         .select('id, name')
+        .eq('publication_id', newsletterId)
         .in('id', moduleIds);
 
       if (articleModules) {
@@ -299,10 +240,8 @@ export const GET = withApiHandler(
 
     console.log('[API] Article modules map size:', articleModulesMap.size);
 
-    // Get all post IDs (including from module articles)
+    // Get all post IDs from module articles
     const rawPostIds = [
-      ...(primaryArticles || []).map(a => a.post_id),
-      ...(secondaryArticles || []).map(a => a.post_id),
       ...(moduleArticles || []).map(a => a.post_id)
     ];
 
@@ -625,8 +564,6 @@ export const GET = withApiHandler(
     };
 
     const allArticles = [
-      ...(primaryArticles || []).map(a => transformArticle(a, 'Primary')),
-      ...(secondaryArticles || []).map(a => transformArticle(a, 'Secondary')),
       ...(moduleArticles || []).map(a => {
         // Get module name for feed type display
         const moduleName = a.article_module_id ? articleModulesMap.get(a.article_module_id) : null;
@@ -653,8 +590,6 @@ export const GET = withApiHandler(
         data: allArticles.slice(0, 5),
         debug: {
           issuesCount: issues?.length || 0,
-          primaryArticlesCount: primaryArticles?.length || 0,
-          secondaryArticlesCount: secondaryArticles?.length || 0,
           moduleArticlesCount: moduleArticles?.length || 0,
           articleModulesCount: articleModulesMap.size,
           postIdsCount: allPostIds.length,
@@ -664,14 +599,14 @@ export const GET = withApiHandler(
           postMapKeysSample: Array.from(postMap.keys()).slice(0, 5),
           postRatingsCount: postRatings?.length || 0,
           ratingsMapSize: ratingsMap.size,
-          // Check if first article's post_id is in the map
-          firstArticleCheck: primaryArticles && primaryArticles.length > 0 ? {
-            articleId: primaryArticles[0].id,
-            articlePostId: primaryArticles[0].post_id,
-            postFound: postMap.has(primaryArticles[0].post_id),
-            postData: postMap.get(primaryArticles[0].post_id) ? {
-              id: postMap.get(primaryArticles[0].post_id).id,
-              title: postMap.get(primaryArticles[0].post_id).title?.slice(0, 50)
+          // Check if first module article's post_id is in the map
+          firstArticleCheck: moduleArticles && moduleArticles.length > 0 ? {
+            articleId: moduleArticles[0].id,
+            articlePostId: moduleArticles[0].post_id,
+            postFound: postMap.has(moduleArticles[0].post_id),
+            postData: postMap.get(moduleArticles[0].post_id) ? {
+              id: postMap.get(moduleArticles[0].post_id).id,
+              title: postMap.get(moduleArticles[0].post_id).title?.slice(0, 50)
             } : null
           } : null
         }

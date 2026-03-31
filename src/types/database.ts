@@ -412,6 +412,7 @@ export interface ArchivedArticle {
   original_article_id: string
   post_id: string | null
   issue_id: string
+  publication_id: string | null
   headline: string
   content: string
   rank: number | null
@@ -422,6 +423,14 @@ export interface ArchivedArticle {
   word_count: number | null
   review_position: number | null
   final_position: number | null
+  article_module_id: string | null
+  ai_image_url: string | null
+  image_alt: string | null
+  trade_image_url: string | null
+  trade_image_alt: string | null
+  ticker: string | null
+  member_name: string | null
+  transaction_type: string | null
   archived_at: string
   archive_reason: string
   issue_date: string | null

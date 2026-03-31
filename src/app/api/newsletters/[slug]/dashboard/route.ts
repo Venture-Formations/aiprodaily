@@ -14,7 +14,7 @@ export const GET = withApiHandler(
     // Get newsletter
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
       .from('publications')
-      .select('*')
+      .select('id, slug, name, description, created_at, updated_at')
       .eq('slug', slug)
       .single()
 
@@ -62,7 +62,7 @@ export const GET = withApiHandler(
     const recentCampaigns = await Promise.all(
       (campaigns?.slice(0, 5) || []).map(async (issue) => {
         const { count: articleCount } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .select('id', { count: 'exact' })
           .eq('issue_id', issue.id)
 

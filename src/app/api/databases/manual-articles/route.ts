@@ -76,7 +76,7 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'Article body is required' }, { status: 400 })
     }
 
-    if (!section_type || !['primary_articles', 'secondary_articles'].includes(section_type)) {
+    if (!section_type || !['primary_articles'].includes(section_type)) {
       return NextResponse.json({ error: 'Valid section type is required' }, { status: 400 })
     }
 

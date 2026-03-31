@@ -15,7 +15,7 @@ export async function executeStep8(issueId: string) {
 
   // Get article count
   const { data: articles } = await supabaseAdmin
-    .from('articles')
+    .from('module_articles')
     .select('id')
     .eq('issue_id', issueId)
 

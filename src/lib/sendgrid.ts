@@ -785,12 +785,8 @@ export class SendGridService {
    * Uses the same template generation as MailerLite service
    */
   private async generateEmailHTML(issue: IssueWithEvents, isReview: boolean): Promise<string> {
-    // Filter active articles and sort by rank
-    const activeArticles = issue.articles
-      .filter(article => article.is_active)
-      .sort((a, b) => (a.rank || 999) - (b.rank || 999))
-
-    console.log('[SendGrid] Active articles to render:', activeArticles.length)
+    // Module articles are now fetched per-module during rendering (not from issue.articles)
+    console.log('[SendGrid] Rendering with module-based article system')
 
     // Fetch newsletter sections order (filtered by publication)
     const { data: sections } = await supabaseAdmin
@@ -807,6 +803,13 @@ export class SendGridService {
       .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true })
+
+    // Fetch article modules for this publication
+    const { data: articleModules } = await supabaseAdmin
+      .from('article_modules')
+      .select('id, name, display_order, publication_id, is_active, block_order')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
 
     // Fetch poll modules for this publication
     const { data: pollModules } = await supabaseAdmin
@@ -861,12 +864,32 @@ export class SendGridService {
       PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
-    // Merge newsletter sections, ad modules, and poll modules into a single sorted list
-    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any } | { type: 'poll_module'; data: any }
+    // Pre-fetch module articles grouped by module for article rendering
+    const { data: allModuleArticles } = await supabaseAdmin
+      .from('module_articles')
+      .select('id, post_id, issue_id, article_module_id, headline, content, rank, is_active, ai_image_url, image_alt, trade_image_url, trade_image_alt, ticker')
+      .eq('issue_id', issue.id)
+      .eq('is_active', true)
+      .order('rank', { ascending: true })
+
+    if (!allModuleArticles || allModuleArticles.length === 0) {
+      console.error(`[SendGrid] No active module_articles found for issue ${issue.id} — newsletter will have empty article sections`)
+    }
+
+    const articlesByModule: Record<string, any[]> = {}
+    for (const article of (allModuleArticles || [])) {
+      const moduleId = article.article_module_id
+      if (!articlesByModule[moduleId]) articlesByModule[moduleId] = []
+      articlesByModule[moduleId].push(article)
+    }
+
+    // Merge all module types into a single sorted list
+    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any } | { type: 'poll_module'; data: any } | { type: 'article_module'; data: any }
     const allItems: SectionItem[] = [
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
       ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
-      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m }))
+      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m })),
+      ...(articleModules || []).map(m => ({ type: 'article_module' as const, data: m }))
     ].sort((a, b) => (a.data.display_order ?? 999) - (b.data.display_order ?? 999))
 
     console.log('[SendGrid] Combined section order:', allItems.map(item =>
@@ -890,17 +913,20 @@ export class SendGridService {
         if (pollModuleHtml) {
           sectionsHtml += pollModuleHtml
         }
+      } else if (item.type === 'article_module') {
+        const { generateArticleModuleSection } = await import('./newsletter-templates')
+        const articleModuleHtml = await generateArticleModuleSection(
+          issue, item.data.id, false, undefined,
+          articlesByModule[item.data.id] || [], item.data
+        )
+        if (articleModuleHtml) {
+          sectionsHtml += articleModuleHtml
+        }
       } else {
         const section = item.data
-        if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
-          const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id, undefined)
-          sectionsHtml += primaryHtml
-        }
-        else if (section.section_type === 'secondary_articles') {
-          const { generateSecondaryArticlesSection } = await import('./newsletter-templates')
-          const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
-          sectionsHtml += secondaryHtml
+        if (section.section_type === 'primary_articles' || section.section_type === 'secondary_articles') {
+          // Legacy section types — skip, articles now rendered via article_modules above
+          continue
         }
         else if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
           const { generateAIAppsSection } = await import('./newsletter-templates')
