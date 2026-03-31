@@ -22,8 +22,6 @@ export {
 // Articles
 export {
   generateArticleModuleSection,
-  generatePrimaryArticlesSection,
-  generateSecondaryArticlesSection,
 } from './articles'
 
 // Ads
