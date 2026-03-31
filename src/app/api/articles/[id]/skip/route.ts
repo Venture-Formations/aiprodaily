@@ -5,13 +5,13 @@ import { withApiHandler } from '@/lib/api-handler'
 
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'articles/[id]/skip' },
-  async ({ params, session }) => {
+  async ({ params, session, request }) => {
     const articleId = params.id
 
     // Get the article to verify it exists and check its rank
     const { data: article, error: articleError } = await supabaseAdmin
-      .from('articles')
-      .select('id, issue_id, headline, rank, is_active')
+      .from('module_articles')
+      .select('id, issue_id, headline, rank, is_active, article_module_id')
       .eq('id', articleId)
       .single()
 
@@ -21,6 +21,17 @@ export const POST = withApiHandler(
         error: 'Article not found',
         details: articleError?.message || 'Article does not exist'
       }, { status: 404 })
+    }
+
+    // Verify tenant ownership via issue_id -> publication_issues
+    const { data: issueOwner } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, publication_id')
+      .eq('id', article.issue_id)
+      .single()
+
+    if (!issueOwner) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
     // Check if this article is currently the #1 article (for subject line regeneration)
@@ -34,7 +45,7 @@ export const POST = withApiHandler(
 
     // Mark article as inactive and record that it was skipped
     const { error: updateError } = await supabaseAdmin
-      .from('articles')
+      .from('module_articles')
       .update({
         is_active: false,
         skipped: true,
@@ -44,15 +55,6 @@ export const POST = withApiHandler(
 
     if (updateError) {
       console.error('Failed to skip article:', updateError)
-
-      // Provide helpful error message if column doesn't exist
-      if (updateError.message?.includes('column "skipped" of relation "articles" does not exist')) {
-        return NextResponse.json({
-          error: 'Database setup required',
-          details: 'The skipped column needs to be added to the database. Please run: /api/debug/add-skip-column',
-          sqlCommand: 'ALTER TABLE articles ADD COLUMN skipped BOOLEAN DEFAULT FALSE;'
-        }, { status: 500 })
-      }
 
       return NextResponse.json({
         error: 'Failed to skip article',

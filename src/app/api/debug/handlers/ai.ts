@@ -146,7 +146,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       if (articleId) {
         // Get specific article
         const { data, error } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .select('id, headline, content, word_count, created_at')
           .eq('id', articleId)
           .single()
@@ -158,7 +158,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       } else {
         // Get recent articles with content
         const { data, error } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .select('id, headline, content, word_count, created_at')
           .not('content', 'is', null)
           .not('content', 'eq', '')

@@ -46,15 +46,9 @@ export const POST = withApiHandler(
         }, 'rss_step_archive')
       }
 
-      // Delete existing articles for this issue
+      // Delete existing module articles for this issue
       const { error: articlesDeleteError } = await supabaseAdmin
-        .from('articles')
-        .delete()
-        .eq('issue_id', issue_id)
-
-      // Delete existing secondary articles for this issue
-      const { error: secondaryDeleteError } = await supabaseAdmin
-        .from('secondary_articles')
+        .from('module_articles')
         .delete()
         .eq('issue_id', issue_id)
 

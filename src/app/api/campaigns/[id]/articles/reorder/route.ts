@@ -8,10 +8,26 @@ export const POST = withApiHandler(
   async ({ params, session, request }) => {
     const issueId = params.id
     const body = await request.json()
-    const { articleOrders } = body
+    const { articleOrders, publicationId } = body
 
     if (!Array.isArray(articleOrders)) {
       return NextResponse.json({ error: 'articleOrders must be an array' }, { status: 400 })
+    }
+
+    // Verify issue ownership by publication_id
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publicationId is required' }, { status: 400 })
+    }
+
+    const { data: issue } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, publication_id')
+      .eq('id', issueId)
+      .eq('publication_id', publicationId)
+      .single()
+
+    if (!issue) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
     // Get the current #1 article before reordering
@@ -25,7 +41,7 @@ export const POST = withApiHandler(
 
     const updatePromises = articleOrders.map(({ articleId, rank }) =>
       supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .update({ rank })
         .eq('id', articleId)
         .eq('issue_id', issueId)

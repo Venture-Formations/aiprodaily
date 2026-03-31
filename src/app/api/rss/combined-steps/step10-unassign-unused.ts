@@ -21,22 +21,13 @@ export async function executeStep10(issueId: string) {
     return { unassigned: 0 }
   }
 
-  // Find posts used in primary articles
-  const { data: primaryArticles } = await supabaseAdmin
-    .from('articles')
+  // Find posts used in module articles
+  const { data: moduleArticles } = await supabaseAdmin
+    .from('module_articles')
     .select('post_id')
     .eq('issue_id', issueId)
 
-  // Find posts used in secondary articles
-  const { data: secondaryArticles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('post_id')
-    .eq('issue_id', issueId)
-
-  const usedPostIds = [
-    ...(primaryArticles?.map(a => a.post_id) || []),
-    ...(secondaryArticles?.map(a => a.post_id) || [])
-  ]
+  const usedPostIds = moduleArticles?.map(a => a.post_id) || []
 
   // Find unused posts (assigned but no articles generated)
   const unusedPostIds = assignedPostIds.filter(id => !usedPostIds.includes(id))

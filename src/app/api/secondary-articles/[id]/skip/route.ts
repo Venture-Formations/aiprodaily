@@ -9,24 +9,35 @@ export const POST = withApiHandler(
 
     // Get the article to verify it exists
     const { data: article, error: articleError } = await supabaseAdmin
-      .from('secondary_articles')
+      .from('module_articles')
       .select('id, issue_id, headline, rank, is_active')
       .eq('id', articleId)
       .single()
 
     if (articleError || !article) {
-      console.error('Secondary article query error:', articleError)
+      console.error('Module article query error:', articleError)
       return NextResponse.json({
-        error: 'Secondary article not found',
-        details: articleError?.message || 'Secondary article does not exist'
+        error: 'Article not found',
+        details: articleError?.message || 'Article does not exist'
       }, { status: 404 })
     }
 
-    console.log(`Skipping secondary article: "${article.headline}" (rank: ${article.rank})`)
+    // Verify publication ownership via issue
+    const { data: issue } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, publication_id')
+      .eq('id', article.issue_id)
+      .single()
+
+    if (!issue) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
+    console.log(`Skipping article: "${article.headline}" (rank: ${article.rank})`)
 
     // Mark article as inactive and record that it was skipped
     const { error: updateError } = await supabaseAdmin
-      .from('secondary_articles')
+      .from('module_articles')
       .update({
         is_active: false,
         skipped: true,
@@ -35,19 +46,9 @@ export const POST = withApiHandler(
       .eq('id', articleId)
 
     if (updateError) {
-      console.error('Failed to skip secondary article:', updateError)
-
-      // Provide helpful error message if column doesn't exist
-      if (updateError.message?.includes('column "skipped" of relation "secondary_articles" does not exist')) {
-        return NextResponse.json({
-          error: 'Database setup required',
-          details: 'The skipped column needs to be added to the secondary_articles table. Please run: /api/debug/setup-secondary-articles',
-          sqlCommand: 'ALTER TABLE secondary_articles ADD COLUMN skipped BOOLEAN DEFAULT FALSE;'
-        }, { status: 500 })
-      }
-
+      console.error('Failed to skip article:', updateError)
       return NextResponse.json({
-        error: 'Failed to skip secondary article',
+        error: 'Failed to skip article',
         details: updateError.message
       }, { status: 500 })
     }
@@ -76,13 +77,13 @@ export const POST = withApiHandler(
           }])
       }
     } catch (logError) {
-      console.error('Failed to log secondary article skip action:', logError)
+      console.error('Failed to log article skip action:', logError)
       // Don't fail the request if logging fails
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Secondary article skipped successfully (marked as inactive)',
+      message: 'Article skipped successfully (marked as inactive)',
       article: {
         id: articleId,
         is_active: false,

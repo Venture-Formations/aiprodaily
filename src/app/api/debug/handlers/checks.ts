@@ -267,7 +267,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
         .eq('issue_id', issueId)
 
       const { data: articles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, post_id, headline, is_active')
         .eq('issue_id', issueId)
 
@@ -861,25 +861,14 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
 
       const duplicatePostIds = duplicatePosts?.map(dp => dp.post_id) || []
       const { data: articlesFromDuplicates } = await supabaseAdmin
-        .from('articles')
-        .select('id, headline, post_id')
-        .eq('issue_id', issueId)
-        .in('post_id', duplicatePostIds)
-
-      const { data: secondaryArticlesFromDuplicates } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id, headline, post_id')
+        .from('module_articles')
+        .select('id, headline, post_id, article_module_id')
         .eq('issue_id', issueId)
         .in('post_id', duplicatePostIds)
 
       const { data: allArticles } = await supabaseAdmin
-        .from('articles')
-        .select('id, headline, post_id, is_active')
-        .eq('issue_id', issueId)
-
-      const { data: allSecondaryArticles } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id, headline, post_id, is_active')
+        .from('module_articles')
+        .select('id, headline, post_id, is_active, article_module_id')
         .eq('issue_id', issueId)
 
       const groupsFormatted = duplicateGroups?.map(group => ({
@@ -910,28 +899,20 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
         deduplication_summary: {
           total_duplicate_groups: duplicateGroups?.length || 0,
           total_duplicate_posts: duplicatePosts?.length || 0,
-          posts_filtered_correctly: duplicatePostIds.length - ((articlesFromDuplicates?.length || 0) + (secondaryArticlesFromDuplicates?.length || 0)),
-          duplicate_posts_that_made_it_to_articles: (articlesFromDuplicates?.length || 0) + (secondaryArticlesFromDuplicates?.length || 0),
+          posts_filtered_correctly: duplicatePostIds.length - (articlesFromDuplicates?.length || 0),
+          duplicate_posts_that_made_it_to_articles: articlesFromDuplicates?.length || 0,
         },
         articles_count: {
-          primary_articles: allArticles?.length || 0,
-          secondary_articles: allSecondaryArticles?.length || 0,
-          primary_active: allArticles?.filter(a => a.is_active).length || 0,
-          secondary_active: allSecondaryArticles?.filter(a => a.is_active).length || 0
+          total_articles: allArticles?.length || 0,
+          active_articles: allArticles?.filter(a => a.is_active).length || 0
         },
         duplicate_groups: groupsFormatted,
         warning_duplicates_in_articles: [
           ...(articlesFromDuplicates?.map(a => ({
-            section: 'primary',
             article_id: a.id,
             headline: a.headline,
-            post_id: a.post_id
-          })) || []),
-          ...(secondaryArticlesFromDuplicates?.map(a => ({
-            section: 'secondary',
-            article_id: a.id,
-            headline: a.headline,
-            post_id: a.post_id
+            post_id: a.post_id,
+            article_module_id: a.article_module_id
           })) || [])
         ]
       })
@@ -1203,7 +1184,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
       const campaignIds = recentCampaigns.map(c => c.id)
 
       const { data: historicalArticles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, post_id, headline, issue_id, is_active, skipped')
         .in('issue_id', campaignIds)
         .eq('is_active', true)
@@ -1517,8 +1498,8 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
       const latestissue = recentCampaigns[0]
 
       const { data: articles, count: articleCount } = await supabaseAdmin
-        .from('articles')
-        .select('*', { count: 'exact' })
+        .from('module_articles')
+        .select('id, post_id, headline, content, is_active, rank, skipped, article_module_id, created_at', { count: 'exact' })
         .eq('issue_id', latestissue.id)
 
       const { data: rssPosts, count: rssPostCount } = await supabaseAdmin
@@ -1638,7 +1619,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
       const campaignsWithCounts = await Promise.all(
         (campaigns || []).map(async (issue) => {
           const { data: articles, error: articlesError } = await supabaseAdmin
-            .from('articles')
+            .from('module_articles')
             .select('id, is_active')
             .eq('issue_id', issue.id)
 
@@ -1901,7 +1882,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
       }
 
       const { data: articles, error: articlesError } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, headline, is_active, post_id')
         .eq('issue_id', issueId)
 
@@ -2085,9 +2066,19 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
       }
 
       const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
-        .from('secondary_articles')
+        .from('module_articles')
         .select(`
-          *,
+          id,
+          post_id,
+          headline,
+          content,
+          rank,
+          is_active,
+          skipped,
+          fact_check_score,
+          word_count,
+          article_module_id,
+          created_at,
           rss_post:rss_posts(
             id,
             title,
@@ -2115,8 +2106,8 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
           is_active: a.is_active,
           rank: a.rank,
           fact_check_score: a.fact_check_score,
-          rss_post_title: a.rss_post?.title,
-          score: a.rss_post?.post_rating?.[0]?.total_score || 0
+          rss_post_title: (a.rss_post as any)?.title,
+          score: (a.rss_post as any)?.post_rating?.[0]?.total_score || 0
         })) || []
       })
     }

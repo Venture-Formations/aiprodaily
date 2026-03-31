@@ -39,7 +39,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
       // Get all articles for this issue with ratings
       const { data: articles, error: articlesError } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select(`
           id,
           headline,
@@ -78,7 +78,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       // Set top 5 as active
       if (top5ArticleIds.length > 0) {
         const { error: activateError } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .update({ is_active: true })
           .in('id', top5ArticleIds)
 
@@ -95,7 +95,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       // Set remaining as inactive
       if (remainingArticleIds.length > 0) {
         const { error: deactivateError } = await supabaseAdmin
-          .from('articles')
+          .from('module_articles')
           .update({ is_active: false })
           .in('id', remainingArticleIds)
 
@@ -378,7 +378,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
     GET: async ({ logger }) => {
       // Get all active articles with their headlines and content
       const { data: articles, error } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, headline, content, created_at')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -1006,7 +1006,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
       // 1. Delete articles
       const { error: articlesError } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .delete()
         .eq('issue_id', issueId)
 

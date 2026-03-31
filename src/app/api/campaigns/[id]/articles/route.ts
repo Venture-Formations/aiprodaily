@@ -8,10 +8,26 @@ export const PATCH = withApiHandler(
     const id = params.id
 
     const body = await request.json()
-    const { article_updates } = body
+    const { article_updates, publicationId } = body
 
     if (!Array.isArray(article_updates)) {
       return NextResponse.json({ error: 'article_updates must be an array' }, { status: 400 })
+    }
+
+    // Verify issue ownership by publication_id
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publicationId is required' }, { status: 400 })
+    }
+
+    const { data: issue } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, publication_id')
+      .eq('id', id)
+      .eq('publication_id', publicationId)
+      .single()
+
+    if (!issue) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
     // Update articles in batch
@@ -23,7 +39,7 @@ export const PATCH = withApiHandler(
       if (typeof rank === 'number') updateData.rank = rank
 
       return supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .update(updateData)
         .eq('id', article_id)
         .eq('issue_id', id)

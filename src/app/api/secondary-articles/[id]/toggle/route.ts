@@ -15,21 +15,32 @@ export const POST = withApiHandler(
 
     // Get the article to verify it exists
     const { data: article, error: articleError } = await supabaseAdmin
-      .from('secondary_articles')
+      .from('module_articles')
       .select('id, issue_id, headline')
       .eq('id', articleId)
       .single()
 
     if (articleError || !article) {
       return NextResponse.json({
-        error: 'Secondary article not found',
-        details: articleError?.message || 'Secondary article does not exist'
+        error: 'Article not found',
+        details: articleError?.message || 'Article does not exist'
       }, { status: 404 })
+    }
+
+    // Verify publication ownership via issue
+    const { data: issue } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, publication_id')
+      .eq('id', article.issue_id)
+      .single()
+
+    if (!issue) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
     // Update the article's active status
     const { error: updateError } = await supabaseAdmin
-      .from('secondary_articles')
+      .from('module_articles')
       .update({
         is_active,
         updated_at: new Date().toISOString()
@@ -37,9 +48,9 @@ export const POST = withApiHandler(
       .eq('id', articleId)
 
     if (updateError) {
-      console.error('Failed to toggle secondary article:', updateError)
+      console.error('Failed to toggle article:', updateError)
       return NextResponse.json({
-        error: 'Failed to toggle secondary article',
+        error: 'Failed to toggle article',
         details: updateError.message
       }, { status: 500 })
     }
@@ -69,13 +80,13 @@ export const POST = withApiHandler(
           }])
       }
     } catch (logError) {
-      console.error('Failed to log secondary article toggle action:', logError)
+      console.error('Failed to log article toggle action:', logError)
       // Don't fail the request if logging fails
     }
 
     return NextResponse.json({
       success: true,
-      message: `Secondary article ${is_active ? 'activated' : 'deactivated'} successfully`,
+      message: `Article ${is_active ? 'activated' : 'deactivated'} successfully`,
       article: {
         id: articleId,
         is_active

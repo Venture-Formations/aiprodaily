@@ -1778,7 +1778,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler;
 
               if (recentIssue) {
                 const { data: articles } = await supabaseAdmin
-                  .from('articles')
+                  .from('module_articles')
                   .select('headline, content')
                   .eq('issue_id', recentIssue.id)
                   .eq('is_active', true)

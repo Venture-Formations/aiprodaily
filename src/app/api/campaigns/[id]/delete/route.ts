@@ -4,19 +4,27 @@ import { withApiHandler } from '@/lib/api-handler'
 
 export const DELETE = withApiHandler(
   { authTier: 'authenticated', logContext: 'campaigns/[id]/delete' },
-  async ({ params }) => {
+  async ({ params, publicationId }) => {
     const issueId = params.id
 
-    // Verify issue exists before deletion
+    // Verify issue exists and belongs to the publication
     const { data: issue, error: fetchError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, status')
+      .select('id, publication_id, date, status')
       .eq('id', issueId)
       .single()
 
     if (fetchError || !issue) {
       return NextResponse.json(
         { error: 'issue not found' },
+        { status: 404 }
+      )
+    }
+
+    // Verify publication ownership if publicationId is available
+    if (publicationId && issue.publication_id !== publicationId) {
+      return NextResponse.json(
+        { error: 'Not found' },
         { status: 404 }
       )
     }
@@ -40,29 +48,7 @@ export const DELETE = withApiHandler(
       deletionErrors.issue_events = { message: issueEventsError.message, code: issueEventsError.code }
     }
 
-    // 2. Delete articles (permanently remove generated content)
-    const { error: articlesError } = await supabaseAdmin
-      .from('articles')
-      .delete()
-      .eq('issue_id', issueId)
-
-    if (articlesError) {
-      console.error('Error deleting articles:', articlesError)
-      deletionErrors.articles = { message: articlesError.message, code: articlesError.code }
-    }
-
-    // 2b. Delete secondary articles (permanently remove generated content)
-    const { error: secondaryArticlesError } = await supabaseAdmin
-      .from('secondary_articles')
-      .delete()
-      .eq('issue_id', issueId)
-
-    if (secondaryArticlesError) {
-      console.error('Error deleting secondary articles:', secondaryArticlesError)
-      deletionErrors.secondary_articles = { message: secondaryArticlesError.message, code: secondaryArticlesError.code }
-    }
-
-    // 2c. Delete module articles (new article modules system)
+    // 2. Delete module articles (permanently remove generated content)
     const { error: moduleArticlesError } = await supabaseAdmin
       .from('module_articles')
       .delete()

@@ -91,7 +91,7 @@ export const POST = withApiHandler(
 
       // Get final article count to report to Slack
       const { data: finalArticles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id')
         .eq('issue_id', issue_id)
 

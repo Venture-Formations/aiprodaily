@@ -40,24 +40,15 @@ export const POST = withApiHandler(
       await processor.generateArticlesForSection(issue_id, 'secondary')
 
       // Count generated articles
-      const { data: primaryArticles } = await supabaseAdmin
-        .from('articles')
+      const { data: moduleArticles } = await supabaseAdmin
+        .from('module_articles')
         .select('id, fact_check_score')
         .eq('issue_id', issue_id)
 
-      const { data: secondaryArticles } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id, fact_check_score')
-        .eq('issue_id', issue_id)
-
-      const primaryCount = primaryArticles?.length || 0
-      const secondaryCount = secondaryArticles?.length || 0
-      const totalArticles = primaryCount + secondaryCount
+      const totalArticles = moduleArticles?.length || 0
 
       // Count articles that passed fact checking
-      const primaryPassed = primaryArticles?.filter(a => a.fact_check_score >= 70).length || 0
-      const secondaryPassed = secondaryArticles?.filter(a => a.fact_check_score >= 70).length || 0
-      const totalPassed = primaryPassed + secondaryPassed
+      const totalPassed = moduleArticles?.filter(a => a.fact_check_score >= 70).length || 0
 
       await completeWorkflowStep(issue_id, 'generating')
 
@@ -65,8 +56,6 @@ export const POST = withApiHandler(
         success: true,
         message: 'Generate articles step completed',
         issue_id,
-        primary_articles: primaryCount,
-        secondary_articles: secondaryCount,
         total_articles: totalArticles,
         fact_check_passed: totalPassed,
         next_state: 'pending_finalize',
