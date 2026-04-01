@@ -132,7 +132,11 @@ export const POST = withApiHandler(
       console.log(`[Subscribe] Successfully added ${email} to SendGrid list`)
     } else if (providerSettings.provider === 'beehiiv') {
       // Use Beehiiv
-      const beehiivPubId = providerSettings.beehiivPublicationId
+      // Beehiiv publication IDs must start with "pub_"
+      let beehiivPubId = providerSettings.beehiivPublicationId
+      if (beehiivPubId && !beehiivPubId.startsWith('pub_')) {
+        beehiivPubId = `pub_${beehiivPubId}`
+      }
       const beehiivApiKey = providerSettings.beehiivApiKey
 
       if (!beehiivPubId || !beehiivApiKey) {
