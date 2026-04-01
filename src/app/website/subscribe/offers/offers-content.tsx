@@ -8,6 +8,7 @@ import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 interface OffersContentProps {
   logoUrl: string
   newsletterName: string
+  afteroffersFormId?: string
 }
 
 function generateAfterOffersClickId() {
@@ -19,7 +20,7 @@ function generateAfterOffersClickId() {
   return `ao_${Date.now()}_${randomPart}`
 }
 
-export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
+export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: OffersContentProps) {
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
   const urlClickId = searchParams.get('click_id') || ''
@@ -80,7 +81,8 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
   if (clickId) {
     params.set('click_id', clickId)
   }
-  const afterOffersUrl = `https://offers.afteroffers.com/show_offers/994-2MMat6y-1?${params.toString()}`
+  const formId = afteroffersFormId || '994-2MMat6y-1'
+  const afterOffersUrl = `https://offers.afteroffers.com/show_offers/${formId}?${params.toString()}`
 
   return (
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">

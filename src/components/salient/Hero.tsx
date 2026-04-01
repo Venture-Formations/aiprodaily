@@ -57,9 +57,10 @@ interface HeroProps {
   calloutText?: string
   heading?: string
   subheading?: string
+  publicationId?: string
 }
 
-export function Hero({ calloutText, heading, subheading }: HeroProps) {
+export function Hero({ calloutText, heading, subheading, publicationId }: HeroProps) {
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -178,7 +179,7 @@ export function Hero({ calloutText, heading, subheading }: HeroProps) {
         onClose={handleModalClose}
         subscriberEmail={subscribedEmail}
         onSubscribeComplete={handleSubscribeComplete}
-        publicationName="AI Accounting Daily"
+        publicationId={publicationId}
       />
     </>
   )

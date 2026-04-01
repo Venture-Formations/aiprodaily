@@ -132,6 +132,7 @@ export default async function WebsiteHome() {
         calloutText={websiteSettings.website_callout_text || undefined}
         heading={websiteSettings.website_heading || undefined}
         subheading={websiteSettings.website_subheading || undefined}
+        publicationId={publicationId}
       />
       {/* Latest News Content */}
       <LatestNewsList

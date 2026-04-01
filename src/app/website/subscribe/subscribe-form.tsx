@@ -58,7 +58,7 @@ function generateAfterOffersClickId() {
   return `ao_${Date.now()}_${randomPart}`
 }
 
-export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline = 'FREE FOREVER' }: { newsletterName?: string; tagline?: string }) {
+export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline = 'FREE FOREVER', publicationId }: { newsletterName?: string; tagline?: string; publicationId?: string }) {
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -209,6 +209,7 @@ export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline 
         subscriberEmail={subscribedEmail}
         onSubscribeComplete={handleSubscribeComplete}
         publicationName={newsletterName}
+        publicationId={publicationId}
       />
     </>
   )

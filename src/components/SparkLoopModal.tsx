@@ -128,6 +128,7 @@ export function SparkLoopModal({
   subscriberEmail,
   onSubscribeComplete,
   publicationName = 'AI Accounting Daily',
+  publicationId,
 }: SparkLoopModalProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -144,7 +145,10 @@ export function SparkLoopModal({
       setError(null)
 
       try {
-        const response = await fetch('/api/sparkloop/recommendations')
+        const recUrl = publicationId
+          ? `/api/sparkloop/recommendations?publicationId=${encodeURIComponent(publicationId)}`
+          : '/api/sparkloop/recommendations'
+        const response = await fetch(recUrl)
         const data = await response.json()
 
         if (data.recommendations && data.recommendations.length > 0) {
@@ -216,6 +220,7 @@ export function SparkLoopModal({
         body: JSON.stringify({
           email: subscriberEmail,
           refCodes,
+          publicationId,
         }),
       })
 
