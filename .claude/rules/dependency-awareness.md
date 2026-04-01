@@ -1,38 +1,39 @@
 # Dependency Awareness Rule
 
-Before modifying any file in `src/lib/`, consult `docs/architecture/DEPENDENCY_MAP.md` to understand the impact.
+GitNexus MCP provides live code intelligence via a knowledge graph. Use its tools instead of static dependency maps.
 
 ## When to Check
 
-1. **Before modifying a lib module** — Read the "Reverse Index: Lib Modules" section to see all files that import it. List affected dependents in your response.
-2. **Before modifying a database table's schema** — Read the "Reverse Index: Tables" section to see all files that reference that table.
-3. **When creating implementation plans** — Include a "Blast Radius" section listing affected crons, routes, and pages from the dependency map.
-4. **When reviewing PRs** — Flag changes to high-connectivity files (Section 5 of the map) for extra scrutiny.
+1. **Before modifying a lib module** — Use GitNexus `impact` tool to see blast radius with confidence scores.
+2. **Before modifying a database table's schema** — Use GitNexus `context` tool for 360-degree symbol view.
+3. **When creating implementation plans** — Use GitNexus `impact` tool and include results in a "Blast Radius" section.
+4. **When reviewing PRs** — Use GitNexus `detect_changes` to map diffs to affected processes.
 
-## How to Check
+## Available GitNexus MCP Tools
 
-```
-1. Read docs/architecture/DEPENDENCY_MAP.md
-2. Search for the file/table/module you're changing
-3. List all dependents in your plan or response
-4. Consider whether dependents need updates too
+| Tool | Purpose |
+|------|---------|
+| `query` | Hybrid search (BM25 + semantic) across the codebase |
+| `context` | 360-degree symbol view with categorized references |
+| `impact` | Blast radius analysis with depth grouping and confidence |
+| `detect_changes` | Maps git diffs to affected processes |
+| `rename` | Coordinated multi-file refactoring with graph validation |
+| `cypher` | Raw graph queries for advanced analysis |
+| `list_repos` | Discover all indexed repositories |
+
+## Re-indexing
+
+GitNexus auto-reindexes via PostToolUse hooks when files change. To manually re-index:
+```bash
+npx gitnexus analyze
 ```
 
 ## What to Report
 
 When modifying a lib file, include in your response:
-- Number of dependents (from the reverse index)
-- Which crons are affected (tagged `[cron]` in the map)
-- Which API routes are affected (tagged `[api]`)
-- Which dashboard/pages are affected (tagged `[dash]`/`[page]`)
+- Blast radius from GitNexus `impact` tool (with confidence scores)
+- Which crons, API routes, and pages are affected
 - Whether database tables touched by the file have other consumers
-
-## Regenerating the Map
-
-If you've made structural changes (new imports, new files, renamed modules), regenerate:
-```bash
-npm run generate:dep-map
-```
 
 ## Priority
 
