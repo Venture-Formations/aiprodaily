@@ -7,7 +7,26 @@ const WEBSITE_SETTINGS_KEYS = [
   'website_heading',
   'website_subheading',
   'tools_directory_enabled',
+  // Subscribe page
+  'subscribe_heading',
+  'subscribe_heading_styled',
+  'subscribe_subheading',
+  'subscribe_tagline',
+  // Subscribe info page
+  'subscribe_info_heading',
+  'subscribe_info_heading_styled',
+  'subscribe_info_subheading',
+  'subscribe_info_job_label',
+  'subscribe_info_job_options',
+  'subscribe_info_clients_label',
+  'subscribe_info_clients_options',
+  'subscribe_info_submit_text',
 ]
+
+const JSON_SETTINGS_KEYS = new Set([
+  'subscribe_info_job_options',
+  'subscribe_info_clients_options',
+])
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/website' },
@@ -35,6 +54,12 @@ export const GET = withApiHandler(
       }
       if (cleanValue === 'true' || cleanValue === 'false') {
         settingsObject[setting.key] = cleanValue === 'true'
+      } else if (JSON_SETTINGS_KEYS.has(setting.key)) {
+        try {
+          settingsObject[setting.key] = JSON.parse(cleanValue)
+        } catch {
+          settingsObject[setting.key] = cleanValue
+        }
       } else {
         settingsObject[setting.key] = cleanValue
       }
@@ -56,7 +81,14 @@ export const POST = withApiHandler(
 
     for (const key of WEBSITE_SETTINGS_KEYS) {
       if (body[key] !== undefined) {
-        const value = typeof body[key] === 'boolean' ? String(body[key]) : body[key]
+        let value: string
+        if (typeof body[key] === 'boolean') {
+          value = String(body[key])
+        } else if (JSON_SETTINGS_KEYS.has(key)) {
+          value = typeof body[key] === 'string' ? body[key] : JSON.stringify(body[key])
+        } else {
+          value = body[key]
+        }
 
         await supabaseAdmin
           .from('publication_settings')

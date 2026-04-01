@@ -798,9 +798,9 @@ export default function EmailSettings({ publicationId }: { publicationId: string
           </div>
         </div>
 
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-          <strong>Required custom fields in Beehiiv:</strong> Create these custom fields in your Beehiiv publication settings before enabling: first_name, last_name, job_type, yearly_clients, fbp, fbc, fb_pixel_timestamp, fb_pixel_event_source_url, fb_pixel_user_agent, fb_pixel_ip, kb_status, kb_reason, kb_sendex, kb_free_email, kb_disposable, kb_role, kb_validation_timestamp.
-        </div>
+        <p className="mt-3 text-sm text-gray-500">
+          Beehiiv handles subscriber management only. Newsletter sending still uses MailerLite, so keep your MailerLite group IDs configured above.
+        </p>
       </div>
 
       {/* Automated Publication Review Schedule */}
