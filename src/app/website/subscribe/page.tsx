@@ -46,7 +46,9 @@ export default async function SubscribePage() {
 
             {/* Subheadline */}
             <p className="mt-4 sm:mt-6 text-base sm:text-lg tracking-tight text-slate-700">
-              {subheading}
+              {subheading.split('\n').map((line, i) => (
+                <span key={i}>{i > 0 && <br />}{line}</span>
+              ))}
             </p>
 
             {/* Subscribe Form */}
