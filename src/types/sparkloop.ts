@@ -196,6 +196,7 @@ export interface SparkLoopModalProps {
   subscriberEmail: string
   onSubscribeComplete: () => void
   publicationName?: string
+  publicationId?: string
 }
 
 /**

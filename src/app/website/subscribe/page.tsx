@@ -53,7 +53,7 @@ export default async function SubscribePage() {
 
             {/* Subscribe Form */}
             <div className="mt-6 sm:mt-10">
-              <SubscribeForm newsletterName={newsletterName} tagline={tagline} />
+              <SubscribeForm newsletterName={newsletterName} tagline={tagline} publicationId={publicationId} />
             </div>
           </div>
         </Container>

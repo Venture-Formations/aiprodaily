@@ -23,7 +23,7 @@ export const POST = withApiHandler(
   { authTier: 'public', logContext: 'sparkloop-subscribe' },
   async ({ request, logger }) => {
     const body = await request.json()
-    const { email, refCodes, source } = body
+    const { email, refCodes, source, publicationId: bodyPublicationId } = body
     const submissionSource = source === 'recs_page' ? 'recs_page' : 'custom_popup'
 
     if (!email) {
@@ -40,8 +40,8 @@ export const POST = withApiHandler(
       )
     }
 
-    // Resolve publication from server-side default (no trust anchor available)
-    const publicationId = PUBLICATION_ID
+    // Resolve publication from request body, fall back to default
+    const publicationId = bodyPublicationId || PUBLICATION_ID
 
     const service = await createSparkLoopServiceForPublication(publicationId)
     if (!service) {

@@ -7,6 +7,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
     apiKey: '',
     upscribeId: '',
     webhookSecret: '',
+    afteroffersFormId: '',
   })
   const [hasApiKey, setHasApiKey] = useState(false)
   const [hasWebhookSecret, setHasWebhookSecret] = useState(false)
@@ -28,6 +29,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
           apiKey: '', // Never pre-fill secrets
           upscribeId: data.upscribeId || '',
           webhookSecret: '', // Never pre-fill secrets
+          afteroffersFormId: data.afteroffersFormId || '',
         })
         setHasApiKey(data.hasApiKey || false)
         setHasWebhookSecret(data.hasWebhookSecret || false)
@@ -142,6 +144,23 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
           />
           <p className="text-xs text-gray-400 mt-1">
             Found in SparkLoop Dashboard &gt; Account Settings &gt; Integrations
+          </p>
+        </div>
+
+        {/* AfterOffers Form ID */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            AfterOffers Form ID
+          </label>
+          <input
+            type="text"
+            value={settings.afteroffersFormId}
+            onChange={(e) => setSettings({ ...settings, afteroffersFormId: e.target.value })}
+            placeholder="e.g., 994-2MMat6y-1"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            The form ID from your AfterOffers embed URL (the part after /show_offers/)
           </p>
         </div>
 

@@ -16,15 +16,17 @@ export default async function OffersPage() {
   // Fetch settings from publication_settings
   const settings = await getPublicationSettings(publicationId, [
     'logo_url',
-    'newsletter_name'
+    'newsletter_name',
+    'afteroffers_form_id',
   ])
 
   const logoUrl = settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
+  const afteroffersFormId = settings.afteroffers_form_id || ''
 
   return (
     <main className="min-h-[100dvh] bg-white">
-      <OffersContent logoUrl={logoUrl} newsletterName={newsletterName} />
+      <OffersContent logoUrl={logoUrl} newsletterName={newsletterName} afteroffersFormId={afteroffersFormId} />
     </main>
   )
 }

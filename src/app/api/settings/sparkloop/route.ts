@@ -18,16 +18,18 @@ export const GET = withApiHandler(
       return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
     }
 
-    const [apiKey, upscribeId, webhookSecret] = await Promise.all([
+    const [apiKey, upscribeId, webhookSecret, afteroffersFormId] = await Promise.all([
       getPublicationSetting(publicationId, 'sparkloop_api_key'),
       getPublicationSetting(publicationId, 'sparkloop_upscribe_id'),
       getPublicationSetting(publicationId, 'sparkloop_webhook_secret'),
+      getPublicationSetting(publicationId, 'afteroffers_form_id'),
     ])
 
     return NextResponse.json({
       hasApiKey: !!apiKey,
       upscribeId: upscribeId || '',
       hasWebhookSecret: !!webhookSecret,
+      afteroffersFormId: afteroffersFormId || '',
     })
   }
 )
@@ -67,6 +69,12 @@ export const POST = withApiHandler(
       const { error } = await updatePublicationSetting(publicationId, 'sparkloop_webhook_secret', body.webhookSecret)
       if (error) throw new Error(`Failed to save webhook secret: ${error}`)
       results.push('Webhook secret updated')
+    }
+
+    if (body.afteroffersFormId !== undefined) {
+      const { error } = await updatePublicationSetting(publicationId, 'afteroffers_form_id', body.afteroffersFormId)
+      if (error) throw new Error(`Failed to save AfterOffers form ID: ${error}`)
+      results.push('AfterOffers form ID updated')
     }
 
     return NextResponse.json({
