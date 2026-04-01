@@ -9,12 +9,10 @@ const WEBSITE_SETTINGS_KEYS = [
   'tools_directory_enabled',
   // Subscribe page
   'subscribe_heading',
-  'subscribe_heading_styled',
   'subscribe_subheading',
   'subscribe_tagline',
   // Subscribe info page
   'subscribe_info_heading',
-  'subscribe_info_heading_styled',
   'subscribe_info_subheading',
   'subscribe_info_job_label',
   'subscribe_info_job_options',

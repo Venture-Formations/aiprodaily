@@ -26,12 +26,10 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
     tools_directory_enabled: true,
     // Subscribe page
     subscribe_heading: '',
-    subscribe_heading_styled: '',
     subscribe_subheading: '',
     subscribe_tagline: '',
     // Subscribe info page
     subscribe_info_heading: '',
-    subscribe_info_heading_styled: '',
     subscribe_info_subheading: '',
     subscribe_info_job_label: '',
     subscribe_info_job_options: DEFAULT_JOB_OPTIONS as { value: string; label: string }[],
@@ -128,14 +126,14 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Heading
           </label>
-          <input
-            type="text"
+          <textarea
             value={settings.website_heading}
             onChange={(e) => setSettings(prev => ({ ...prev, website_heading: e.target.value }))}
-            placeholder="Stay Ahead of **AI Trends** in Accounting and Finance"
+            placeholder={"Stay Ahead of **AI Trends**\nin Accounting and Finance"}
+            rows={2}
             className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-          <p className="text-xs text-gray-400 mt-1">Wrap text in **double asterisks** to apply the gradient underline style. Example: Stay Ahead of **AI Trends** in Accounting</p>
+          <p className="text-xs text-gray-400 mt-1">Use Enter for line breaks. Wrap text in **double asterisks** for gradient underline style.</p>
         </div>
 
         <div>
@@ -187,25 +185,14 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Heading</label>
-          <input
-            type="text"
+          <textarea
             value={settings.subscribe_heading}
             onChange={(e) => setSettings(prev => ({ ...prev, subscribe_heading: e.target.value }))}
-            placeholder="Master AI Tools, Prompts & News"
+            placeholder={"Master AI Tools, Prompts & News\n**in Just 3 Minutes a Day**"}
+            rows={2}
             className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Heading (Styled Line)</label>
-          <input
-            type="text"
-            value={settings.subscribe_heading_styled}
-            onChange={(e) => setSettings(prev => ({ ...prev, subscribe_heading_styled: e.target.value }))}
-            placeholder="in Just 3 Minutes a Day"
-            className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <p className="text-xs text-gray-400 mt-1">This line appears with the gradient underline style.</p>
+          <p className="text-xs text-gray-400 mt-1">Use Enter for line breaks. Wrap text in **double asterisks** for gradient underline style.</p>
         </div>
 
         <div>
@@ -241,24 +228,14 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Heading</label>
-          <input
-            type="text"
+          <textarea
             value={settings.subscribe_info_heading}
             onChange={(e) => setSettings(prev => ({ ...prev, subscribe_info_heading: e.target.value }))}
-            placeholder="One Last Step!"
+            placeholder={"One Last Step!\n**Personalize Your Experience**"}
+            rows={2}
             className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Heading (Styled Line)</label>
-          <input
-            type="text"
-            value={settings.subscribe_info_heading_styled}
-            onChange={(e) => setSettings(prev => ({ ...prev, subscribe_info_heading_styled: e.target.value }))}
-            placeholder="Personalize Your Experience"
-            className="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+          <p className="text-xs text-gray-400 mt-1">Use Enter for line breaks. Wrap text in **double asterisks** for gradient underline style.</p>
         </div>
 
         <div>
