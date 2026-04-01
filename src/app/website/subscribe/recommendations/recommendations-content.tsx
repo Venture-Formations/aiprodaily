@@ -252,7 +252,7 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
 
           {/* Headline */}
           <h1 className="font-display text-xl tracking-tight text-slate-900 sm:text-2xl mb-2">
-            Thank you for visiting AI Accounting Daily
+            Thank you for visiting {newsletterName}
           </h1>
 
           {/* Subheadline */}
