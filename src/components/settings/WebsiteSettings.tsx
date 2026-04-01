@@ -40,6 +40,7 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [websiteBaseUrl, setWebsiteBaseUrl] = useState('')
 
   useEffect(() => {
     loadSettings()
@@ -47,10 +48,23 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
   const loadSettings = async () => {
     try {
-      const response = await fetch(`/api/settings/website?publication_id=${publicationId}`)
-      if (response.ok) {
-        const data = await response.json()
+      const [settingsRes, pubRes] = await Promise.all([
+        fetch(`/api/settings/website?publication_id=${publicationId}`),
+        fetch(`/api/newsletters`),
+      ])
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
         setSettings(prev => ({ ...prev, ...data }))
+      }
+      if (pubRes.ok) {
+        const pubData = await pubRes.json()
+        const pub = (pubData.newsletters || []).find((n: { id: string }) => n.id === publicationId)
+        const domain = pub?.website_domain
+        if (domain) {
+          // In staging, use the staging Vercel URL; in production, use the real domain
+          const isStaging = window.location.hostname.includes('staging')
+          setWebsiteBaseUrl(isStaging ? '' : `https://${domain}`)
+        }
       }
     } catch (error) {
       console.error('Failed to load website settings:', error)
@@ -105,7 +119,7 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
       <div className="border rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-gray-900">Home Page Hero</h3>
-          <a href="/" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
+          <a href={`${websiteBaseUrl}/`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
         </div>
 
         <div>
@@ -180,7 +194,7 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
       <div className="border rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-gray-900">Subscribe Page</h3>
-          <a href="/subscribe" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
+          <a href={`${websiteBaseUrl}/subscribe`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
         </div>
 
         <div>
@@ -223,7 +237,7 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
       <div className="border rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-gray-900">Subscribe Info Page</h3>
-          <a href="/subscribe/info" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
+          <a href={`${websiteBaseUrl}/subscribe/info`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
         </div>
 
         <div>
