@@ -103,14 +103,10 @@ export const GET = withApiHandler(
     let query = supabaseAdmin
       .from('publication_issues')
       .select(`
-        *,
-        articles:articles(
-          count
-        ),
-        manual_articles:manual_articles(
-          count
-        ),
-        email_metrics(*)
+        id, date, status, subject_line, created_at, updated_at, publication_id,
+        articles:module_articles(count),
+        manual_articles:manual_articles(count),
+        email_metrics(id, sent_count, opened_count, clicked_count, unsubscribed_count, open_rate, click_rate)
       `)
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)
