@@ -41,10 +41,12 @@ export const GET = withApiHandler(
       }
     }
 
-    // Get all known tickers
+    // Check only the tickers we care about (avoids Supabase default 1000-row limit on full table scan)
+    const tickersToCheck = Array.from(tickerMap.keys())
     const { data: knownRows } = await supabaseAdmin
       .from('ticker_company_names')
       .select('ticker')
+      .in('ticker', tickersToCheck)
 
     const knownSet = new Set(
       (knownRows || []).map((r: { ticker: string }) => r.ticker.toUpperCase())
