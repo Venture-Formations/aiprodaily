@@ -32,4 +32,5 @@ ALTER TABLE combined_feed_settings
   ADD COLUMN IF NOT EXISTS upload_schedule_time TEXT DEFAULT '09:00',
   ADD COLUMN IF NOT EXISTS staged_upload_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS last_activation_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS trade_freshness_days INTEGER DEFAULT 7;
+  ADD COLUMN IF NOT EXISTS trade_freshness_days INTEGER DEFAULT 7,
+  ADD COLUMN IF NOT EXISTS max_trades_per_member INTEGER DEFAULT 5;

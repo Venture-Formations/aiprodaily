@@ -15,14 +15,15 @@ export const GET = withApiHandler(
     // Load settings for max_trades and freshness
     const { data: settings } = await supabaseAdmin
       .from('combined_feed_settings')
-      .select('max_trades, trade_freshness_days')
+      .select('max_trades, trade_freshness_days, max_trades_per_member')
       .limit(1)
       .single()
 
     const maxTrades = settings?.max_trades ?? 21
     const tradeFreshnessDays = settings?.trade_freshness_days ?? 7
+    const maxTradesPerMember = settings?.max_trades_per_member ?? 5
 
-    const trades = await getTopTrades(maxTrades, tradeFreshnessDays)
+    const trades = await getTopTrades(maxTrades, tradeFreshnessDays, maxTradesPerMember)
     const tradesWithNames = await resolveTickerNames(trades)
     const { totalTrades, uniqueTickers } = await getTradeStats()
 

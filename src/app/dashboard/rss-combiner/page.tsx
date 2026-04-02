@@ -79,6 +79,7 @@ interface FeedSettings {
   staged_upload_at: string | null
   last_activation_at: string | null
   trade_freshness_days: number
+  max_trades_per_member: number
 }
 
 interface StagingStatus {
@@ -164,6 +165,7 @@ export default function RSSCombinerPage() {
     upload_schedule_day: 2,
     upload_schedule_time: '09:00',
     trade_freshness_days: 7,
+    max_trades_per_member: 5,
   })
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -239,6 +241,7 @@ export default function RSSCombinerPage() {
           upload_schedule_day: s.upload_schedule_day ?? 2,
           upload_schedule_time: s.upload_schedule_time ?? '09:00',
           trade_freshness_days: s.trade_freshness_days ?? 7,
+          max_trades_per_member: s.max_trades_per_member ?? 5,
         })
       }
     }
@@ -1682,19 +1685,35 @@ export default function RSSCombinerPage() {
                   </select>
                 </div>
               </div>
-              <div className="mt-3">
-                <label className="block text-xs text-gray-500 mb-1">Trade Freshness (days)</label>
-                <input
-                  type="number"
-                  value={editSettings.trade_freshness_days}
-                  onChange={(e) => setEditSettings({ ...editSettings, trade_freshness_days: parseInt(e.target.value) || 7 })}
-                  min={1}
-                  max={90}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Only select trades added to the spreadsheet within this many days (based on Quiver_Upload_Time column).
-                </p>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Trade Freshness (days)</label>
+                  <input
+                    type="number"
+                    value={editSettings.trade_freshness_days}
+                    onChange={(e) => setEditSettings({ ...editSettings, trade_freshness_days: parseInt(e.target.value) || 7 })}
+                    min={1}
+                    max={90}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Only trades added within this window (Quiver_Upload_Time).
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Max Trades per Member</label>
+                  <input
+                    type="number"
+                    value={editSettings.max_trades_per_member}
+                    onChange={(e) => setEditSettings({ ...editSettings, max_trades_per_member: parseInt(e.target.value) || 5 })}
+                    min={1}
+                    max={50}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Limit per congress member to ensure diversity.
+                  </p>
+                </div>
               </div>
               <button
                 onClick={handleSaveSettings}

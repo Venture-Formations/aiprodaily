@@ -227,7 +227,7 @@ async function fetchAllRows<T>(
  * Get top trades: deduplicate by ticker (keep largest trade_size_parsed),
  * exclude tickers in combined_feed_excluded_companies, sort by size DESC, limit N.
  */
-export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: number): Promise<CongressTrade[]> {
+export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: number, maxTradesPerMember?: number): Promise<CongressTrade[]> {
   // Get excluded tickers (small table, no pagination needed)
   const { data: excludedRows } = await supabaseAdmin
     .from('combined_feed_excluded_companies')
@@ -258,14 +258,26 @@ export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: numbe
 
   // Deduplicate by ticker (first occurrence = largest trade since sorted by size desc)
   // Skip "Over $50,000,000" trades — these are outliers that often fail to fetch
+  // Limit trades per member (congress member) to ensure diversity
   const seen = new Set<string>()
+  const memberCount = new Map<string, number>()
   const deduped: CongressTrade[] = []
+  const perMemberLimit = maxTradesPerMember ?? 0 // 0 = no limit
 
   for (const trade of freshTrades) {
     const upperTicker = trade.ticker.toUpperCase()
     if (excludedTickers.has(upperTicker)) continue
     if (trade.trade_size_usd?.toLowerCase().startsWith('over')) continue
     if (seen.has(upperTicker)) continue
+
+    // Check per-member limit
+    if (perMemberLimit > 0 && trade.name) {
+      const memberKey = trade.name.toLowerCase().trim()
+      const count = memberCount.get(memberKey) ?? 0
+      if (count >= perMemberLimit) continue
+      memberCount.set(memberKey, count + 1)
+    }
+
     seen.add(upperTicker)
     deduped.push(trade)
     if (deduped.length >= maxTrades) break
@@ -533,7 +545,7 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 1. Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_trades, sale_url_template, purchase_url_template, max_age_days, trade_freshness_days')
+    .select('max_trades, sale_url_template, purchase_url_template, max_age_days, trade_freshness_days, max_trades_per_member')
     .limit(1)
     .single()
 
@@ -542,6 +554,7 @@ export async function runIngestion(): Promise<IngestionResult> {
   const purchaseTemplate = settings?.purchase_url_template || ''
   const maxAgeDays = settings?.max_age_days ?? 7
   const tradeFreshnessDays = settings?.trade_freshness_days ?? 7
+  const maxTradesPerMember = settings?.max_trades_per_member ?? 5
 
   // 2. Load approved source domains
   const { data: approvedRows } = await supabaseAdmin
@@ -560,8 +573,8 @@ export async function runIngestion(): Promise<IngestionResult> {
 
   const excludedKeywords = (excludedKeywordRows || []).map((r: { keyword: string }) => r.keyword.toLowerCase())
 
-  // 4. Get top trades and resolve names (filtered by freshness)
-  const trades = await getTopTrades(maxTrades, tradeFreshnessDays)
+  // 4. Get top trades and resolve names (filtered by freshness + per-member limit)
+  const trades = await getTopTrades(maxTrades, tradeFreshnessDays, maxTradesPerMember)
   const tradesWithNames = await resolveTickerNames(trades)
   const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate, maxAgeDays)
 
