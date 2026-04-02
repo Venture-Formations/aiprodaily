@@ -21,7 +21,12 @@ export const GET = withApiHandler(
     const tradeFreshnessDays = settings?.trade_freshness_days ?? 7
 
     // Get the top trades that would actually be selected for the feed
-    const topTrades = await getTopTrades(maxTrades, tradeFreshnessDays)
+    let topTrades = await getTopTrades(maxTrades, tradeFreshnessDays)
+
+    // If freshness filter returns nothing (e.g. stale data before re-upload), fall back without freshness
+    if (topTrades.length === 0) {
+      topTrades = await getTopTrades(maxTrades)
+    }
 
     if (topTrades.length === 0) {
       return NextResponse.json({ unknown: [] })
