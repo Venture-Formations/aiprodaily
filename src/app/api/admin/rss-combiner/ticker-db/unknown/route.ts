@@ -1,33 +1,38 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getTopTrades } from '@/lib/rss-combiner'
 
 /**
- * Returns tickers from congress_trades that don't have a mapping in ticker_company_names.
- * Used by the dashboard to flag tickers that need names confirmed.
+ * Returns tickers from the top selected trades that don't have a mapping in ticker_company_names.
+ * Only checks trades that would actually be used in the feed (respects freshness + exclusions).
  */
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/ticker-db/unknown' },
   async () => {
-    // Get unique tickers from trades
-    const { data: tradeRows, error: tradeError } = await supabaseAdmin
-      .from('congress_trades')
-      .select('ticker, company')
+    // Load settings for max_trades and freshness
+    const { data: settings } = await supabaseAdmin
+      .from('combined_feed_settings')
+      .select('max_trades, trade_freshness_days')
+      .limit(1)
+      .single()
 
-    if (tradeError) {
-      return NextResponse.json({ error: tradeError.message }, { status: 500 })
-    }
+    const maxTrades = settings?.max_trades ?? 21
+    const tradeFreshnessDays = settings?.trade_freshness_days ?? 7
 
-    if (!tradeRows || tradeRows.length === 0) {
+    // Get the top trades that would actually be selected for the feed
+    const topTrades = await getTopTrades(maxTrades, tradeFreshnessDays)
+
+    if (topTrades.length === 0) {
       return NextResponse.json({ unknown: [] })
     }
 
-    // Deduplicate by uppercase ticker, keep the company name from the first occurrence
+    // Build ticker → raw company map from the selected trades
     const tickerMap = new Map<string, string>()
-    for (const row of tradeRows) {
-      const upper = row.ticker.toUpperCase()
+    for (const trade of topTrades) {
+      const upper = trade.ticker.toUpperCase()
       if (!tickerMap.has(upper)) {
-        tickerMap.set(upper, row.company || row.ticker)
+        tickerMap.set(upper, trade.company || trade.ticker)
       }
     }
 
@@ -40,7 +45,7 @@ export const GET = withApiHandler(
       (knownRows || []).map((r: { ticker: string }) => r.ticker.toUpperCase())
     )
 
-    // Find unknown tickers
+    // Find unknown tickers (in top trades but not in ticker_company_names)
     const unknown: { ticker: string; raw_company: string }[] = []
     tickerMap.forEach((company, ticker) => {
       if (!knownSet.has(ticker)) {
