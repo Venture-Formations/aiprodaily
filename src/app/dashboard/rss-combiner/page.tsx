@@ -1105,7 +1105,13 @@ export default function RSSCombinerPage() {
                           <span className="flex-1 text-sm text-gray-600 truncate">{ut.raw_company}</span>
                           <button
                             onClick={() => setConfirmingTicker({ ticker: ut.ticker, name: ut.raw_company })}
-                            className="px-3 py-1 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700"
+                            className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleConfirmUnknownTicker(ut.ticker, ut.raw_company)}
+                            className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
                           >
                             Confirm
                           </button>
