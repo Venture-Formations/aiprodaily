@@ -112,10 +112,10 @@ export const GET = withApiHandler(
       })
     }
 
-    // Fetch live prompt from publication_settings
+    // Fetch live prompt from publication_settings (tenant-specific)
     const { data, error } = await supabaseAdmin
       .from('publication_settings')
-      .select('key, value, ai_provider, description, expected_outputs')
+      .select('key, value, description')
       .eq('publication_id', resolvedPublicationId)
       .eq('key', promptKey)
       .maybeSingle()
@@ -137,8 +137,15 @@ export const GET = withApiHandler(
       })
     }
 
+    // Fetch ai_provider and expected_outputs from app_settings (those columns live there, not on publication_settings)
+    const { data: appSetting } = await supabaseAdmin
+      .from('app_settings')
+      .select('ai_provider, expected_outputs')
+      .eq('key', promptKey)
+      .maybeSingle()
+
     // Check if provider matches (optional - return prompt anyway but include provider info)
-    const promptProvider = data.ai_provider || 'openai'
+    const promptProvider = appSetting?.ai_provider || 'openai'
     const providerMatches = promptProvider === provider
 
     return NextResponse.json({
@@ -148,7 +155,7 @@ export const GET = withApiHandler(
         prompt: data.value,
         ai_provider: promptProvider,
         description: data.description,
-        expected_outputs: data.expected_outputs,
+        expected_outputs: appSetting?.expected_outputs || null,
         provider_matches: providerMatches
       }
     })

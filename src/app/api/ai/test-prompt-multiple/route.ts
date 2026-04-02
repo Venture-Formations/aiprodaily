@@ -187,25 +187,15 @@ export const POST = withApiHandler(
         )
       }
 
-      // Get duplicate post IDs to exclude
-      const { data: poolDuplicates } = await supabaseAdmin
-        .from('duplicate_posts')
-        .select('post_id')
-
-      const poolDuplicateIds = poolDuplicates?.map(d => d.post_id) || []
-
-      let poolQuery = supabaseAdmin
+      // Fetch pool posts first, then filter out duplicates in JS
+      // (duplicate_posts has no publication_id — filtering in-query would create
+      //  a massive NOT IN clause that can exceed PostgREST URL limits)
+      const { data: poolPosts, error: poolError } = await supabaseAdmin
         .from('rss_posts')
         .select('id, title, description, full_article_text, source_url, publication_date')
         .in('feed_id', pubFeedIds)
         .not('full_article_text', 'is', null)
         .gte('publication_date', cutoffDateStr)
-
-      if (poolDuplicateIds.length > 0) {
-        poolQuery = poolQuery.not('id', 'in', `(${poolDuplicateIds.join(',')})`)
-      }
-
-      const { data: poolPosts, error: poolError } = await poolQuery
         .order('publication_date', { ascending: false })
         .limit(500)
 
@@ -217,7 +207,23 @@ export const POST = withApiHandler(
         )
       }
 
-      const allPosts = poolPosts || []
+      // Filter out duplicate posts in JS to avoid massive NOT IN clauses
+      const poolPostIds = (poolPosts || []).map(p => p.id)
+      let filteredPosts = poolPosts || []
+
+      if (poolPostIds.length > 0) {
+        const { data: poolDuplicates } = await supabaseAdmin
+          .from('duplicate_posts')
+          .select('post_id')
+          .in('post_id', poolPostIds)
+
+        if (poolDuplicates && poolDuplicates.length > 0) {
+          const dupSet = new Set(poolDuplicates.map(d => d.post_id))
+          filteredPosts = filteredPosts.filter(p => !dupSet.has(p.id))
+        }
+      }
+
+      const allPosts = filteredPosts
       posts = allPosts.slice(offset, offset + limit)
 
       if (posts.length === 0) {
