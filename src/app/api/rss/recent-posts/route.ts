@@ -209,28 +209,31 @@ export const GET = withApiHandler(
         })
       }
 
-      // Get duplicate post IDs to exclude
-      const { data: poolDuplicates } = await supabaseAdmin
-        .from('duplicate_posts')
-        .select('post_id')
-
-      const poolDuplicateIds = poolDuplicates?.map(d => d.post_id) || []
-
-      // Query rss_posts directly via feed_id
-      let poolQuery = supabaseAdmin
+      // Fetch pool posts first, then exclude duplicates in JS
+      // (Avoids stuffing thousands of IDs into a PostgREST filter which can exceed URL limits)
+      const { data: rawPoolPosts, error: poolError } = await supabaseAdmin
         .from('rss_posts')
         .select('id, title, description, full_article_text, source_url, publication_date')
         .in('feed_id', pubFeedIds)
         .not('full_article_text', 'is', null)
         .gte('publication_date', cutoffDateStr)
-
-      if (poolDuplicateIds.length > 0) {
-        poolQuery = poolQuery.not('id', 'in', `(${poolDuplicateIds.join(',')})`)
-      }
-
-      const { data: poolPosts, error: poolError } = await poolQuery
         .order('publication_date', { ascending: false })
-        .limit(limit)
+        .limit(limit + 100) // Fetch extra to account for duplicate filtering
+
+      // Filter out duplicates in JS
+      let poolPosts = rawPoolPosts
+      if (rawPoolPosts && rawPoolPosts.length > 0) {
+        const { data: poolDuplicates } = await supabaseAdmin
+          .from('duplicate_posts')
+          .select('post_id')
+          .in('post_id', rawPoolPosts.map(p => p.id))
+
+        if (poolDuplicates && poolDuplicates.length > 0) {
+          const dupSet = new Set(poolDuplicates.map(d => d.post_id))
+          poolPosts = rawPoolPosts.filter(p => !dupSet.has(p.id))
+        }
+        poolPosts = poolPosts?.slice(0, limit) ?? null
+      }
 
       if (poolError) {
         logger.error({ err: poolError }, '[API] Error fetching pool posts')
@@ -309,38 +312,42 @@ export const GET = withApiHandler(
 
     const issueIds = issues.map(c => c.id)
 
-    // Get list of duplicate post IDs to exclude
-    const { data: duplicatePosts, error: duplicatesError } = await supabaseAdmin
-      .from('duplicate_posts')
-      .select('post_id')
-
-    if (duplicatesError) {
-      logger.error({ err: duplicatesError }, '[API] Error fetching duplicates')
-    }
-
-    const duplicatePostIds = duplicatePosts?.map(d => d.post_id) || []
-    logger.info(`[API] Excluding ${duplicatePostIds.length} duplicate posts`)
-
-    // Fetch recent RSS posts from these campaigns, filtered by section if specified
+    // Fetch recent RSS posts, then exclude duplicates in JS
+    // (Avoids stuffing thousands of IDs into a PostgREST filter which can exceed URL limits)
     let query = supabaseAdmin
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
       .in('issue_id', issueIds)
-      .not('full_article_text', 'is', null)  // Exclude posts without full text
-
-    // Exclude duplicate posts
-    if (duplicatePostIds.length > 0) {
-      query = query.not('id', 'in', `(${duplicatePostIds.join(',')})`)
-    }
+      .not('full_article_text', 'is', null)
 
     // Filter by feed IDs if section is specified
     if (feedIds !== null) {
       query = query.in('feed_id', feedIds)
     }
 
-    const { data: posts, error } = await query
+    const { data: rawPosts, error } = await query
       .order('publication_date', { ascending: false })
-      .limit(limit)
+      .limit(limit + 100)
+
+    // Filter out duplicates in JS
+    let posts = rawPosts
+    if (rawPosts && rawPosts.length > 0) {
+      const { data: duplicatePosts, error: duplicatesError } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+        .in('post_id', rawPosts.map(p => p.id))
+
+      if (duplicatesError) {
+        logger.error({ err: duplicatesError }, '[API] Error fetching duplicates')
+      }
+
+      if (duplicatePosts && duplicatePosts.length > 0) {
+        const dupSet = new Set(duplicatePosts.map(d => d.post_id))
+        posts = rawPosts.filter(p => !dupSet.has(p.id))
+        logger.info(`[API] Excluded ${dupSet.size} duplicate posts`)
+      }
+      posts = posts?.slice(0, limit) ?? null
+    }
 
     if (error) {
       logger.error({ err: error }, '[API] Error fetching recent posts')

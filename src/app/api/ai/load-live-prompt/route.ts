@@ -23,6 +23,26 @@ export const GET = withApiHandler(
       )
     }
 
+    // Resolve slug to UUID if publication_id is not a UUID
+    let resolvedPublicationId = publication_id
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(publication_id)) {
+      const { data: pub, error: pubError } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('slug', publication_id)
+        .single()
+
+      if (pubError || !pub) {
+        logger.error({ slug: publication_id, err: pubError }, 'Publication not found for slug')
+        return NextResponse.json(
+          { error: 'Publication not found' },
+          { status: 404 }
+        )
+      }
+      resolvedPublicationId = pub.id
+    }
+
     // Check if this is a module-based prompt type (e.g., "module-{uuid}-title" or "module-{uuid}-body")
     const moduleMatch = prompt_type.match(/^module-(.+)-(title|body)$/)
 
@@ -92,26 +112,11 @@ export const GET = withApiHandler(
       })
     }
 
-    // Get the first active newsletter for publication_id if not provided
-    let newsletterId = publication_id
-    if (!newsletterId || newsletterId === 'undefined') {
-      const { data: newsletter } = await supabaseAdmin
-        .from('publications')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (newsletter) {
-        newsletterId = newsletter.id
-      }
-    }
-
     // Fetch live prompt from publication_settings
     const { data, error } = await supabaseAdmin
       .from('publication_settings')
       .select('key, value, ai_provider, description, expected_outputs')
-      .eq('publication_id', newsletterId)
+      .eq('publication_id', resolvedPublicationId)
       .eq('key', promptKey)
       .maybeSingle()
 
