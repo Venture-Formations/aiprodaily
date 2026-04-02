@@ -245,15 +245,21 @@ export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: numbe
   )
 
   // Apply freshness filter based on quiver_upload_time
+  // Falls back to all trades if freshness filter returns nothing (e.g. stale data before re-upload)
   let freshTrades = trades
   if (tradeFreshnessDays && tradeFreshnessDays > 0) {
     const freshnessDate = new Date()
     freshnessDate.setDate(freshnessDate.getDate() - tradeFreshnessDays)
     const freshnessStr = freshnessDate.toISOString().split('T')[0]
-    freshTrades = trades.filter(
+    const filtered = trades.filter(
       (t) => t.quiver_upload_time && t.quiver_upload_time >= freshnessStr
     )
-    console.log(`[RSS-Combiner] Freshness filter: ${trades.length} total → ${freshTrades.length} within ${tradeFreshnessDays} days`)
+    if (filtered.length > 0) {
+      freshTrades = filtered
+      console.log(`[RSS-Combiner] Freshness filter: ${trades.length} total → ${freshTrades.length} within ${tradeFreshnessDays} days`)
+    } else {
+      console.log(`[RSS-Combiner] Freshness filter returned 0 trades, falling back to all ${trades.length} trades`)
+    }
   }
 
   // Deduplicate by ticker (first occurrence = largest trade since sorted by size desc)
