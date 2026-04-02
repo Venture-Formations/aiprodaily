@@ -80,6 +80,8 @@ interface FeedSettings {
   last_activation_at: string | null
   trade_freshness_days: number
   max_trades_per_member: number
+  feed_article_age_days: number
+  min_articles_per_company: number
 }
 
 interface StagingStatus {
@@ -166,6 +168,8 @@ export default function RSSCombinerPage() {
     upload_schedule_time: '09:00',
     trade_freshness_days: 7,
     max_trades_per_member: 5,
+    feed_article_age_days: 14,
+    min_articles_per_company: 2,
   })
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -242,6 +246,8 @@ export default function RSSCombinerPage() {
           upload_schedule_time: s.upload_schedule_time ?? '09:00',
           trade_freshness_days: s.trade_freshness_days ?? 7,
           max_trades_per_member: s.max_trades_per_member ?? 5,
+          feed_article_age_days: s.feed_article_age_days ?? 14,
+          min_articles_per_company: s.min_articles_per_company ?? 2,
         })
       }
     }
@@ -1613,7 +1619,7 @@ export default function RSSCombinerPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Max Age (days)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Ingestion Max Age (days)</label>
                     <input
                       type="number"
                       value={editSettings.max_age_days}
@@ -1633,6 +1639,32 @@ export default function RSSCombinerPage() {
                       max={1440}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
                     />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Feed Article Age (days)</label>
+                    <input
+                      type="number"
+                      value={editSettings.feed_article_age_days}
+                      onChange={(e) => setEditSettings({ ...editSettings, feed_article_age_days: parseInt(e.target.value) || 14 })}
+                      min={1}
+                      max={90}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Starting window for articles in feed output. Expands by 5 days as needed.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Min Articles per Company</label>
+                    <input
+                      type="number"
+                      value={editSettings.min_articles_per_company}
+                      onChange={(e) => setEditSettings({ ...editSettings, min_articles_per_company: parseInt(e.target.value) || 2 })}
+                      min={1}
+                      max={20}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Window expands until each company has at least this many.</p>
                   </div>
                 </div>
                 <button

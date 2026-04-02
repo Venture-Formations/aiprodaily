@@ -740,7 +740,7 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   // Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_age_days, cache_ttl_minutes, feed_title')
+    .select('cache_ttl_minutes, feed_title, feed_article_age_days, min_articles_per_company')
     .limit(1)
     .single()
 
@@ -751,27 +751,61 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     return cachedXml
   }
 
-  const maxAgeDays = settings?.max_age_days ?? 7
+  const feedArticleAgeDays = settings?.feed_article_age_days ?? 14
+  const minArticlesPerCompany = settings?.min_articles_per_company ?? 2
   const feedTitle = settings?.feed_title ?? 'Combined RSS Feed'
 
-  // Query stored articles from DB
-  const cutoffDate = new Date()
-  cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays)
+  const ARTICLE_COLUMNS = 'article_title, article_url, article_description, source_name, source_domain, published_at, ticker, company_name, transaction_type, trade_meta'
+  const MAX_WINDOW = 90
 
-  const { data: articles, error } = await supabaseAdmin
-    .from('congress_feed_articles')
-    .select('article_title, article_url, article_description, source_name, source_domain, published_at, ticker, company_name, transaction_type, trade_meta')
-    .gte('published_at', cutoffDate.toISOString())
-    .order('published_at', { ascending: false })
-    .limit(500)
+  // Expand article age window by 5 days until each company has enough articles
+  let windowDays = feedArticleAgeDays
+  let articles: any[] = []
 
-  if (error) {
-    console.error('[RSS-Combiner] Failed to query articles:', error.message)
-    throw new Error('Failed to query stored articles')
+  while (windowDays <= MAX_WINDOW) {
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - windowDays)
+
+    const { data, error } = await supabaseAdmin
+      .from('congress_feed_articles')
+      .select(ARTICLE_COLUMNS)
+      .gte('published_at', cutoffDate.toISOString())
+      .order('published_at', { ascending: false })
+      .limit(500)
+
+    if (error) {
+      console.error('[RSS-Combiner] Failed to query articles:', error.message)
+      throw new Error('Failed to query stored articles')
+    }
+
+    articles = data || []
+
+    // Check if every company has at least minArticlesPerCompany
+    if (minArticlesPerCompany > 0 && articles.length > 0) {
+      const companyCounts = new Map<string, number>()
+      for (const row of articles) {
+        const key = (row.ticker || '').toUpperCase()
+        companyCounts.set(key, (companyCounts.get(key) ?? 0) + 1)
+      }
+
+      let allMet = true
+      companyCounts.forEach((count) => {
+        if (count < minArticlesPerCompany) allMet = false
+      })
+
+      if (allMet || windowDays >= MAX_WINDOW) {
+        console.log(`[RSS-Combiner] Feed articles: ${windowDays}-day window → ${articles.length} articles across ${companyCounts.size} companies`)
+        break
+      }
+    } else {
+      break
+    }
+
+    windowDays += 5
   }
 
   // Convert DB rows to NormalizedItem format
-  const items: NormalizedItem[] = (articles || []).map((row) => ({
+  const items: NormalizedItem[] = articles.map((row) => ({
     title: row.article_title,
     link: row.article_url,
     description: row.article_description || '',

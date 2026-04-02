@@ -33,4 +33,6 @@ ALTER TABLE combined_feed_settings
   ADD COLUMN IF NOT EXISTS staged_upload_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS last_activation_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS trade_freshness_days INTEGER DEFAULT 7,
-  ADD COLUMN IF NOT EXISTS max_trades_per_member INTEGER DEFAULT 5;
+  ADD COLUMN IF NOT EXISTS max_trades_per_member INTEGER DEFAULT 5,
+  ADD COLUMN IF NOT EXISTS feed_article_age_days INTEGER DEFAULT 14,
+  ADD COLUMN IF NOT EXISTS min_articles_per_company INTEGER DEFAULT 2;
