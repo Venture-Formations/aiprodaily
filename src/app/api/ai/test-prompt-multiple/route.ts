@@ -20,6 +20,7 @@ function injectPostData(obj: any, post: any): any {
         .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
         .replace(/\{\{headline\}\}/g, post.title || '')
         .replace(/\{\{url\}\}/g, post.source_url || '')
+        .replace(/\{\{company_name\}\}/g, post.company_name || '')
     }
     // Replace random integer placeholders: {{random_X-Y}}
     result = result.replace(/\{\{random_(\d+)-(\d+)\}\}/g, (match: string, minStr: string, maxStr: string) => {
@@ -192,7 +193,7 @@ export const POST = withApiHandler(
       //  a massive NOT IN clause that can exceed PostgREST URL limits)
       const { data: poolPosts, error: poolError } = await supabaseAdmin
         .from('rss_posts')
-        .select('id, title, description, full_article_text, source_url, publication_date')
+        .select('id, title, description, full_article_text, source_url, publication_date, feed_id')
         .in('feed_id', pubFeedIds)
         .not('full_article_text', 'is', null)
         .gte('publication_date', cutoffDateStr)
@@ -275,7 +276,8 @@ export const POST = withApiHandler(
             description,
             full_article_text,
             source_url,
-            publication_date
+            publication_date,
+            feed_id
           )
         `)
         .in('issue_id', sentIssueIds)
@@ -306,6 +308,7 @@ export const POST = withApiHandler(
         full_article_text: string | null
         source_url: string | null
         publication_date: string | null
+        feed_id: string | null
       }>()
 
       for (const article of result.data || []) {
@@ -316,6 +319,7 @@ export const POST = withApiHandler(
           full_article_text: string | null
           source_url: string | null
           publication_date: string | null
+          feed_id: string | null
         } | null
 
         if (rssPost && !postsMap.has(rssPost.id)) {
@@ -335,6 +339,24 @@ export const POST = withApiHandler(
     }
 
     console.log(`[AI Test Multiple] Testing ${posts.length} posts`)
+
+    // Resolve feed names for {{company_name}} placeholder
+    const feedIds = Array.from(new Set(posts.map((p: any) => p.feed_id).filter(Boolean)))
+    const feedNameMap = new Map<string, string>()
+    if (feedIds.length > 0) {
+      const { data: feeds } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id, name')
+        .in('id', feedIds)
+      for (const feed of feeds || []) {
+        feedNameMap.set(feed.id, feed.name)
+      }
+    }
+
+    // Attach company_name to each post
+    for (const post of posts) {
+      ;(post as any).company_name = feedNameMap.get((post as any).feed_id) || ''
+    }
 
     // Process each post
     const startTime = Date.now()

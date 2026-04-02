@@ -38,6 +38,7 @@ function injectPostData(obj: any, post: any): any {
       .replace(/\{\{content\}\}/g, post.content || post.full_article_text || 'No content available')
       .replace(/\{\{headline\}\}/g, post.title || post.headline || '')
       .replace(/\{\{url\}\}/g, post.source_url || '')
+      .replace(/\{\{company_name\}\}/g, post.company_name || '')
       .replace(/\{\{source_url\}\}/g, post.source_url || '')
       .replace(/\{\{newsletter_content\}\}/g, post.newsletter_content || '')
       .replace(/\{\{original_content\}\}/g, post.original_content || '')

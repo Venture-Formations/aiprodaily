@@ -28,6 +28,7 @@ function injectPostData(obj: any, post: any): any {
         .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
         .replace(/\{\{headline\}\}/g, post.title || '')
         .replace(/\{\{url\}\}/g, post.source_url || '')
+        .replace(/\{\{company_name\}\}/g, post.company_name || '')
     }
     // Replace random integer placeholders: {{random_X-Y}}
     result = result.replace(/\{\{random_(\d+)-(\d+)\}\}/g, (match: string, minStr: string, maxStr: string) => {

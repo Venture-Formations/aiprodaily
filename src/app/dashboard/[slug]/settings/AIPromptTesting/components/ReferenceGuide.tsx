@@ -40,6 +40,10 @@ export default function ReferenceGuide({ promptType }: ReferenceGuideProps) {
             <span className="text-blue-600">{'{{url}}'}</span>
             <span className="text-gray-600 ml-2">- Article source URL</span>
           </div>
+          <div className="font-mono">
+            <span className="text-blue-600">{'{{company_name}}'}</span>
+            <span className="text-gray-600 ml-2">- RSS feed name (source company)</span>
+          </div>
         </div>
 
         {/* Dynamic Placeholders */}
@@ -168,7 +172,7 @@ export default function ReferenceGuide({ promptType }: ReferenceGuideProps) {
           <ul className="list-disc list-inside space-y-1 ml-2">
             <li><strong>Full API Request:</strong> Include model, messages, temperature, max_output_tokens, etc.</li>
             <li><strong>Text Box Format:</strong> <code className="bg-white px-1 rounded">{'{"prompt": "...", "model": "gpt-4o", "max_tokens": 500}'}</code></li>
-            <li>Use placeholders like <code className="bg-white px-1 rounded">{'{{title}}'}</code>, <code className="bg-white px-1 rounded">{'{{description}}'}</code>, <code className="bg-white px-1 rounded">{'{{content}}'}</code>, <code className="bg-white px-1 rounded">{'{{random_X-Y}}'}</code></li>
+            <li>Use placeholders like <code className="bg-white px-1 rounded">{'{{title}}'}</code>, <code className="bg-white px-1 rounded">{'{{description}}'}</code>, <code className="bg-white px-1 rounded">{'{{content}}'}</code>, <code className="bg-white px-1 rounded">{'{{company_name}}'}</code>, <code className="bg-white px-1 rounded">{'{{random_X-Y}}'}</code></li>
             <li>JSON is sent to API exactly as-is (only placeholders replaced)</li>
             <li>For OpenAI: Use <code className="bg-white px-1 rounded">max_output_tokens</code> (not max_tokens)</li>
             <li>For GPT-5: You can include reasoning parameters like <code className="bg-white px-1 rounded">{'{"reasoning": {"effort": "low", "budget_tokens": 150}}'}</code></li>
