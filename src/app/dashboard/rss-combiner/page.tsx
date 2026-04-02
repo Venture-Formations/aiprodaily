@@ -988,7 +988,7 @@ export default function RSSCombinerPage() {
                     <p className="text-xs text-gray-400 mt-1">For Purchase transactions. Use {'{company_name}'} as placeholder.</p>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Max Trades for Feed</label>
+                    <label className="block text-xs text-gray-500 mb-1">Total Trades for Feed</label>
                     <input
                       type="number"
                       value={editSettings.max_trades}
