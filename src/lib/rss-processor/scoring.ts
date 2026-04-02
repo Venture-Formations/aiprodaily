@@ -148,6 +148,17 @@ export class Scoring {
 
     console.log(`[Score] Using ${criteria.length} criteria from mod ${moduleId}`)
 
+    // Look up feed name for company_name placeholder
+    let companyName = ''
+    if (post.feed_id) {
+      const { data: feed } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('name')
+        .eq('id', post.feed_id)
+        .single()
+      companyName = feed?.name || ''
+    }
+
     // Evaluate post against each enabled criterion
     const criteriaScores: Array<{ score: number; reason: string; weight: number }> = []
 
@@ -168,7 +179,8 @@ export class Scoring {
           {
             title: post.title,
             description: post.description || '',
-            content: fullText
+            content: fullText,
+            company_name: companyName
           },
           provider,
           `module_criteria_${criterion.number}`
