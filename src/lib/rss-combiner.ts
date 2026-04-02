@@ -244,12 +244,41 @@ export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: numbe
     { order: { column: 'trade_size_parsed', ascending: false } }
   )
 
+  // Helper: run dedup/exclusion/per-member logic on a set of trades
+  const perMemberLimit = maxTradesPerMember ?? 0 // 0 = no limit
+  const selectTrades = (pool: CongressTrade[]): CongressTrade[] => {
+    const seen = new Set<string>()
+    const memberCounts = new Map<string, number>()
+    const result: CongressTrade[] = []
+
+    for (const trade of pool) {
+      const upperTicker = trade.ticker.toUpperCase()
+      if (excludedTickers.has(upperTicker)) continue
+      if (trade.trade_size_usd?.toLowerCase().startsWith('over')) continue
+      if (seen.has(upperTicker)) continue
+
+      if (perMemberLimit > 0 && trade.name) {
+        const memberKey = trade.name.toLowerCase().trim()
+        const count = memberCounts.get(memberKey) ?? 0
+        if (count >= perMemberLimit) continue
+        memberCounts.set(memberKey, count + 1)
+      }
+
+      seen.add(upperTicker)
+      result.push(trade)
+      if (result.length >= maxTrades) break
+    }
+
+    return result
+  }
+
   // Apply freshness filter based on quiver_upload_time
-  // Expands window by 5 days at a time until we have enough trades (up to 90 days max)
-  let freshTrades = trades
+  // Expands window by 5 days at a time until we have enough qualified trades (up to 90 days max)
+  let deduped: CongressTrade[]
   if (tradeFreshnessDays && tradeFreshnessDays > 0) {
     const MAX_WINDOW = 90
     let windowDays = tradeFreshnessDays
+    deduped = []
 
     while (windowDays <= MAX_WINDOW) {
       const freshnessDate = new Date()
@@ -259,48 +288,18 @@ export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: numbe
         (t) => t.quiver_upload_time && t.quiver_upload_time >= freshnessStr
       )
 
-      if (filtered.length >= maxTrades) {
-        freshTrades = filtered
-        console.log(`[RSS-Combiner] Freshness filter: ${trades.length} total → ${filtered.length} within ${windowDays} days`)
-        break
-      }
+      const selected = selectTrades(filtered)
 
-      if (windowDays >= MAX_WINDOW) {
-        // Use whatever we have at max window
-        freshTrades = filtered.length > 0 ? filtered : trades
-        console.log(`[RSS-Combiner] Freshness filter reached ${MAX_WINDOW}-day max: ${filtered.length} trades`)
+      if (selected.length >= maxTrades || windowDays >= MAX_WINDOW) {
+        deduped = selected
+        console.log(`[RSS-Combiner] Freshness: ${windowDays}-day window → ${filtered.length} raw → ${selected.length} selected trades`)
         break
       }
 
       windowDays += 5
     }
-  }
-
-  // Deduplicate by ticker (first occurrence = largest trade since sorted by size desc)
-  // Skip "Over $50,000,000" trades — these are outliers that often fail to fetch
-  // Limit trades per member (congress member) to ensure diversity
-  const seen = new Set<string>()
-  const memberCount = new Map<string, number>()
-  const deduped: CongressTrade[] = []
-  const perMemberLimit = maxTradesPerMember ?? 0 // 0 = no limit
-
-  for (const trade of freshTrades) {
-    const upperTicker = trade.ticker.toUpperCase()
-    if (excludedTickers.has(upperTicker)) continue
-    if (trade.trade_size_usd?.toLowerCase().startsWith('over')) continue
-    if (seen.has(upperTicker)) continue
-
-    // Check per-member limit
-    if (perMemberLimit > 0 && trade.name) {
-      const memberKey = trade.name.toLowerCase().trim()
-      const count = memberCount.get(memberKey) ?? 0
-      if (count >= perMemberLimit) continue
-      memberCount.set(memberKey, count + 1)
-    }
-
-    seen.add(upperTicker)
-    deduped.push(trade)
-    if (deduped.length >= maxTrades) break
+  } else {
+    deduped = selectTrades(trades)
   }
 
   return deduped
