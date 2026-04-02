@@ -758,6 +758,16 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   const ARTICLE_COLUMNS = 'article_title, article_url, article_description, source_name, source_domain, published_at, ticker, company_name, transaction_type, trade_meta'
   const MAX_WINDOW = 90
 
+  // Load approved sources to filter output
+  const { data: approvedRows } = await supabaseAdmin
+    .from('congress_approved_sources')
+    .select('source_domain')
+    .eq('is_active', true)
+
+  const approvedDomains = new Set(
+    (approvedRows || []).map((r: { source_domain: string }) => r.source_domain.toLowerCase().replace(/^www\./, ''))
+  )
+
   // Expand article age window by 5 days until each company has enough articles
   let windowDays = feedArticleAgeDays
   let articles: any[] = []
@@ -778,7 +788,11 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
       throw new Error('Failed to query stored articles')
     }
 
-    articles = data || []
+    // Filter to only approved sources
+    articles = (data || []).filter((row: any) => {
+      const domain = (row.source_domain || '').toLowerCase().replace(/^www\./, '')
+      return domain && approvedDomains.has(domain)
+    })
 
     // Check if every company has at least minArticlesPerCompany
     if (minArticlesPerCompany > 0 && articles.length > 0) {
