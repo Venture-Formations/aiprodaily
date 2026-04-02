@@ -74,6 +74,18 @@ interface FeedSettings {
   max_trades: number
   last_ingestion_at: string | null
   updated_at: string
+  upload_schedule_day: number
+  upload_schedule_time: string
+  staged_upload_at: string | null
+  last_activation_at: string | null
+  trade_freshness_days: number
+}
+
+interface StagingStatus {
+  count: number
+  staged_upload_at: string | null
+  upload_schedule_day: number
+  upload_schedule_time: string
 }
 
 // Column header mapping for XLSX parsing (client-side)
@@ -92,6 +104,8 @@ const COLUMN_MAP: Record<string, string> = {
   chamber: 'chamber',
   state: 'state',
   'capitol trades url': 'capitol_trades_url',
+  'quiver upload time': 'quiver_upload_time',
+  quiveruploadtime: 'quiver_upload_time',
 }
 
 function normalizeHeader(h: string): string {
@@ -147,6 +161,9 @@ export default function RSSCombinerPage() {
     sale_url_template: '',
     purchase_url_template: '',
     max_trades: 21,
+    upload_schedule_day: 2,
+    upload_schedule_time: '09:00',
+    trade_freshness_days: 7,
   })
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -183,6 +200,11 @@ export default function RSSCombinerPage() {
   const [excludedKeywords, setExcludedKeywords] = useState<ExcludedKeyword[]>([])
   const [newKeyword, setNewKeyword] = useState('')
 
+  // Staging state
+  const [stagingStatus, setStagingStatus] = useState<StagingStatus | null>(null)
+  const [activating, setActivating] = useState(false)
+  const [activationResult, setActivationResult] = useState<any>(null)
+
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
@@ -210,6 +232,9 @@ export default function RSSCombinerPage() {
           sale_url_template: s.sale_url_template || '',
           purchase_url_template: s.purchase_url_template || '',
           max_trades: s.max_trades,
+          upload_schedule_day: s.upload_schedule_day ?? 2,
+          upload_schedule_time: s.upload_schedule_time ?? '09:00',
+          trade_freshness_days: s.trade_freshness_days ?? 7,
         })
       }
     }
@@ -247,6 +272,14 @@ export default function RSSCombinerPage() {
     }
   }, [])
 
+  const fetchStagingStatus = useCallback(async () => {
+    const res = await fetch('/api/admin/rss-combiner/staging')
+    if (res.ok) {
+      const data = await res.json()
+      setStagingStatus(data)
+    }
+  }, [])
+
   // Track which tabs have been loaded
   const loadedTabs = useRef<Set<string>>(new Set())
 
@@ -266,6 +299,7 @@ export default function RSSCombinerPage() {
         switch (activeTab) {
           case 'trades':
             promises.push(fetchTrades())
+            promises.push(fetchStagingStatus())
             break
           case 'ticker-db':
             promises.push(fetchTickers())
@@ -289,7 +323,7 @@ export default function RSSCombinerPage() {
       }
     }
     loadTabData()
-  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedKeywords])
+  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedKeywords, fetchStagingStatus])
 
   // --- Upload Handlers ---
 
@@ -344,7 +378,7 @@ export default function RSSCombinerPage() {
         const trade: Record<string, any> = {}
         for (const [rawHeader, dbCol] of Object.entries(colIndex)) {
           const val = row[rawHeader]
-          if (dbCol === 'traded' || dbCol === 'filed') {
+          if (dbCol === 'traded' || dbCol === 'filed' || dbCol === 'quiver_upload_time') {
             trade[dbCol] = parseExcelDate(val)
           } else {
             trade[dbCol] = val != null ? String(val).trim() || null : null
@@ -388,9 +422,10 @@ export default function RSSCombinerPage() {
         inserted: totalInserted,
         total: rows.length,
         uniqueTickers: new Set(trades.map((t: any) => t.ticker?.toUpperCase())).size,
+        staged: true,
         errors: allErrors.slice(0, 20),
       })
-      fetchTrades()
+      fetchStagingStatus()
       fileInput.value = ''
     } catch (err: any) {
       setUploadResult({ error: err.message || 'Upload failed' })
@@ -594,6 +629,34 @@ export default function RSSCombinerPage() {
     }
   }
 
+  const handleActivateNow = async () => {
+    setActivating(true)
+    setActivationResult(null)
+    try {
+      const res = await fetch('/api/admin/rss-combiner/activate', { method: 'POST' })
+      const data = await res.json()
+      setActivationResult(data)
+      if (data.activated) {
+        fetchTrades()
+        fetchStagingStatus()
+        fetchSettings()
+      }
+    } catch {
+      setActivationResult({ activated: false, reason: 'request_failed' })
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  const handleDiscardStaged = async () => {
+    if (!confirm('Discard all staged data?')) return
+    const res = await fetch('/api/admin/rss-combiner/staging', { method: 'DELETE' })
+    if (res.ok) {
+      setStagingStatus(null)
+      setUploadResult(null)
+    }
+  }
+
   const handleSaveSettings = async () => {
     setSavingSettings(true)
     try {
@@ -756,11 +819,11 @@ export default function RSSCombinerPage() {
                     disabled={uploading}
                     className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {uploading ? 'Uploading...' : 'Upload & Replace All Trades'}
+                    {uploading ? 'Uploading...' : 'Stage Upload'}
                   </button>
                 </form>
                 <p className="mt-2 text-xs text-gray-500">
-                  Expects congressional trading XLSX. File is parsed in browser then uploaded in batches.
+                  Uploads are staged until the scheduled activation time. Use &quot;Activate Now&quot; for immediate processing.
                 </p>
 
                 {uploadProgress && (
@@ -774,7 +837,7 @@ export default function RSSCombinerPage() {
                     ) : (
                       <>
                         <div className="font-medium mb-1">
-                          Upload complete: {uploadResult.inserted?.toLocaleString()} of {uploadResult.total?.toLocaleString()} rows inserted
+                          Staged: {uploadResult.inserted?.toLocaleString()} of {uploadResult.total?.toLocaleString()} rows
                         </div>
                         <div className="text-blue-700">Unique tickers: {uploadResult.uniqueTickers}</div>
                         {uploadResult.errors?.length > 0 && (
@@ -785,6 +848,50 @@ export default function RSSCombinerPage() {
                           </div>
                         )}
                       </>
+                    )}
+                  </div>
+                )}
+
+                {/* Staging Status */}
+                {stagingStatus && stagingStatus.count > 0 && (
+                  <div className="mt-3 p-3 rounded bg-amber-50 border border-amber-200 text-sm">
+                    <div className="font-medium text-amber-800 mb-1">
+                      {stagingStatus.count.toLocaleString()} rows staged
+                    </div>
+                    <div className="text-amber-700 text-xs mb-2">
+                      Will activate on {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][stagingStatus.upload_schedule_day]} at {
+                        (() => {
+                          const [h, m] = stagingStatus.upload_schedule_time.split(':').map(Number)
+                          const ampm = h >= 12 ? 'PM' : 'AM'
+                          const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+                          return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+                        })()
+                      } CT
+                      {stagingStatus.staged_upload_at && (
+                        <> (uploaded {new Date(stagingStatus.staged_upload_at).toLocaleDateString()})</>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleActivateNow}
+                        disabled={activating}
+                        className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {activating ? 'Activating...' : 'Activate Now'}
+                      </button>
+                      <button
+                        onClick={handleDiscardStaged}
+                        className="flex-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded hover:bg-red-100 border border-red-200"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                    {activationResult && (
+                      <div className={`mt-2 text-xs ${activationResult.activated ? 'text-green-700' : 'text-red-600'}`}>
+                        {activationResult.activated
+                          ? `Activated ${activationResult.rowsCopied?.toLocaleString()} trades. ${activationResult.ingestion?.articlesStored ?? 0} articles ingested.`
+                          : `Activation failed: ${activationResult.reason}`}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1396,6 +1503,84 @@ export default function RSSCombinerPage() {
                   {savingSettings ? 'Saving...' : 'Save Settings'}
                 </button>
               </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h2 className="text-sm font-medium text-gray-700 mb-3">Upload Schedule</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                Staged uploads will be automatically activated at this time each week (US Central Time).
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Day of Week</label>
+                  <select
+                    value={editSettings.upload_schedule_day}
+                    onChange={(e) => setEditSettings({ ...editSettings, upload_schedule_day: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  >
+                    <option value={0}>Sunday</option>
+                    <option value={1}>Monday</option>
+                    <option value={2}>Tuesday</option>
+                    <option value={3}>Wednesday</option>
+                    <option value={4}>Thursday</option>
+                    <option value={5}>Friday</option>
+                    <option value={6}>Saturday</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Time (CT)</label>
+                  <select
+                    value={editSettings.upload_schedule_time}
+                    onChange={(e) => setEditSettings({ ...editSettings, upload_schedule_time: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  >
+                    {Array.from({ length: 48 }, (_, i) => {
+                      const h = Math.floor(i / 2)
+                      const m = i % 2 === 0 ? '00' : '30'
+                      const val = `${String(h).padStart(2, '0')}:${m}`
+                      const ampm = h >= 12 ? 'PM' : 'AM'
+                      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+                      return <option key={val} value={val}>{h12}:{m} {ampm}</option>
+                    })}
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="block text-xs text-gray-500 mb-1">Trade Freshness (days)</label>
+                <input
+                  type="number"
+                  value={editSettings.trade_freshness_days}
+                  onChange={(e) => setEditSettings({ ...editSettings, trade_freshness_days: parseInt(e.target.value) || 7 })}
+                  min={1}
+                  max={90}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Only select trades added to the spreadsheet within this many days (based on Quiver_Upload_Time column).
+                </p>
+              </div>
+              <button
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+                className="mt-3 w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingSettings ? 'Saving...' : 'Save Schedule'}
+              </button>
+
+              {/* Activation Status */}
+              {settings && (
+                <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-500 space-y-1">
+                  {settings.last_activation_at && (
+                    <div>Last activation: {new Date(settings.last_activation_at).toLocaleString()}</div>
+                  )}
+                  {settings.last_ingestion_at && (
+                    <div>Last ingestion: {new Date(settings.last_ingestion_at).toLocaleString()}</div>
+                  )}
+                  {settings.staged_upload_at && (
+                    <div className="text-amber-600 font-medium">Data staged: {new Date(settings.staged_upload_at).toLocaleString()}</div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-4">
