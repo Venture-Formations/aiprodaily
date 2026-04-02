@@ -245,20 +245,34 @@ export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: numbe
   )
 
   // Apply freshness filter based on quiver_upload_time
-  // Falls back to all trades if freshness filter returns nothing (e.g. stale data before re-upload)
+  // Expands window by 5 days at a time until we have enough trades (up to 90 days max)
   let freshTrades = trades
   if (tradeFreshnessDays && tradeFreshnessDays > 0) {
-    const freshnessDate = new Date()
-    freshnessDate.setDate(freshnessDate.getDate() - tradeFreshnessDays)
-    const freshnessStr = freshnessDate.toISOString().split('T')[0]
-    const filtered = trades.filter(
-      (t) => t.quiver_upload_time && t.quiver_upload_time >= freshnessStr
-    )
-    if (filtered.length > 0) {
-      freshTrades = filtered
-      console.log(`[RSS-Combiner] Freshness filter: ${trades.length} total → ${freshTrades.length} within ${tradeFreshnessDays} days`)
-    } else {
-      console.log(`[RSS-Combiner] Freshness filter returned 0 trades, falling back to all ${trades.length} trades`)
+    const MAX_WINDOW = 90
+    let windowDays = tradeFreshnessDays
+
+    while (windowDays <= MAX_WINDOW) {
+      const freshnessDate = new Date()
+      freshnessDate.setDate(freshnessDate.getDate() - windowDays)
+      const freshnessStr = freshnessDate.toISOString().split('T')[0]
+      const filtered = trades.filter(
+        (t) => t.quiver_upload_time && t.quiver_upload_time >= freshnessStr
+      )
+
+      if (filtered.length >= maxTrades) {
+        freshTrades = filtered
+        console.log(`[RSS-Combiner] Freshness filter: ${trades.length} total → ${filtered.length} within ${windowDays} days`)
+        break
+      }
+
+      if (windowDays >= MAX_WINDOW) {
+        // Use whatever we have at max window
+        freshTrades = filtered.length > 0 ? filtered : trades
+        console.log(`[RSS-Combiner] Freshness filter reached ${MAX_WINDOW}-day max: ${filtered.length} trades`)
+        break
+      }
+
+      windowDays += 5
     }
   }
 
