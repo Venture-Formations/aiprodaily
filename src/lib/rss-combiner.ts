@@ -22,6 +22,7 @@ interface CongressTrade {
   district: string | null
   chamber: string | null
   state: string | null
+  quiver_upload_time: string | null
 }
 
 interface TradeWithCompanyName extends CongressTrade {
@@ -226,7 +227,7 @@ async function fetchAllRows<T>(
  * Get top trades: deduplicate by ticker (keep largest trade_size_parsed),
  * exclude tickers in combined_feed_excluded_companies, sort by size DESC, limit N.
  */
-export async function getTopTrades(maxTrades: number): Promise<CongressTrade[]> {
+export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: number, maxTradesPerMember?: number): Promise<CongressTrade[]> {
   // Get excluded tickers (small table, no pagination needed)
   const { data: excludedRows } = await supabaseAdmin
     .from('combined_feed_excluded_companies')
@@ -239,23 +240,66 @@ export async function getTopTrades(maxTrades: number): Promise<CongressTrade[]> 
   // Fetch all trades with pagination, ordered by size desc
   const trades = await fetchAllRows<CongressTrade>(
     'congress_trades',
-    'id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state',
+    'id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time',
     { order: { column: 'trade_size_parsed', ascending: false } }
   )
 
-  // Deduplicate by ticker (first occurrence = largest trade since sorted by size desc)
-  // Skip "Over $50,000,000" trades — these are outliers that often fail to fetch
-  const seen = new Set<string>()
-  const deduped: CongressTrade[] = []
+  // Helper: run dedup/exclusion/per-member logic on a set of trades
+  const perMemberLimit = maxTradesPerMember ?? 0 // 0 = no limit
+  const selectTrades = (pool: CongressTrade[]): CongressTrade[] => {
+    const seen = new Set<string>()
+    const memberCounts = new Map<string, number>()
+    const result: CongressTrade[] = []
 
-  for (const trade of trades) {
-    const upperTicker = trade.ticker.toUpperCase()
-    if (excludedTickers.has(upperTicker)) continue
-    if (trade.trade_size_usd?.toLowerCase().startsWith('over')) continue
-    if (seen.has(upperTicker)) continue
-    seen.add(upperTicker)
-    deduped.push(trade)
-    if (deduped.length >= maxTrades) break
+    for (const trade of pool) {
+      const upperTicker = trade.ticker.toUpperCase()
+      if (excludedTickers.has(upperTicker)) continue
+      if (trade.trade_size_usd?.toLowerCase().startsWith('over')) continue
+      if (seen.has(upperTicker)) continue
+
+      if (perMemberLimit > 0 && trade.name) {
+        const memberKey = trade.name.toLowerCase().trim()
+        const count = memberCounts.get(memberKey) ?? 0
+        if (count >= perMemberLimit) continue
+        memberCounts.set(memberKey, count + 1)
+      }
+
+      seen.add(upperTicker)
+      result.push(trade)
+      if (result.length >= maxTrades) break
+    }
+
+    return result
+  }
+
+  // Apply freshness filter based on quiver_upload_time
+  // Expands window by 5 days at a time until we have enough qualified trades (up to 90 days max)
+  let deduped: CongressTrade[]
+  if (tradeFreshnessDays && tradeFreshnessDays > 0) {
+    const MAX_WINDOW = 90
+    let windowDays = tradeFreshnessDays
+    deduped = []
+
+    while (windowDays <= MAX_WINDOW) {
+      const freshnessDate = new Date()
+      freshnessDate.setDate(freshnessDate.getDate() - windowDays)
+      const freshnessStr = freshnessDate.toISOString().split('T')[0]
+      const filtered = trades.filter(
+        (t) => t.quiver_upload_time && t.quiver_upload_time >= freshnessStr
+      )
+
+      const selected = selectTrades(filtered)
+
+      if (selected.length >= maxTrades || windowDays >= MAX_WINDOW) {
+        deduped = selected
+        console.log(`[RSS-Combiner] Freshness: ${windowDays}-day window → ${filtered.length} raw → ${selected.length} selected trades`)
+        break
+      }
+
+      windowDays += 5
+    }
+  } else {
+    deduped = selectTrades(trades)
   }
 
   return deduped
@@ -520,7 +564,7 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 1. Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_trades, sale_url_template, purchase_url_template, max_age_days')
+    .select('max_trades, sale_url_template, purchase_url_template, max_age_days, trade_freshness_days, max_trades_per_member')
     .limit(1)
     .single()
 
@@ -528,6 +572,8 @@ export async function runIngestion(): Promise<IngestionResult> {
   const saleTemplate = settings?.sale_url_template || ''
   const purchaseTemplate = settings?.purchase_url_template || ''
   const maxAgeDays = settings?.max_age_days ?? 7
+  const tradeFreshnessDays = settings?.trade_freshness_days ?? 7
+  const maxTradesPerMember = settings?.max_trades_per_member ?? 5
 
   // 2. Load approved source domains
   const { data: approvedRows } = await supabaseAdmin
@@ -546,8 +592,8 @@ export async function runIngestion(): Promise<IngestionResult> {
 
   const excludedKeywords = (excludedKeywordRows || []).map((r: { keyword: string }) => r.keyword.toLowerCase())
 
-  // 4. Get top trades and resolve names
-  const trades = await getTopTrades(maxTrades)
+  // 4. Get top trades and resolve names (filtered by freshness + per-member limit)
+  const trades = await getTopTrades(maxTrades, tradeFreshnessDays, maxTradesPerMember)
   const tradesWithNames = await resolveTickerNames(trades)
   const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate, maxAgeDays)
 
@@ -694,7 +740,7 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   // Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_age_days, cache_ttl_minutes, feed_title')
+    .select('cache_ttl_minutes, feed_title, feed_article_age_days, min_articles_per_company')
     .limit(1)
     .single()
 
@@ -705,27 +751,61 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     return cachedXml
   }
 
-  const maxAgeDays = settings?.max_age_days ?? 7
+  const feedArticleAgeDays = settings?.feed_article_age_days ?? 14
+  const minArticlesPerCompany = settings?.min_articles_per_company ?? 2
   const feedTitle = settings?.feed_title ?? 'Combined RSS Feed'
 
-  // Query stored articles from DB
-  const cutoffDate = new Date()
-  cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays)
+  const ARTICLE_COLUMNS = 'article_title, article_url, article_description, source_name, source_domain, published_at, ticker, company_name, transaction_type, trade_meta'
+  const MAX_WINDOW = 90
 
-  const { data: articles, error } = await supabaseAdmin
-    .from('congress_feed_articles')
-    .select('article_title, article_url, article_description, source_name, source_domain, published_at, ticker, company_name, transaction_type, trade_meta')
-    .gte('published_at', cutoffDate.toISOString())
-    .order('published_at', { ascending: false })
-    .limit(500)
+  // Expand article age window by 5 days until each company has enough articles
+  let windowDays = feedArticleAgeDays
+  let articles: any[] = []
 
-  if (error) {
-    console.error('[RSS-Combiner] Failed to query articles:', error.message)
-    throw new Error('Failed to query stored articles')
+  while (windowDays <= MAX_WINDOW) {
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - windowDays)
+
+    const { data, error } = await supabaseAdmin
+      .from('congress_feed_articles')
+      .select(ARTICLE_COLUMNS)
+      .gte('published_at', cutoffDate.toISOString())
+      .order('published_at', { ascending: false })
+      .limit(500)
+
+    if (error) {
+      console.error('[RSS-Combiner] Failed to query articles:', error.message)
+      throw new Error('Failed to query stored articles')
+    }
+
+    articles = data || []
+
+    // Check if every company has at least minArticlesPerCompany
+    if (minArticlesPerCompany > 0 && articles.length > 0) {
+      const companyCounts = new Map<string, number>()
+      for (const row of articles) {
+        const key = (row.ticker || '').toUpperCase()
+        companyCounts.set(key, (companyCounts.get(key) ?? 0) + 1)
+      }
+
+      let allMet = true
+      companyCounts.forEach((count) => {
+        if (count < minArticlesPerCompany) allMet = false
+      })
+
+      if (allMet || windowDays >= MAX_WINDOW) {
+        console.log(`[RSS-Combiner] Feed articles: ${windowDays}-day window → ${articles.length} articles across ${companyCounts.size} companies`)
+        break
+      }
+    } else {
+      break
+    }
+
+    windowDays += 5
   }
 
   // Convert DB rows to NormalizedItem format
-  const items: NormalizedItem[] = (articles || []).map((row) => ({
+  const items: NormalizedItem[] = articles.map((row) => ({
     title: row.article_title,
     link: row.article_url,
     description: row.article_description || '',
@@ -752,6 +832,151 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   cachedAt = Date.now()
 
   return xml
+}
+
+export interface ActivationResult {
+  activated: boolean
+  rowsCopied: number
+  reason?: string
+}
+
+/**
+ * Move staged trades to the live congress_trades table.
+ * Steps: count staged → delete live → copy staged to live (paginated) → clear staged → update settings.
+ */
+export async function activateStagedUpload(): Promise<ActivationResult> {
+  // Check if there's staged data
+  const { count } = await supabaseAdmin
+    .from('congress_trades_staged')
+    .select('id', { count: 'exact', head: true })
+
+  if (!count || count === 0) {
+    return { activated: false, rowsCopied: 0, reason: 'no_staged_data' }
+  }
+
+  console.log(`[RSS-Combiner] Activating ${count} staged trades`)
+
+  // Delete all live trades
+  const { error: deleteError } = await supabaseAdmin
+    .from('congress_trades')
+    .delete()
+    .gte('id', '00000000-0000-0000-0000-000000000000')
+
+  if (deleteError) {
+    console.error('[RSS-Combiner] Failed to clear live trades:', deleteError.message)
+    return { activated: false, rowsCopied: 0, reason: 'delete_failed' }
+  }
+
+  // Copy staged to live in batches
+  const BATCH_SIZE = 1000
+  let offset = 0
+  let totalCopied = 0
+
+  while (true) {
+    const { data: batch, error: fetchError } = await supabaseAdmin
+      .from('congress_trades_staged')
+      .select('ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, capitol_trades_url, quiver_upload_time')
+      .range(offset, offset + BATCH_SIZE - 1)
+
+    if (fetchError) {
+      console.error(`[RSS-Combiner] Failed to fetch staged batch at offset ${offset}:`, fetchError.message)
+      break
+    }
+
+    if (!batch || batch.length === 0) break
+
+    const { error: insertError } = await supabaseAdmin
+      .from('congress_trades')
+      .insert(batch)
+
+    if (insertError) {
+      console.error(`[RSS-Combiner] Failed to insert batch at offset ${offset}:`, insertError.message)
+    } else {
+      totalCopied += batch.length
+    }
+
+    if (batch.length < BATCH_SIZE) break
+    offset += BATCH_SIZE
+  }
+
+  // Clear staging table
+  await supabaseAdmin
+    .from('congress_trades_staged')
+    .delete()
+    .gte('id', '00000000-0000-0000-0000-000000000000')
+
+  // Update settings: record activation time, clear staged_upload_at
+  await supabaseAdmin
+    .from('combined_feed_settings')
+    .update({
+      last_activation_at: new Date().toISOString(),
+      staged_upload_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .not('id', 'is', null)
+
+  invalidateCache()
+  invalidateTradesCache()
+
+  console.log(`[RSS-Combiner] Activation complete: ${totalCopied} trades copied to live`)
+
+  return { activated: true, rowsCopied: totalCopied }
+}
+
+/**
+ * Check if the scheduled activation time has passed and activate staged data if so.
+ * Schedule is day-of-week + time in America/Chicago timezone.
+ */
+export async function checkAndActivateSchedule(): Promise<ActivationResult> {
+  const { data: settings } = await supabaseAdmin
+    .from('combined_feed_settings')
+    .select('upload_schedule_day, upload_schedule_time, staged_upload_at, last_activation_at')
+    .limit(1)
+    .single()
+
+  if (!settings?.staged_upload_at) {
+    return { activated: false, rowsCopied: 0, reason: 'no_staged_data' }
+  }
+
+  const scheduleDay = settings.upload_schedule_day ?? 2 // Tuesday
+  const scheduleTime = settings.upload_schedule_time ?? '09:00'
+  const [scheduleHour, scheduleMinute] = scheduleTime.split(':').map(Number)
+
+  // Get current time in America/Chicago
+  const nowCT = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })
+  )
+  const nowDow = nowCT.getDay() // 0=Sunday
+
+  // Find the most recent scheduled activation time
+  // Go back up to 7 days to find the last occurrence of scheduleDay
+  let daysBack = (nowDow - scheduleDay + 7) % 7
+  const scheduledDate = new Date(nowCT)
+  scheduledDate.setDate(scheduledDate.getDate() - daysBack)
+  scheduledDate.setHours(scheduleHour, scheduleMinute, 0, 0)
+
+  // If the scheduled time is in the future (same day but later), go back a week
+  if (scheduledDate > nowCT) {
+    scheduledDate.setDate(scheduledDate.getDate() - 7)
+  }
+
+  const stagedAt = new Date(settings.staged_upload_at)
+  const lastActivatedAt = settings.last_activation_at ? new Date(settings.last_activation_at) : null
+
+  // Activate if:
+  // 1. Data was staged before the scheduled time
+  // 2. We haven't already activated since the scheduled time
+  const scheduledTimeMs = scheduledDate.getTime()
+  const alreadyActivated = lastActivatedAt && lastActivatedAt.getTime() >= scheduledTimeMs
+  const stagedBeforeSchedule = stagedAt.getTime() < scheduledTimeMs
+  const nowPastSchedule = nowCT.getTime() >= scheduledTimeMs
+
+  if (nowPastSchedule && stagedBeforeSchedule && !alreadyActivated) {
+    console.log(`[RSS-Combiner] Scheduled activation triggered (schedule: ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][scheduleDay]} ${scheduleTime} CT)`)
+    return activateStagedUpload()
+  }
+
+  return { activated: false, rowsCopied: 0, reason: 'not_time_yet' }
 }
 
 export function invalidateCache(): void {

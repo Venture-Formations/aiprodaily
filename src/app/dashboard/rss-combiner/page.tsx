@@ -74,6 +74,21 @@ interface FeedSettings {
   max_trades: number
   last_ingestion_at: string | null
   updated_at: string
+  upload_schedule_day: number
+  upload_schedule_time: string
+  staged_upload_at: string | null
+  last_activation_at: string | null
+  trade_freshness_days: number
+  max_trades_per_member: number
+  feed_article_age_days: number
+  min_articles_per_company: number
+}
+
+interface StagingStatus {
+  count: number
+  staged_upload_at: string | null
+  upload_schedule_day: number
+  upload_schedule_time: string
 }
 
 // Column header mapping for XLSX parsing (client-side)
@@ -92,6 +107,8 @@ const COLUMN_MAP: Record<string, string> = {
   chamber: 'chamber',
   state: 'state',
   'capitol trades url': 'capitol_trades_url',
+  'quiver upload time': 'quiver_upload_time',
+  quiveruploadtime: 'quiver_upload_time',
 }
 
 function normalizeHeader(h: string): string {
@@ -147,6 +164,12 @@ export default function RSSCombinerPage() {
     sale_url_template: '',
     purchase_url_template: '',
     max_trades: 21,
+    upload_schedule_day: 2,
+    upload_schedule_time: '09:00',
+    trade_freshness_days: 7,
+    max_trades_per_member: 5,
+    feed_article_age_days: 14,
+    min_articles_per_company: 2,
   })
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -183,6 +206,15 @@ export default function RSSCombinerPage() {
   const [excludedKeywords, setExcludedKeywords] = useState<ExcludedKeyword[]>([])
   const [newKeyword, setNewKeyword] = useState('')
 
+  // Staging state
+  const [stagingStatus, setStagingStatus] = useState<StagingStatus | null>(null)
+  const [activating, setActivating] = useState(false)
+  const [activationResult, setActivationResult] = useState<any>(null)
+
+  // Unknown tickers state
+  const [unknownTickers, setUnknownTickers] = useState<{ ticker: string; raw_company: string }[]>([])
+  const [confirmingTicker, setConfirmingTicker] = useState<{ ticker: string; name: string } | null>(null)
+
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
@@ -210,6 +242,12 @@ export default function RSSCombinerPage() {
           sale_url_template: s.sale_url_template || '',
           purchase_url_template: s.purchase_url_template || '',
           max_trades: s.max_trades,
+          upload_schedule_day: s.upload_schedule_day ?? 2,
+          upload_schedule_time: s.upload_schedule_time ?? '09:00',
+          trade_freshness_days: s.trade_freshness_days ?? 7,
+          max_trades_per_member: s.max_trades_per_member ?? 5,
+          feed_article_age_days: s.feed_article_age_days ?? 14,
+          min_articles_per_company: s.min_articles_per_company ?? 2,
         })
       }
     }
@@ -247,6 +285,22 @@ export default function RSSCombinerPage() {
     }
   }, [])
 
+  const fetchUnknownTickers = useCallback(async () => {
+    const res = await fetch('/api/admin/rss-combiner/ticker-db/unknown')
+    if (res.ok) {
+      const data = await res.json()
+      setUnknownTickers(data.unknown || [])
+    }
+  }, [])
+
+  const fetchStagingStatus = useCallback(async () => {
+    const res = await fetch('/api/admin/rss-combiner/staging')
+    if (res.ok) {
+      const data = await res.json()
+      setStagingStatus(data)
+    }
+  }, [])
+
   // Track which tabs have been loaded
   const loadedTabs = useRef<Set<string>>(new Set())
 
@@ -266,9 +320,12 @@ export default function RSSCombinerPage() {
         switch (activeTab) {
           case 'trades':
             promises.push(fetchTrades())
+            promises.push(fetchStagingStatus())
             break
           case 'ticker-db':
             promises.push(fetchTickers())
+            promises.push(fetchUnknownTickers())
+            promises.push(fetchExcludedCompanies())
             break
           case 'excluded-companies':
             promises.push(fetchExcludedCompanies())
@@ -289,7 +346,7 @@ export default function RSSCombinerPage() {
       }
     }
     loadTabData()
-  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedKeywords])
+  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedKeywords, fetchStagingStatus, fetchUnknownTickers])
 
   // --- Upload Handlers ---
 
@@ -344,7 +401,7 @@ export default function RSSCombinerPage() {
         const trade: Record<string, any> = {}
         for (const [rawHeader, dbCol] of Object.entries(colIndex)) {
           const val = row[rawHeader]
-          if (dbCol === 'traded' || dbCol === 'filed') {
+          if (dbCol === 'traded' || dbCol === 'filed' || dbCol === 'quiver_upload_time') {
             trade[dbCol] = parseExcelDate(val)
           } else {
             trade[dbCol] = val != null ? String(val).trim() || null : null
@@ -388,9 +445,10 @@ export default function RSSCombinerPage() {
         inserted: totalInserted,
         total: rows.length,
         uniqueTickers: new Set(trades.map((t: any) => t.ticker?.toUpperCase())).size,
+        staged: true,
         errors: allErrors.slice(0, 20),
       })
-      fetchTrades()
+      fetchStagingStatus()
       fileInput.value = ''
     } catch (err: any) {
       setUploadResult({ error: err.message || 'Upload failed' })
@@ -466,6 +524,46 @@ export default function RSSCombinerPage() {
       body: JSON.stringify({ id }),
     })
     if (res.ok) setTickers((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const handleConfirmUnknownTicker = async (ticker: string, companyName: string) => {
+    const res = await fetch('/api/admin/rss-combiner/ticker-db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, company_name: companyName }),
+    })
+    if (res.ok) {
+      setUnknownTickers((prev) => prev.filter((t) => t.ticker !== ticker))
+      setConfirmingTicker(null)
+      fetchTickers()
+    }
+  }
+
+  const handleToggleExclude = async (ticker: string) => {
+    const existing = excludedCompanies.find((c) => c.ticker.toUpperCase() === ticker.toUpperCase())
+    if (existing) {
+      // Include (remove from excluded)
+      const res = await fetch('/api/admin/rss-combiner/excluded-companies', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: existing.id }),
+      })
+      if (res.ok) {
+        setExcludedCompanies((prev) => prev.filter((c) => c.id !== existing.id))
+      }
+    } else {
+      // Exclude (add to excluded)
+      const tickerMapping = tickers.find((t) => t.ticker.toUpperCase() === ticker.toUpperCase())
+      const res = await fetch('/api/admin/rss-combiner/excluded-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, company_name: tickerMapping?.company_name || undefined }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setExcludedCompanies((prev) => [...prev, data.company])
+      }
+    }
   }
 
   const handleAddExcludedCompany = async () => {
@@ -594,6 +692,34 @@ export default function RSSCombinerPage() {
     }
   }
 
+  const handleActivateNow = async () => {
+    setActivating(true)
+    setActivationResult(null)
+    try {
+      const res = await fetch('/api/admin/rss-combiner/activate', { method: 'POST' })
+      const data = await res.json()
+      setActivationResult(data)
+      if (data.activated) {
+        fetchTrades()
+        fetchStagingStatus()
+        fetchSettings()
+      }
+    } catch {
+      setActivationResult({ activated: false, reason: 'request_failed' })
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  const handleDiscardStaged = async () => {
+    if (!confirm('Discard all staged data?')) return
+    const res = await fetch('/api/admin/rss-combiner/staging', { method: 'DELETE' })
+    if (res.ok) {
+      setStagingStatus(null)
+      setUploadResult(null)
+    }
+  }
+
   const handleSaveSettings = async () => {
     setSavingSettings(true)
     try {
@@ -620,6 +746,9 @@ export default function RSSCombinerPage() {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  // Build excluded tickers set for quick lookup
+  const excludedTickerSet = new Set(excludedCompanies.map((c) => c.ticker.toUpperCase()))
 
   // Filtered ticker list for search (reset page when search changes)
   const filteredTickers = tickerSearch
@@ -671,6 +800,11 @@ export default function RSSCombinerPage() {
                 }`}
               >
                 {tab.label}
+                {tab.key === 'ticker-db' && unknownTickers.length > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                    {unknownTickers.length}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -756,11 +890,11 @@ export default function RSSCombinerPage() {
                     disabled={uploading}
                     className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {uploading ? 'Uploading...' : 'Upload & Replace All Trades'}
+                    {uploading ? 'Uploading...' : 'Stage Upload'}
                   </button>
                 </form>
                 <p className="mt-2 text-xs text-gray-500">
-                  Expects congressional trading XLSX. File is parsed in browser then uploaded in batches.
+                  Uploads are staged until the scheduled activation time. Use &quot;Activate Now&quot; for immediate processing.
                 </p>
 
                 {uploadProgress && (
@@ -774,7 +908,7 @@ export default function RSSCombinerPage() {
                     ) : (
                       <>
                         <div className="font-medium mb-1">
-                          Upload complete: {uploadResult.inserted?.toLocaleString()} of {uploadResult.total?.toLocaleString()} rows inserted
+                          Staged: {uploadResult.inserted?.toLocaleString()} of {uploadResult.total?.toLocaleString()} rows
                         </div>
                         <div className="text-blue-700">Unique tickers: {uploadResult.uniqueTickers}</div>
                         {uploadResult.errors?.length > 0 && (
@@ -785,6 +919,50 @@ export default function RSSCombinerPage() {
                           </div>
                         )}
                       </>
+                    )}
+                  </div>
+                )}
+
+                {/* Staging Status */}
+                {stagingStatus && stagingStatus.count > 0 && (
+                  <div className="mt-3 p-3 rounded bg-amber-50 border border-amber-200 text-sm">
+                    <div className="font-medium text-amber-800 mb-1">
+                      {stagingStatus.count.toLocaleString()} rows staged
+                    </div>
+                    <div className="text-amber-700 text-xs mb-2">
+                      Will activate on {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][stagingStatus.upload_schedule_day]} at {
+                        (() => {
+                          const [h, m] = stagingStatus.upload_schedule_time.split(':').map(Number)
+                          const ampm = h >= 12 ? 'PM' : 'AM'
+                          const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+                          return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+                        })()
+                      } CT
+                      {stagingStatus.staged_upload_at && (
+                        <> (uploaded {new Date(stagingStatus.staged_upload_at).toLocaleDateString()})</>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleActivateNow}
+                        disabled={activating}
+                        className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {activating ? 'Activating...' : 'Activate Now'}
+                      </button>
+                      <button
+                        onClick={handleDiscardStaged}
+                        className="flex-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded hover:bg-red-100 border border-red-200"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                    {activationResult && (
+                      <div className={`mt-2 text-xs ${activationResult.activated ? 'text-green-700' : 'text-red-600'}`}>
+                        {activationResult.activated
+                          ? `Activated ${activationResult.rowsCopied?.toLocaleString()} trades. ${activationResult.ingestion?.articlesStored ?? 0} articles ingested.`
+                          : `Activation failed: ${activationResult.reason}`}
+                      </div>
                     )}
                   </div>
                 )}
@@ -816,7 +994,7 @@ export default function RSSCombinerPage() {
                     <p className="text-xs text-gray-400 mt-1">For Purchase transactions. Use {'{company_name}'} as placeholder.</p>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Max Trades for Feed</label>
+                    <label className="block text-xs text-gray-500 mb-1">Total Trades for Feed</label>
                     <input
                       type="number"
                       value={editSettings.max_trades}
@@ -889,6 +1067,71 @@ export default function RSSCombinerPage() {
         {/* Tab: Ticker Database */}
         {activeTab === 'ticker-db' && (
           <div className="space-y-6">
+            {/* Unknown Tickers - Confirm Section */}
+            {unknownTickers.length > 0 && (
+              <div className="bg-amber-50 rounded-lg border border-amber-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-amber-200">
+                  <h2 className="text-sm font-medium text-amber-800">
+                    Unknown Tickers ({unknownTickers.length})
+                  </h2>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    These tickers from uploaded trades don&apos;t have a name mapping. Confirm or edit the company name to add them.
+                  </p>
+                </div>
+                <div className="divide-y divide-amber-100">
+                  {unknownTickers.map((ut) => (
+                    <div key={ut.ticker} className="px-4 py-2 flex items-center gap-3">
+                      <span className="font-mono font-medium text-sm text-gray-900 w-20">{ut.ticker}</span>
+                      {confirmingTicker?.ticker === ut.ticker ? (
+                        <div className="flex-1 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={confirmingTicker.name}
+                            onChange={(e) => setConfirmingTicker({ ...confirmingTicker, name: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleConfirmUnknownTicker(ut.ticker, confirmingTicker.name)
+                              if (e.key === 'Escape') setConfirmingTicker(null)
+                            }}
+                            autoFocus
+                            className="flex-1 px-2 py-1 text-sm border border-amber-300 rounded"
+                          />
+                          <button
+                            onClick={() => handleConfirmUnknownTicker(ut.ticker, confirmingTicker.name)}
+                            disabled={!confirmingTicker.name.trim()}
+                            className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setConfirmingTicker(null)}
+                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-white rounded border border-gray-300 hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="flex-1 text-sm text-gray-600 truncate">{ut.raw_company}</span>
+                          <button
+                            onClick={() => setConfirmingTicker({ ticker: ut.ticker, name: ut.raw_company })}
+                            className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleConfirmUnknownTicker(ut.ticker, ut.raw_company)}
+                            className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+                          >
+                            Confirm
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h2 className="text-sm font-medium text-gray-700 mb-3">Add Ticker Mapping</h2>
               <div className="flex items-end gap-2">
@@ -1025,6 +1268,16 @@ export default function RSSCombinerPage() {
                                   className="text-blue-500 hover:text-blue-700 text-xs"
                                 >
                                   Edit
+                                </button>
+                                <button
+                                  onClick={() => handleToggleExclude(t.ticker)}
+                                  className={`text-xs ${
+                                    excludedTickerSet.has(t.ticker.toUpperCase())
+                                      ? 'text-green-600 hover:text-green-800'
+                                      : 'text-orange-500 hover:text-orange-700'
+                                  }`}
+                                >
+                                  {excludedTickerSet.has(t.ticker.toUpperCase()) ? 'Include' : 'Exclude'}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteTicker(t.id)}
@@ -1366,7 +1619,7 @@ export default function RSSCombinerPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Max Age (days)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Ingestion Max Age (days)</label>
                     <input
                       type="number"
                       value={editSettings.max_age_days}
@@ -1388,6 +1641,32 @@ export default function RSSCombinerPage() {
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Feed Article Age (days)</label>
+                    <input
+                      type="number"
+                      value={editSettings.feed_article_age_days}
+                      onChange={(e) => setEditSettings({ ...editSettings, feed_article_age_days: parseInt(e.target.value) || 14 })}
+                      min={1}
+                      max={90}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Starting window for articles in feed output. Expands by 5 days as needed.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Min Articles per Company</label>
+                    <input
+                      type="number"
+                      value={editSettings.min_articles_per_company}
+                      onChange={(e) => setEditSettings({ ...editSettings, min_articles_per_company: parseInt(e.target.value) || 2 })}
+                      min={1}
+                      max={20}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Window expands until each company has at least this many.</p>
+                  </div>
+                </div>
                 <button
                   onClick={handleSaveSettings}
                   disabled={savingSettings}
@@ -1396,6 +1675,100 @@ export default function RSSCombinerPage() {
                   {savingSettings ? 'Saving...' : 'Save Settings'}
                 </button>
               </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h2 className="text-sm font-medium text-gray-700 mb-3">Upload Schedule</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                Staged uploads will be automatically activated at this time each week (US Central Time).
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Day of Week</label>
+                  <select
+                    value={editSettings.upload_schedule_day}
+                    onChange={(e) => setEditSettings({ ...editSettings, upload_schedule_day: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  >
+                    <option value={0}>Sunday</option>
+                    <option value={1}>Monday</option>
+                    <option value={2}>Tuesday</option>
+                    <option value={3}>Wednesday</option>
+                    <option value={4}>Thursday</option>
+                    <option value={5}>Friday</option>
+                    <option value={6}>Saturday</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Time (CT)</label>
+                  <select
+                    value={editSettings.upload_schedule_time}
+                    onChange={(e) => setEditSettings({ ...editSettings, upload_schedule_time: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  >
+                    {Array.from({ length: 48 }, (_, i) => {
+                      const h = Math.floor(i / 2)
+                      const m = i % 2 === 0 ? '00' : '30'
+                      const val = `${String(h).padStart(2, '0')}:${m}`
+                      const ampm = h >= 12 ? 'PM' : 'AM'
+                      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+                      return <option key={val} value={val}>{h12}:{m} {ampm}</option>
+                    })}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Trade Freshness (days)</label>
+                  <input
+                    type="number"
+                    value={editSettings.trade_freshness_days}
+                    onChange={(e) => setEditSettings({ ...editSettings, trade_freshness_days: parseInt(e.target.value) || 7 })}
+                    min={1}
+                    max={90}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Only trades added within this window (Quiver_Upload_Time).
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Max Trades per Member</label>
+                  <input
+                    type="number"
+                    value={editSettings.max_trades_per_member}
+                    onChange={(e) => setEditSettings({ ...editSettings, max_trades_per_member: parseInt(e.target.value) || 5 })}
+                    min={1}
+                    max={50}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Limit per congress member to ensure diversity.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+                className="mt-3 w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingSettings ? 'Saving...' : 'Save Schedule'}
+              </button>
+
+              {/* Activation Status */}
+              {settings && (
+                <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-500 space-y-1">
+                  {settings.last_activation_at && (
+                    <div>Last activation: {new Date(settings.last_activation_at).toLocaleString()}</div>
+                  )}
+                  {settings.last_ingestion_at && (
+                    <div>Last ingestion: {new Date(settings.last_ingestion_at).toLocaleString()}</div>
+                  )}
+                  {settings.staged_upload_at && (
+                    <div className="text-amber-600 font-medium">Data staged: {new Date(settings.staged_upload_at).toLocaleString()}</div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-4">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { invalidateCache, invalidateTradesCache, parseTradeSize } from '@/lib/rss-combiner'
+import { invalidateTradesCache, parseTradeSize } from '@/lib/rss-combiner'
 import { z } from 'zod'
 
 const BATCH_SIZE = 1000
@@ -20,6 +20,7 @@ const tradeRowSchema = z.object({
   chamber: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   capitol_trades_url: z.string().nullable().optional(),
+  quiver_upload_time: z.string().nullable().optional(),
 })
 
 const uploadSchema = z.object({
@@ -55,25 +56,25 @@ export const POST = withApiHandler(
       )
     }
 
-    // Truncate existing trades (skip if appending a subsequent chunk)
+    // Truncate existing staged trades (skip if appending a subsequent chunk)
     if (!input.append) {
       const { error: truncError } = await supabaseAdmin
-        .from('congress_trades')
+        .from('congress_trades_staged')
         .delete()
         .gte('id', '00000000-0000-0000-0000-000000000000')
 
       if (truncError) {
-        console.error('[RSS-Combiner] Truncate failed:', truncError.message)
-        return NextResponse.json({ error: 'Failed to clear existing trades' }, { status: 500 })
+        console.error('[RSS-Combiner] Truncate staged failed:', truncError.message)
+        return NextResponse.json({ error: 'Failed to clear staged trades' }, { status: 500 })
       }
     }
 
-    // Batch insert
+    // Batch insert into staging table
     let inserted = 0
     for (let i = 0; i < trades.length; i += BATCH_SIZE) {
       const batch = trades.slice(i, i + BATCH_SIZE)
       const { error: insertError } = await supabaseAdmin
-        .from('congress_trades')
+        .from('congress_trades_staged')
         .insert(batch)
 
       if (insertError) {
@@ -83,7 +84,14 @@ export const POST = withApiHandler(
       }
     }
 
-    invalidateCache()
+    // Record when data was staged (only on final chunk or single upload)
+    if (!input.append || inserted > 0) {
+      await supabaseAdmin
+        .from('combined_feed_settings')
+        .update({ staged_upload_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .not('id', 'is', null)
+    }
+
     invalidateTradesCache()
 
     const uniqueTickers = new Set(trades.map((t) => t.ticker.toUpperCase())).size
@@ -92,6 +100,7 @@ export const POST = withApiHandler(
       inserted,
       total: rows.length,
       uniqueTickers,
+      staged: true,
       errors: errors.slice(0, 20),
     })
   }

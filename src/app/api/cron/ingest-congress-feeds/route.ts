@@ -1,22 +1,33 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { runIngestion } from '@/lib/rss-combiner'
+import { runIngestion, checkAndActivateSchedule } from '@/lib/rss-combiner'
 
 /**
  * Congress Feed Ingestion Cron (runs every 3 hours)
- * Fetches Google News articles for top congressional trades, filters by approved sources.
+ * 1. Checks if scheduled activation is due (staged trades → live)
+ * 2. Fetches Google News articles for top congressional trades, filters by approved sources.
  *
  * Both GET (Vercel cron) and POST (manual with Bearer token) are secured via system auth tier.
  */
 const handler = withApiHandler(
   { authTier: 'system', logContext: 'ingest-congress-feeds' },
   async ({ logger }) => {
-    logger.info('Starting congress feed ingestion')
+    // Check if scheduled activation is due
+    const activation = await checkAndActivateSchedule()
 
+    if (activation.activated) {
+      logger.info(
+        { rowsCopied: activation.rowsCopied },
+        'Scheduled activation completed, running ingestion with new trades'
+      )
+    }
+
+    // Run ingestion (whether or not activation happened)
     const result = await runIngestion()
 
     logger.info(
       {
+        activated: activation.activated,
         feedsFetched: result.feedsFetched,
         articlesStored: result.articlesStored,
         articlesFiltered: result.articlesFiltered,
@@ -26,6 +37,8 @@ const handler = withApiHandler(
 
     return NextResponse.json({
       success: true,
+      activated: activation.activated,
+      rowsCopied: activation.rowsCopied,
       ...result,
       timestamp: new Date().toISOString(),
     })
