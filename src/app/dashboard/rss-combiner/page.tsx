@@ -205,6 +205,10 @@ export default function RSSCombinerPage() {
   const [activating, setActivating] = useState(false)
   const [activationResult, setActivationResult] = useState<any>(null)
 
+  // Unknown tickers state
+  const [unknownTickers, setUnknownTickers] = useState<{ ticker: string; raw_company: string }[]>([])
+  const [confirmingTicker, setConfirmingTicker] = useState<{ ticker: string; name: string } | null>(null)
+
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
@@ -272,6 +276,14 @@ export default function RSSCombinerPage() {
     }
   }, [])
 
+  const fetchUnknownTickers = useCallback(async () => {
+    const res = await fetch('/api/admin/rss-combiner/ticker-db/unknown')
+    if (res.ok) {
+      const data = await res.json()
+      setUnknownTickers(data.unknown || [])
+    }
+  }, [])
+
   const fetchStagingStatus = useCallback(async () => {
     const res = await fetch('/api/admin/rss-combiner/staging')
     if (res.ok) {
@@ -303,6 +315,8 @@ export default function RSSCombinerPage() {
             break
           case 'ticker-db':
             promises.push(fetchTickers())
+            promises.push(fetchUnknownTickers())
+            promises.push(fetchExcludedCompanies())
             break
           case 'excluded-companies':
             promises.push(fetchExcludedCompanies())
@@ -323,7 +337,7 @@ export default function RSSCombinerPage() {
       }
     }
     loadTabData()
-  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedKeywords, fetchStagingStatus])
+  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedKeywords, fetchStagingStatus, fetchUnknownTickers])
 
   // --- Upload Handlers ---
 
@@ -501,6 +515,46 @@ export default function RSSCombinerPage() {
       body: JSON.stringify({ id }),
     })
     if (res.ok) setTickers((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const handleConfirmUnknownTicker = async (ticker: string, companyName: string) => {
+    const res = await fetch('/api/admin/rss-combiner/ticker-db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, company_name: companyName }),
+    })
+    if (res.ok) {
+      setUnknownTickers((prev) => prev.filter((t) => t.ticker !== ticker))
+      setConfirmingTicker(null)
+      fetchTickers()
+    }
+  }
+
+  const handleToggleExclude = async (ticker: string) => {
+    const existing = excludedCompanies.find((c) => c.ticker.toUpperCase() === ticker.toUpperCase())
+    if (existing) {
+      // Include (remove from excluded)
+      const res = await fetch('/api/admin/rss-combiner/excluded-companies', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: existing.id }),
+      })
+      if (res.ok) {
+        setExcludedCompanies((prev) => prev.filter((c) => c.id !== existing.id))
+      }
+    } else {
+      // Exclude (add to excluded)
+      const tickerMapping = tickers.find((t) => t.ticker.toUpperCase() === ticker.toUpperCase())
+      const res = await fetch('/api/admin/rss-combiner/excluded-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, company_name: tickerMapping?.company_name || undefined }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setExcludedCompanies((prev) => [...prev, data.company])
+      }
+    }
   }
 
   const handleAddExcludedCompany = async () => {
@@ -684,6 +738,9 @@ export default function RSSCombinerPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Build excluded tickers set for quick lookup
+  const excludedTickerSet = new Set(excludedCompanies.map((c) => c.ticker.toUpperCase()))
+
   // Filtered ticker list for search (reset page when search changes)
   const filteredTickers = tickerSearch
     ? tickers.filter(
@@ -734,6 +791,11 @@ export default function RSSCombinerPage() {
                 }`}
               >
                 {tab.label}
+                {tab.key === 'ticker-db' && unknownTickers.length > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                    {unknownTickers.length}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -996,6 +1058,65 @@ export default function RSSCombinerPage() {
         {/* Tab: Ticker Database */}
         {activeTab === 'ticker-db' && (
           <div className="space-y-6">
+            {/* Unknown Tickers - Confirm Section */}
+            {unknownTickers.length > 0 && (
+              <div className="bg-amber-50 rounded-lg border border-amber-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-amber-200">
+                  <h2 className="text-sm font-medium text-amber-800">
+                    Unknown Tickers ({unknownTickers.length})
+                  </h2>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    These tickers from uploaded trades don&apos;t have a name mapping. Confirm or edit the company name to add them.
+                  </p>
+                </div>
+                <div className="divide-y divide-amber-100">
+                  {unknownTickers.map((ut) => (
+                    <div key={ut.ticker} className="px-4 py-2 flex items-center gap-3">
+                      <span className="font-mono font-medium text-sm text-gray-900 w-20">{ut.ticker}</span>
+                      {confirmingTicker?.ticker === ut.ticker ? (
+                        <div className="flex-1 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={confirmingTicker.name}
+                            onChange={(e) => setConfirmingTicker({ ...confirmingTicker, name: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleConfirmUnknownTicker(ut.ticker, confirmingTicker.name)
+                              if (e.key === 'Escape') setConfirmingTicker(null)
+                            }}
+                            autoFocus
+                            className="flex-1 px-2 py-1 text-sm border border-amber-300 rounded"
+                          />
+                          <button
+                            onClick={() => handleConfirmUnknownTicker(ut.ticker, confirmingTicker.name)}
+                            disabled={!confirmingTicker.name.trim()}
+                            className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setConfirmingTicker(null)}
+                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-white rounded border border-gray-300 hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="flex-1 text-sm text-gray-600 truncate">{ut.raw_company}</span>
+                          <button
+                            onClick={() => setConfirmingTicker({ ticker: ut.ticker, name: ut.raw_company })}
+                            className="px-3 py-1 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700"
+                          >
+                            Confirm
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h2 className="text-sm font-medium text-gray-700 mb-3">Add Ticker Mapping</h2>
               <div className="flex items-end gap-2">
@@ -1132,6 +1253,16 @@ export default function RSSCombinerPage() {
                                   className="text-blue-500 hover:text-blue-700 text-xs"
                                 >
                                   Edit
+                                </button>
+                                <button
+                                  onClick={() => handleToggleExclude(t.ticker)}
+                                  className={`text-xs ${
+                                    excludedTickerSet.has(t.ticker.toUpperCase())
+                                      ? 'text-green-600 hover:text-green-800'
+                                      : 'text-orange-500 hover:text-orange-700'
+                                  }`}
+                                >
+                                  {excludedTickerSet.has(t.ticker.toUpperCase()) ? 'Include' : 'Exclude'}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteTicker(t.id)}
