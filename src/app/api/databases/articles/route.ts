@@ -221,51 +221,21 @@ export const GET = withApiHandler(
         feedType = feed.use_for_primary_section ? 'Primary' : (feed.use_for_secondary_section ? 'Secondary' : 'Unknown');
       }
 
-      // Extract publisher name from source URL domain
+      // Extract publisher name: first from title suffix ("Title - Source"), then from URL domain
       let sourceName = '';
-      if (post.source_url) {
+      const title = post.title || '';
+      const dashIdx = title.lastIndexOf(' - ');
+      if (dashIdx > 0) {
+        sourceName = title.substring(dashIdx + 3).trim();
+      }
+      if (!sourceName && post.source_url) {
         try {
           const hostname = new URL(post.source_url).hostname
             .replace(/^www\./, '')
             .replace(/^news\./, '')
             .replace(/^feeds\./, '')
             .replace(/^rss\./, '');
-          // Map common domains to clean names
-          const domainMap: Record<string, string> = {
-            'cnbc.com': 'CNBC',
-            'finance.yahoo.com': 'Yahoo Finance',
-            'yahoo.com': 'Yahoo',
-            'reuters.com': 'Reuters',
-            'bloomberg.com': 'Bloomberg',
-            'globenewswire.com': 'GlobeNewsWire',
-            'prnewswire.com': 'PR Newswire',
-            'businesswire.com': 'Business Wire',
-            'techcrunch.com': 'TechCrunch',
-            'theverge.com': 'The Verge',
-            'arstechnica.com': 'Ars Technica',
-            'wired.com': 'Wired',
-            'nytimes.com': 'NY Times',
-            'wsj.com': 'WSJ',
-            'washingtonpost.com': 'Washington Post',
-            'bbc.com': 'BBC',
-            'bbc.co.uk': 'BBC',
-            'theguardian.com': 'The Guardian',
-            'ft.com': 'Financial Times',
-            'forbes.com': 'Forbes',
-            'venturebeat.com': 'VentureBeat',
-            'zdnet.com': 'ZDNet',
-            'cnet.com': 'CNET',
-            'engadget.com': 'Engadget',
-            'apnews.com': 'AP News',
-            'marketwatch.com': 'MarketWatch',
-            'investors.com': 'IBD',
-            'barrons.com': "Barron's",
-            'seekingalpha.com': 'Seeking Alpha',
-            'fool.com': 'Motley Fool',
-            'investopedia.com': 'Investopedia',
-            'benzinga.com': 'Benzinga',
-          };
-          sourceName = domainMap[hostname] || hostname.split('.').slice(0, -1).join('.').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          sourceName = hostname.split('.').slice(0, -1).join('.').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         } catch {
           sourceName = '';
         }
