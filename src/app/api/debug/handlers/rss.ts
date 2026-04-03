@@ -801,6 +801,17 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
       const force = searchParams.get('force') === 'true'
 
+      // Resolve company name from ticker_company_names table
+      const { data: nameMapping } = await supabaseAdmin
+        .from('ticker_company_names')
+        .select('company_name')
+        .eq('ticker', trade.ticker.toUpperCase())
+        .maybeSingle()
+
+      if (nameMapping?.company_name) {
+        trade.company = nameMapping.company_name
+      }
+
       // If force, delete existing image from storage and clear DB field
       if (force && trade.image_url) {
         const objectPath = `st/t/${trade.id}.png`
