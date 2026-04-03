@@ -129,7 +129,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             height: '630px',
             display: 'flex',
             position: 'relative',
-            background: 'linear-gradient(145deg, #d4e6f1 0%, #85c1e9 30%, #5dade2 60%, #3498db 100%)',
+            background: 'linear-gradient(145deg, #1a3a5c 0%, #1e4a6e 30%, #2c5f8a 60%, #1a3a5c 100%)',
             overflow: 'hidden',
           }}
         >
