@@ -115,7 +115,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
     let fontData: ArrayBuffer | null = null
     try {
       const fontRes = await fetch(
-        'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYAZ9hiJ-Ek-_EeA.woff',
+        'https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYMZg.ttf',
         { signal: AbortSignal.timeout(5_000) }
       )
       if (fontRes.ok) {
