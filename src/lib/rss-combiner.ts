@@ -1,6 +1,7 @@
 import { Feed } from 'feed'
 import { supabaseAdmin } from '@/lib/supabase'
 import { XMLParser } from 'fast-xml-parser'
+import { generateAndUploadTradeImage } from './trade-image-generator'
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -23,6 +24,7 @@ interface CongressTrade {
   chamber: string | null
   state: string | null
   quiver_upload_time: string | null
+  image_url: string | null
 }
 
 interface TradeWithCompanyName extends CongressTrade {
@@ -38,6 +40,7 @@ interface NormalizedItem {
   sourceLabel: string
   sourceName: string
   guid: string
+  tradeImageUrl?: string | null
   tradeMeta?: {
     ticker: string
     company_name: string
@@ -240,7 +243,7 @@ export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: numbe
   // Fetch all trades with pagination, ordered by size desc
   const trades = await fetchAllRows<CongressTrade>(
     'congress_trades',
-    'id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time',
+    'id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time, image_url',
     { order: { column: 'trade_size_parsed', ascending: false } }
   )
 
@@ -549,6 +552,7 @@ export function generateCombinedFeedXml(
       author: item.author ? [{ name: item.author }] : undefined,
       category: categories,
       extensions,
+      image: item.tradeImageUrl || undefined,
     })
   }
 
@@ -594,7 +598,38 @@ export async function runIngestion(): Promise<IngestionResult> {
 
   // 4. Get top trades and resolve names (filtered by freshness + per-member limit)
   const trades = await getTopTrades(maxTrades, tradeFreshnessDays, maxTradesPerMember)
+
   const tradesWithNames = await resolveTickerNames(trades)
+
+  // 4b. Generate trade card images for trades missing image_url
+  // Uses resolved company names from ticker_company_names table
+  const TRADE_IMAGE_DELAY_MS = 300
+  let imagesGenerated = 0
+  for (let i = 0; i < tradesWithNames.length; i++) {
+    const trade = tradesWithNames[i]
+    if (trade.image_url) continue // already generated
+
+    if (i > 0 && imagesGenerated > 0) {
+      await new Promise((r) => setTimeout(r, TRADE_IMAGE_DELAY_MS))
+    }
+
+    try {
+      const imageUrl = await generateAndUploadTradeImage({
+        ...trade,
+        company: trade.company_name,
+      })
+      if (imageUrl) {
+        trade.image_url = imageUrl
+        imagesGenerated++
+      }
+    } catch (error) {
+      console.error(`[RSS-Combiner] Failed to generate image for trade ${trade.id}:`, error)
+    }
+  }
+
+  if (imagesGenerated > 0) {
+    console.log(`[RSS-Combiner] Generated ${imagesGenerated} trade card images`)
+  }
   const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate, maxAgeDays)
 
   // 5. Calculate age cutoff
@@ -818,6 +853,24 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     windowDays += 5
   }
 
+  // Load trade image URLs keyed by ticker
+  const articleTickers = Array.from(new Set(articles.map((r: any) => r.ticker).filter(Boolean)))
+  const tradeImageMap = new Map<string, string>()
+
+  if (articleTickers.length > 0) {
+    const { data: tradeImages } = await supabaseAdmin
+      .from('congress_trades')
+      .select('ticker, image_url')
+      .in('ticker', articleTickers)
+      .not('image_url', 'is', null)
+
+    for (const row of tradeImages || []) {
+      if (row.image_url) {
+        tradeImageMap.set(row.ticker.toUpperCase(), row.image_url)
+      }
+    }
+  }
+
   // Convert DB rows to NormalizedItem format
   const items: NormalizedItem[] = articles.map((row) => ({
     title: row.article_title,
@@ -828,6 +881,7 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     sourceLabel: row.company_name,
     sourceName: row.source_name || '',
     guid: row.article_url,
+    tradeImageUrl: tradeImageMap.get((row.ticker || '').toUpperCase()) || null,
     tradeMeta: {
       ticker: row.ticker,
       company_name: row.company_name,
