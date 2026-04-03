@@ -102,7 +102,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
   // Determine transaction colors
   const isPurchase = transaction.toLowerCase().includes('purchase')
   const barGradient = isPurchase
-    ? 'linear-gradient(135deg, #145a32 0%, #1e7e34 50%, #28a745 100%)'
+    ? 'linear-gradient(135deg, #004d00 0%, #006600 50%, #008000 100%)'
     : 'linear-gradient(135deg, #7a1a1a 0%, #a93226 50%, #c0392b 100%)'
   const barShadow = '0 4px 20px rgba(0,0,0,0.5)'
   const transactionLabel = isPurchase ? 'Purchase' : 'Sale'
