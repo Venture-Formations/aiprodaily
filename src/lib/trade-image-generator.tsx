@@ -111,6 +111,11 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
   const subtitle = [chamber, state].filter(Boolean).join(' · ')
 
   try {
+    // Load Inter Black (900) for thick, bold letters
+    const fontData = await fetch(
+      'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYAZ9hiJ-Ek-_EeA.woff'
+    ).then((res) => res.arrayBuffer())
+
     const response = new ImageResponse(
       (
         <div
@@ -200,7 +205,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
               <div
                 style={{
                   fontSize: '48px',
-                  fontWeight: 700,
+                  fontWeight: 900,
                   color: 'white',
                   letterSpacing: '1px',
                   textShadow: '0 2px 8px rgba(0,0,0,0.5)',
@@ -247,7 +252,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 <span
                   style={{
                     fontSize: '20px',
-                    fontWeight: 700,
+                    fontWeight: 900,
                     color: 'rgba(255,255,255,0.6)',
                     letterSpacing: '2px',
                     textTransform: 'uppercase',
@@ -258,7 +263,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 <span
                   style={{
                     fontSize: '28px',
-                    fontWeight: 700,
+                    fontWeight: 900,
                     color: tickerColor,
                     letterSpacing: '1px',
                     textShadow: `0 0 8px ${tickerColor}40`,
@@ -273,7 +278,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 style={{
                   background: buttonBg,
                   borderRadius: '10px',
-                  padding: '16px 48px',
+                  padding: '8px 36px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -288,7 +293,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 <div
                   style={{
                     fontSize: '38px',
-                    fontWeight: 700,
+                    fontWeight: 900,
                     color: 'white',
                     letterSpacing: '4px',
                     textShadow: '0 1px 4px rgba(0,0,0,0.3)',
@@ -304,6 +309,14 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
       {
         width: 1200,
         height: 630,
+        fonts: [
+          {
+            name: 'Inter',
+            data: fontData,
+            weight: 900,
+            style: 'normal',
+          },
+        ],
       }
     )
 
