@@ -102,13 +102,23 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
   // Determine transaction colors
   const isPurchase = transaction.toLowerCase().includes('purchase')
   const barGradient = isPurchase
-    ? 'linear-gradient(135deg, #27ae60 0%, #2ecc71 50%, #1abc9c 100%)'
-    : 'linear-gradient(135deg, #c0392b 0%, #e74c3c 50%, #e67e22 100%)'
-  const barShadow = '0 4px 16px rgba(0,0,0,0.35)'
+    ? 'linear-gradient(135deg, #1a8a4a 0%, #27ae60 50%, #2ecc71 100%)'
+    : 'linear-gradient(135deg, #7a1a1a 0%, #a93226 50%, #c0392b 100%)'
+  const barShadow = '0 4px 20px rgba(0,0,0,0.5)'
   const transactionLabel = isPurchase ? 'Purchase' : 'Sale'
 
   // Build chamber/state subtitle
   const subtitle = [chamber, state].filter(Boolean).join(' · ')
+
+  // Photo dimensions and positioning
+  const photoWidth = 360
+  const photoHeight = 470
+  const photoLeft = 50
+  const photoTop = 80
+
+  // Bar positioning — bars start from left edge, tucked behind the photo
+  const barLeft = 0
+  const barTextLeft = photoLeft + photoWidth + 30 // text starts after the photo
 
   try {
     const response = new ImageResponse(
@@ -118,21 +128,138 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             width: '1200px',
             height: '630px',
             display: 'flex',
-            alignItems: 'center',
-            background: 'linear-gradient(145deg, #0a0a1a 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%)',
-            padding: '60px',
+            position: 'relative',
+            background: 'linear-gradient(145deg, #d4e6f1 0%, #85c1e9 30%, #5dade2 60%, #3498db 100%)',
+            overflow: 'hidden',
           }}
         >
-          {/* Member photo */}
+          {/* Subtle pattern overlay */}
           <div
             style={{
-              width: '320px',
-              height: '400px',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 50%)',
+              display: 'flex',
+            }}
+          />
+
+          {/* Name bar — full width, tucked behind photo */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${barLeft}px`,
+              top: `${photoTop + 20}px`,
+              right: '50px',
+              height: '120px',
+              background: barGradient,
+              borderRadius: '0 8px 8px 0',
+              boxShadow: barShadow,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              paddingLeft: `${barTextLeft}px`,
+              paddingRight: '32px',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '44px',
+                fontWeight: 700,
+                color: 'white',
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              }}
+            >
+              {memberName}
+            </div>
+            {subtitle && (
+              <div
+                style={{
+                  fontSize: '22px',
+                  color: 'rgba(255,255,255,0.9)',
+                  marginTop: '2px',
+                  textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }}
+              >
+                {subtitle}
+              </div>
+            )}
+          </div>
+
+          {/* Transaction bar */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${barLeft}px`,
+              top: `${photoTop + 160}px`,
+              right: '50px',
+              height: '80px',
+              background: barGradient,
+              borderRadius: '0 8px 8px 0',
+              boxShadow: barShadow,
+              display: 'flex',
+              alignItems: 'center',
+              paddingLeft: `${barTextLeft}px`,
+              paddingRight: '32px',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '34px',
+                fontWeight: 700,
+                color: 'white',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              }}
+            >
+              {transactionLabel}
+            </div>
+          </div>
+
+          {/* Company bar */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${barLeft}px`,
+              top: `${photoTop + 260}px`,
+              right: '50px',
+              height: '80px',
+              background: barGradient,
+              borderRadius: '0 8px 8px 0',
+              boxShadow: barShadow,
+              display: 'flex',
+              alignItems: 'center',
+              paddingLeft: `${barTextLeft}px`,
+              paddingRight: '32px',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '34px',
+                fontWeight: 700,
+                color: 'white',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              }}
+            >
+              {companyName}
+            </div>
+          </div>
+
+          {/* Member photo — overlaps bars, sits on top */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${photoLeft}px`,
+              top: `${photoTop}px`,
+              width: `${photoWidth}px`,
+              height: `${photoHeight}px`,
               borderRadius: '12px',
               overflow: 'hidden',
-              flexShrink: 0,
               display: 'flex',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.3)',
             }}
           >
             <img
@@ -143,94 +270,6 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 objectFit: 'cover',
               }}
             />
-          </div>
-
-          {/* Info bars */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              marginLeft: '50px',
-              flex: 1,
-              gap: '20px',
-            }}
-          >
-            {/* Name bar */}
-            <div
-              style={{
-                background: barGradient,
-                borderRadius: '6px',
-                padding: '24px 32px',
-                display: 'flex',
-                flexDirection: 'column',
-                boxShadow: barShadow,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '42px',
-                  fontWeight: 700,
-                  color: 'white',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                }}
-              >
-                {memberName}
-              </div>
-              {subtitle && (
-                <div
-                  style={{
-                    fontSize: '22px',
-                    color: 'rgba(255,255,255,0.85)',
-                    marginTop: '4px',
-                  }}
-                >
-                  {subtitle}
-                </div>
-              )}
-            </div>
-
-            {/* Transaction bar */}
-            <div
-              style={{
-                background: barGradient,
-                borderRadius: '6px',
-                padding: '20px 32px',
-                display: 'flex',
-                boxShadow: barShadow,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '32px',
-                  fontWeight: 700,
-                  color: 'white',
-                }}
-              >
-                {transactionLabel}
-              </div>
-            </div>
-
-            {/* Company bar */}
-            <div
-              style={{
-                background: barGradient,
-                borderRadius: '6px',
-                padding: '20px 32px',
-                display: 'flex',
-                boxShadow: barShadow,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '32px',
-                  fontWeight: 700,
-                  color: 'white',
-                }}
-              >
-                {companyName}
-              </div>
-            </div>
           </div>
         </div>
       ),
