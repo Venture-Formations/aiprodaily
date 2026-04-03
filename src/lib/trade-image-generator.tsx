@@ -284,33 +284,60 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 </span>
               </div>
 
-              {/* Buy/Sell button */}
+              {/* Buy/Sell button — outer glow ring */}
               <div
                 style={{
-                  background: buttonBg,
-                  borderRadius: '10px',
-                  padding: '8px 36px',
+                  background: isPurchase
+                    ? 'linear-gradient(135deg, #00ff88 0%, #00cc66 50%, #00ff88 100%)'
+                    : 'linear-gradient(135deg, #ff4444 0%, #cc0000 50%, #ff4444 100%)',
+                  borderRadius: '14px',
+                  padding: '3px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                   boxShadow: isPurchase
-                    ? '0 0 12px rgba(0,128,0,0.4), 0 4px 12px rgba(0,0,0,0.3)'
-                    : '0 0 12px rgba(204,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3)',
-                  border: isPurchase
-                    ? '1px solid rgba(0,255,136,0.3)'
-                    : '1px solid rgba(255,68,68,0.3)',
+                    ? '0 0 16px rgba(0,255,136,0.5), 0 0 32px rgba(0,255,136,0.2), 0 4px 12px rgba(0,0,0,0.3)'
+                    : '0 0 16px rgba(255,68,68,0.5), 0 0 32px rgba(255,68,68,0.2), 0 4px 12px rgba(0,0,0,0.3)',
                 }}
               >
+                {/* Inner button */}
                 <div
                   style={{
-                    fontSize: '38px',
-                    fontWeight: 900,
-                    color: 'white',
-                    letterSpacing: '4px',
-                    textShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                    background: buttonBg,
+                    borderRadius: '11px',
+                    padding: '10px 40px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
                   }}
                 >
-                  {buttonLabel}
+                  {/* Top highlight reflection */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '50%',
+                      background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%)',
+                      borderRadius: '11px 11px 0 0',
+                      display: 'flex',
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: '38px',
+                      fontWeight: 900,
+                      color: 'white',
+                      letterSpacing: '4px',
+                      textShadow: isPurchase
+                        ? '0 0 10px rgba(0,255,136,0.4), 0 1px 4px rgba(0,0,0,0.3)'
+                        : '0 0 10px rgba(255,68,68,0.4), 0 1px 4px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    {buttonLabel}
+                  </div>
                 </div>
               </div>
             </div>
