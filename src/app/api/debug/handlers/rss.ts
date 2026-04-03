@@ -799,7 +799,20 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
         trade = data
       }
 
-      // Generate the image (will skip if already exists)
+      const force = searchParams.get('force') === 'true'
+
+      // If force, delete existing image from storage and clear DB field
+      if (force && trade.image_url) {
+        const objectPath = `st/t/${trade.id}.png`
+        await supabaseAdmin.storage.from('img').remove([objectPath])
+        await supabaseAdmin
+          .from('congress_trades')
+          .update({ image_url: null })
+          .eq('id', trade.id)
+        trade.image_url = null
+      }
+
+      // Generate the image (will skip if already exists unless forced)
       const imageUrl = await generateAndUploadTradeImage(trade)
 
       return NextResponse.json({
@@ -813,7 +826,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
           transaction: trade.transaction,
         },
         imageUrl,
-        alreadyExisted: !!trade.image_url,
+        regenerated: force,
       })
     }
   },
