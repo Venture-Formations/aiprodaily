@@ -85,6 +85,12 @@ export default function ArticlesTab({ slug }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPosts, setTotalPosts] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const pageSize = 100
+
   // Date range filter
   const initialRange = getDateRange('7d')
   const [datePreset, setDatePreset] = useState<DatePreset>('7d')
@@ -148,7 +154,7 @@ export default function ArticlesTab({ slug }: Props) {
     abortRef.current = controller
     fetchPosts(controller.signal)
     return () => controller.abort()
-  }, [slug, dateFrom, dateTo])
+  }, [slug, dateFrom, dateTo, currentPage])
 
   useEffect(() => {
     applyFiltersAndSort()
@@ -160,6 +166,7 @@ export default function ArticlesTab({ slug }: Props) {
       const range = getDateRange(preset)
       setDateFrom(range.from)
       setDateTo(range.to)
+      setCurrentPage(1)
     } else {
       setCustomFrom(dateFrom)
       setCustomTo(dateTo)
@@ -170,6 +177,7 @@ export default function ArticlesTab({ slug }: Props) {
     if (DATE_REGEX.test(customFrom) && DATE_REGEX.test(customTo)) {
       setDateFrom(customFrom)
       setDateTo(customTo)
+      setCurrentPage(1)
     }
   }
 
@@ -178,6 +186,8 @@ export default function ArticlesTab({ slug }: Props) {
       setLoading(true)
       const params = new URLSearchParams({
         publication_id: slug,
+        page: String(currentPage),
+        page_size: String(pageSize),
       })
       if (dateFrom) params.set('start_date', dateFrom)
       if (dateTo) params.set('end_date', dateTo)
@@ -187,6 +197,8 @@ export default function ArticlesTab({ slug }: Props) {
       }
       const result = await response.json()
       setPosts(result.data || [])
+      setTotalPosts(result.total || 0)
+      setTotalPages(result.totalPages || 0)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -571,7 +583,7 @@ export default function ArticlesTab({ slug }: Props) {
 
         <div className="mt-4 flex justify-between items-center">
           <div className="text-sm text-gray-600">
-            Showing {filteredPosts.length} of {posts.length} scored posts
+            Showing {filteredPosts.length} of {posts.length} scored posts (page {currentPage} of {totalPages}, {totalPosts} total)
             {sortColumn && (
               <span className="ml-2 text-gray-500">
                 | Sorted by {columns.find(c => c.key === sortColumn)?.label} ({sortDirection === 'desc' ? 'Z→A / High→Low' : 'A→Z / Low→High'})
@@ -820,10 +832,52 @@ export default function ArticlesTab({ slug }: Props) {
         </div>
       </div>
 
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages} ({totalPosts} total posts)
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <span className="text-sm text-gray-700 px-2">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Last
+            </button>
+          </div>
+        </div>
+      )}
+
       {filteredPosts.length > 0 && (
-        <div className="mt-4 text-sm text-gray-600">
+        <div className="mt-2 text-sm text-gray-600">
           <p>
-            Total Posts: {filteredPosts.length} |
+            This Page: {filteredPosts.length} |
             Primary: {filteredPosts.filter(a => a.feedType === 'Primary').length} |
             Secondary: {filteredPosts.filter(a => a.feedType === 'Secondary').length} |
             Used: {filteredPosts.filter(a => a.finalPosition !== null).length} |

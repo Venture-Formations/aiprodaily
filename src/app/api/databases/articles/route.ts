@@ -16,6 +16,8 @@ export const GET = withApiHandler(
     const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
     const dateFrom = dateFromRaw && DATE_REGEX.test(dateFromRaw) ? dateFromRaw : null;
     const dateTo = dateToRaw && DATE_REGEX.test(dateToRaw) ? dateToRaw : null;
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const pageSize = Math.min(500, Math.max(1, parseInt(searchParams.get('page_size') || '100')));
 
     if (!newsletterSlug) {
       return NextResponse.json(
@@ -277,13 +279,22 @@ export const GET = withApiHandler(
       return scoreB - scoreA;
     });
 
-    console.log(`[API] Scored posts fetched: ${allScoredPosts.length} total`);
+    const total = allScoredPosts.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const startIndex = (page - 1) * pageSize;
+    const paginatedPosts = allScoredPosts.slice(startIndex, startIndex + pageSize);
+
+    console.log(`[API] Scored posts: ${total} total, page ${page}/${totalPages} (${paginatedPosts.length} returned)`);
 
     // Check for debug parameter
     const debug = searchParams.get('debug') === 'true';
     if (debug) {
       return NextResponse.json({
-        data: allScoredPosts.slice(0, 5),
+        data: paginatedPosts.slice(0, 5),
+        total,
+        page,
+        pageSize,
+        totalPages,
         debug: {
           rssPostsCount: allRssPosts.length,
           postRatingsCount: postRatings.length,
@@ -294,6 +305,6 @@ export const GET = withApiHandler(
       });
     }
 
-    return NextResponse.json({ data: allScoredPosts });
+    return NextResponse.json({ data: paginatedPosts, total, page, pageSize, totalPages });
   }
 );
