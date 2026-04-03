@@ -63,7 +63,8 @@ export async function generateAndUploadTradeImage(trade: TradeInput): Promise<st
     chamber: trade.chamber || '',
     state: trade.state || '',
     transaction: trade.transaction || 'Purchase',
-    companyName: trade.company ? `${trade.company} (${trade.ticker})` : trade.ticker,
+    companyName: trade.company || trade.ticker,
+    ticker: trade.ticker,
     photoDataUrl: photoBase64,
   })
 
@@ -93,32 +94,21 @@ interface CardParams {
   state: string
   transaction: string
   companyName: string
+  ticker: string
   photoDataUrl: string
 }
 
 async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
-  const { memberName, chamber, state, transaction, companyName, photoDataUrl } = params
+  const { memberName, chamber, state, transaction, companyName, ticker, photoDataUrl } = params
 
-  // Determine transaction colors
   const isPurchase = transaction.toLowerCase().includes('purchase')
-  const barGradient = isPurchase
-    ? 'linear-gradient(135deg, #004d00 0%, #006600 50%, #008000 100%)'
-    : 'linear-gradient(135deg, #7a1a1a 0%, #a93226 50%, #c0392b 100%)'
-  const barShadow = '0 4px 20px rgba(0,0,0,0.5)'
-  const transactionLabel = isPurchase ? 'Purchase' : 'Sale'
+  const tickerColor = isPurchase ? '#00ff88' : '#ff4444'
+  const buttonBg = isPurchase
+    ? 'linear-gradient(180deg, #008000 0%, #004d00 100%)'
+    : 'linear-gradient(180deg, #cc0000 0%, #8b0000 100%)'
+  const buttonLabel = isPurchase ? 'BUY' : 'SELL'
 
-  // Build chamber/state subtitle
   const subtitle = [chamber, state].filter(Boolean).join(' · ')
-
-  // Photo dimensions and positioning
-  const photoWidth = 360
-  const photoHeight = 470
-  const photoLeft = 50
-  const photoTop = 80
-
-  // Bar positioning — bars start from left edge, tucked behind the photo
-  const barLeft = 0
-  const barTextLeft = photoLeft + photoWidth + 30 // text starts after the photo
 
   try {
     const response = new ImageResponse(
@@ -128,148 +118,185 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             width: '1200px',
             height: '630px',
             display: 'flex',
-            position: 'relative',
-            background: 'linear-gradient(145deg, #1a3a5c 0%, #1e4a6e 30%, #2c5f8a 60%, #1a3a5c 100%)',
-            overflow: 'hidden',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#0a0a1a',
           }}
         >
-          {/* Subtle pattern overlay */}
+          {/* Pill container */}
           <div
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 50%)',
+              width: '1080px',
+              height: '280px',
+              borderRadius: '140px',
+              background: 'linear-gradient(135deg, #1a1a4e 0%, #2d1b69 50%, #1a1a4e 100%)',
               display: 'flex',
-            }}
-          />
-
-          {/* Name bar — full width, tucked behind photo */}
-          <div
-            style={{
-              position: 'absolute',
-              left: `${barLeft}px`,
-              top: `${photoTop + 20}px`,
-              right: '50px',
-              height: '120px',
-              background: barGradient,
-              borderRadius: '0 8px 8px 0',
-              boxShadow: barShadow,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              paddingLeft: `${barTextLeft}px`,
-              paddingRight: '32px',
+              alignItems: 'center',
+              position: 'relative',
+              boxShadow: '0 0 15px rgba(0,212,255,0.4), 0 0 30px rgba(0,212,255,0.2), 0 0 60px rgba(0,212,255,0.1), inset 0 0 30px rgba(0,212,255,0.05)',
+              border: '2px solid rgba(0,212,255,0.3)',
+              padding: '0 60px 0 0',
             }}
           >
+            {/* Photo ring — outer glow */}
             <div
               style={{
-                fontSize: '44px',
-                fontWeight: 700,
-                color: 'white',
-                textTransform: 'uppercase',
-                letterSpacing: '2px',
-                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                width: '240px',
+                height: '240px',
+                borderRadius: '120px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: '20px',
+                flexShrink: 0,
+                background: 'linear-gradient(135deg, #00d4ff 0%, #6366f1 50%, #00d4ff 100%)',
+                boxShadow: '0 0 10px rgba(0,212,255,0.5), 0 0 20px rgba(0,212,255,0.3)',
               }}
             >
-              {memberName}
-            </div>
-            {subtitle && (
+              {/* Photo ring — inner border */}
               <div
                 style={{
-                  fontSize: '22px',
-                  color: 'rgba(255,255,255,0.9)',
-                  marginTop: '2px',
-                  textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  width: '228px',
+                  height: '228px',
+                  borderRadius: '114px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#1a1a4e',
                 }}
               >
-                {subtitle}
+                {/* Photo */}
+                <div
+                  style={{
+                    width: '216px',
+                    height: '216px',
+                    borderRadius: '108px',
+                    overflow: 'hidden',
+                    display: 'flex',
+                  }}
+                >
+                  <img
+                    src={photoDataUrl}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Transaction bar */}
-          <div
-            style={{
-              position: 'absolute',
-              left: `${barLeft}px`,
-              top: `${photoTop + 160}px`,
-              right: '50px',
-              height: '80px',
-              background: barGradient,
-              borderRadius: '0 8px 8px 0',
-              boxShadow: barShadow,
-              display: 'flex',
-              alignItems: 'center',
-              paddingLeft: `${barTextLeft}px`,
-              paddingRight: '32px',
-            }}
-          >
+            {/* Center content — Name + Subtitle */}
             <div
               style={{
-                fontSize: '34px',
-                fontWeight: 700,
-                color: 'white',
-                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                marginLeft: '40px',
+                flex: 1,
               }}
             >
-              {transactionLabel}
+              <div
+                style={{
+                  fontSize: '48px',
+                  fontWeight: 700,
+                  color: 'white',
+                  letterSpacing: '1px',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                }}
+              >
+                {memberName}
+              </div>
+              {subtitle && (
+                <div
+                  style={{
+                    fontSize: '22px',
+                    fontWeight: 600,
+                    color: '#00d4ff',
+                    marginTop: '4px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '2px',
+                    textShadow: '0 0 10px rgba(0,212,255,0.3)',
+                  }}
+                >
+                  {subtitle}
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Company bar */}
-          <div
-            style={{
-              position: 'absolute',
-              left: `${barLeft}px`,
-              top: `${photoTop + 260}px`,
-              right: '50px',
-              height: '80px',
-              background: barGradient,
-              borderRadius: '0 8px 8px 0',
-              boxShadow: barShadow,
-              display: 'flex',
-              alignItems: 'center',
-              paddingLeft: `${barTextLeft}px`,
-              paddingRight: '32px',
-            }}
-          >
+            {/* Right side — Ticker + Button */}
             <div
               style={{
-                fontSize: '34px',
-                fontWeight: 700,
-                color: 'white',
-                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                flexShrink: 0,
+                marginLeft: '20px',
+                gap: '12px',
               }}
             >
-              {companyName}
-            </div>
-          </div>
+              {/* Ticker label */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: 'rgba(255,255,255,0.6)',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  STOCK:
+                </span>
+                <span
+                  style={{
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    color: tickerColor,
+                    letterSpacing: '1px',
+                    textShadow: `0 0 8px ${tickerColor}40`,
+                  }}
+                >
+                  {ticker}
+                </span>
+              </div>
 
-          {/* Member photo — overlaps bars, sits on top */}
-          <div
-            style={{
-              position: 'absolute',
-              left: `${photoLeft}px`,
-              top: `${photoTop}px`,
-              width: `${photoWidth}px`,
-              height: `${photoHeight}px`,
-              borderRadius: '12px',
-              overflow: 'hidden',
-              display: 'flex',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.3)',
-            }}
-          >
-            <img
-              src={photoDataUrl}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
+              {/* Buy/Sell button */}
+              <div
+                style={{
+                  background: buttonBg,
+                  borderRadius: '10px',
+                  padding: '14px 40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: isPurchase
+                    ? '0 0 12px rgba(0,128,0,0.4), 0 4px 12px rgba(0,0,0,0.3)'
+                    : '0 0 12px rgba(204,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3)',
+                  border: isPurchase
+                    ? '1px solid rgba(0,255,136,0.3)'
+                    : '1px solid rgba(255,68,68,0.3)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '28px',
+                    fontWeight: 700,
+                    color: 'white',
+                    letterSpacing: '3px',
+                    textShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  {buttonLabel}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ),
