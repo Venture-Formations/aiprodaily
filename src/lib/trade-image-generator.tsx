@@ -63,7 +63,7 @@ export async function generateAndUploadTradeImage(trade: TradeInput): Promise<st
     chamber: trade.chamber || '',
     state: trade.state || '',
     transaction: trade.transaction || 'Purchase',
-    companyName: trade.company || trade.ticker,
+    companyName: trade.company ? `${trade.company} (${trade.ticker})` : trade.ticker,
     photoDataUrl: photoBase64,
   })
 
