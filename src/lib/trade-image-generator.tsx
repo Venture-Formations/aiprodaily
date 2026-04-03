@@ -112,9 +112,20 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
 
   try {
     // Load Inter Black (900) for thick, bold letters
-    const fontData = await fetch(
-      'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYAZ9hiJ-Ek-_EeA.woff'
-    ).then((res) => res.arrayBuffer())
+    let fontData: ArrayBuffer | null = null
+    try {
+      const fontRes = await fetch(
+        'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYAZ9hiJ-Ek-_EeA.woff',
+        { signal: AbortSignal.timeout(5_000) }
+      )
+      if (fontRes.ok) {
+        fontData = await fontRes.arrayBuffer()
+      } else {
+        console.error(`[trade-image] Font fetch failed: HTTP ${fontRes.status}`)
+      }
+    } catch (fontErr) {
+      console.error('[trade-image] Font fetch error:', fontErr)
+    }
 
     const response = new ImageResponse(
       (
@@ -309,21 +320,23 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
       {
         width: 1200,
         height: 630,
-        fonts: [
-          {
-            name: 'Inter',
-            data: fontData,
-            weight: 900,
-            style: 'normal',
-          },
-        ],
+        ...(fontData ? {
+          fonts: [
+            {
+              name: 'Inter',
+              data: fontData,
+              weight: 900 as const,
+              style: 'normal' as const,
+            },
+          ],
+        } : {}),
       }
     )
 
     const arrayBuffer = await response.arrayBuffer()
     return Buffer.from(arrayBuffer)
   } catch (error) {
-    console.error('[trade-image] Failed to render trade card:', error)
+    console.error('[trade-image] Failed to render trade card:', error instanceof Error ? error.stack : error)
     return null
   }
 }
