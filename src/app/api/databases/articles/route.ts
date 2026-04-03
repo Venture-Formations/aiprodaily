@@ -68,53 +68,75 @@ export const GET = withApiHandler(
 
     console.log('[API] Criteria settings found:', criteriaSettings?.length || 0);
 
-    // Fetch all scored rss_posts for this publication, filtered by processed_at date range
+    // Fetch all RSS feeds for this publication (rss_posts links through feed_id, not publication_id)
+    const { data: pubFeeds } = await supabase
+      .from('rss_feeds')
+      .select('id, name, use_for_primary_section, use_for_secondary_section')
+      .eq('publication_id', newsletterId);
+
+    const feedList = pubFeeds || [];
+    const feedIds = feedList.map(f => f.id);
+    const feedMap = new Map(feedList.map(f => [f.id, f]));
+
+    console.log('[API] Found', feedIds.length, 'feeds for publication');
+
+    if (feedIds.length === 0) {
+      return NextResponse.json({ data: [] });
+    }
+
+    // Fetch all scored rss_posts for these feeds, filtered by processed_at date range
     let allRssPosts: any[] = [];
-    let rssOffset = 0;
-    const rssBatchSize = 1000;
-    let hasMorePosts = true;
+    const CHUNK_SIZE = 100;
 
-    while (hasMorePosts) {
-      let rssQuery = supabase
-        .from('rss_posts')
-        .select(`
-          id,
-          feed_id,
-          title,
-          description,
-          full_article_text,
-          publication_date,
-          author,
-          source_url,
-          image_url,
-          processed_at
-        `)
-        .eq('publication_id', newsletterId);
+    // Query feeds in chunks to avoid .in() limit
+    for (let i = 0; i < feedIds.length; i += CHUNK_SIZE) {
+      const feedChunk = feedIds.slice(i, i + CHUNK_SIZE);
+      let rssOffset = 0;
+      const rssBatchSize = 1000;
+      let hasMorePosts = true;
 
-      // Apply date range filter on processed_at (ingest date)
-      if (dateFrom) {
-        rssQuery = rssQuery.gte('processed_at', dateFrom);
-      }
-      if (dateTo) {
-        // Add a day to dateTo to include the full day (processed_at is timestamptz)
-        rssQuery = rssQuery.lt('processed_at', dateTo + 'T23:59:59.999Z');
-      }
+      while (hasMorePosts) {
+        let rssQuery = supabase
+          .from('rss_posts')
+          .select(`
+            id,
+            feed_id,
+            title,
+            description,
+            full_article_text,
+            publication_date,
+            author,
+            source_url,
+            image_url,
+            processed_at
+          `)
+          .in('feed_id', feedChunk);
 
-      rssQuery = rssQuery.range(rssOffset, rssOffset + rssBatchSize - 1);
+        // Apply date range filter on processed_at (ingest date)
+        if (dateFrom) {
+          rssQuery = rssQuery.gte('processed_at', dateFrom);
+        }
+        if (dateTo) {
+          rssQuery = rssQuery.lt('processed_at', dateTo + 'T23:59:59.999Z');
+        }
 
-      const { data: rssBatch, error: rssError } = await rssQuery;
+        rssQuery = rssQuery.range(rssOffset, rssOffset + rssBatchSize - 1);
 
-      if (rssError) {
-        console.error('[API] RSS posts fetch error:', rssError.message);
-        break;
-      }
+        const { data: rssBatch, error: rssError } = await rssQuery;
 
-      if (!rssBatch || rssBatch.length === 0) {
-        hasMorePosts = false;
-      } else {
-        allRssPosts = allRssPosts.concat(rssBatch);
-        rssOffset += rssBatchSize;
-        hasMorePosts = rssBatch.length === rssBatchSize;
+        if (rssError) {
+          console.error('[API] RSS posts fetch error:', rssError.message);
+          hasMorePosts = false;
+          break;
+        }
+
+        if (!rssBatch || rssBatch.length === 0) {
+          hasMorePosts = false;
+        } else {
+          allRssPosts = allRssPosts.concat(rssBatch);
+          rssOffset += rssBatchSize;
+          hasMorePosts = rssBatch.length === rssBatchSize;
+        }
       }
     }
 
@@ -123,7 +145,6 @@ export const GET = withApiHandler(
     const allPostIds = allRssPosts.map(p => p.id);
 
     // Fetch post ratings in chunks
-    const CHUNK_SIZE = 100;
     let postRatings: any[] = [];
     if (allPostIds.length > 0) {
       for (let i = 0; i < allPostIds.length; i += CHUNK_SIZE) {
@@ -156,22 +177,6 @@ export const GET = withApiHandler(
 
     const ratingsMap = new Map(postRatings.map(r => [r.post_id, r]));
     console.log('[API] Ratings map size:', ratingsMap.size);
-
-    // Fetch RSS feeds for section/feed name lookup
-    const allFeedIds = allRssPosts
-      .map(p => p.feed_id)
-      .filter((id, index, self) => id && self.indexOf(id) === index);
-
-    let rssFeeds: any[] = [];
-    if (allFeedIds.length > 0) {
-      const { data } = await supabase
-        .from('rss_feeds')
-        .select('id, name, use_for_primary_section, use_for_secondary_section')
-        .in('id', allFeedIds);
-      rssFeeds = data || [];
-    }
-
-    const feedMap = new Map(rssFeeds.map(f => [f.id, f]));
 
     // Fetch module_articles to get position (rank) for posts that were used in issues
     let moduleArticles: any[] = [];
