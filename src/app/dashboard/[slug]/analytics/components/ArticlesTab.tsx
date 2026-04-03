@@ -10,6 +10,7 @@ interface ScoredPost {
   publicationDate: string
   author: string
   sourceUrl: string
+  sourceName: string
   imageUrl: string
   feedType: string
   feedName: string
@@ -122,12 +123,13 @@ export default function ArticlesTab({ slug }: Props) {
     { key: 'ingestDate', label: 'Ingest Date', enabled: true, exportable: true, width: 'sm' },
     { key: 'finalPosition', label: 'Pos', enabled: true, exportable: true, width: 'xs' },
     { key: 'feedType', label: 'Section', enabled: true, exportable: true, width: 'md' },
-    { key: 'feedName', label: 'Source', enabled: true, exportable: true, width: 'md' },
+    { key: 'feedName', label: 'Feed Name', enabled: false, exportable: true, width: 'md' },
     { key: 'originalTitle', label: 'Original Title', enabled: true, exportable: true, width: 'lg' },
     { key: 'originalDescription', label: 'Original Description', enabled: false, exportable: true, width: 'xl' },
     { key: 'originalFullText', label: 'Original Full Text', enabled: false, exportable: true, width: 'xl' },
     { key: 'publicationDate', label: 'Pub Date', enabled: false, exportable: true, width: 'sm' },
     { key: 'author', label: 'Author', enabled: false, exportable: true, width: 'md' },
+    { key: 'sourceName', label: 'Source', enabled: true, exportable: true, width: 'md' },
     { key: 'sourceUrl', label: 'Source URL', enabled: false, exportable: true, width: 'xs' },
     { key: 'imageUrl', label: 'Image', enabled: false, exportable: true, width: 'xs' },
     { key: 'totalScore', label: 'Score', enabled: true, exportable: true, width: 'xs' },
@@ -226,7 +228,8 @@ export default function ArticlesTab({ slug }: Props) {
       filtered = filtered.filter(a =>
         a.originalTitle.toLowerCase().includes(term) ||
         a.author.toLowerCase().includes(term) ||
-        a.feedName.toLowerCase().includes(term)
+        a.feedName.toLowerCase().includes(term) ||
+        a.sourceName.toLowerCase().includes(term)
       )
     }
 
