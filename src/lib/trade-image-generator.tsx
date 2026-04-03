@@ -99,9 +99,12 @@ interface CardParams {
 async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
   const { memberName, chamber, state, transaction, companyName, photoDataUrl } = params
 
-  // Determine transaction color
+  // Determine transaction colors
   const isPurchase = transaction.toLowerCase().includes('purchase')
-  const barColor = isPurchase ? '#2ecc71' : '#e74c3c'
+  const barGradient = isPurchase
+    ? 'linear-gradient(135deg, #27ae60 0%, #2ecc71 50%, #1abc9c 100%)'
+    : 'linear-gradient(135deg, #c0392b 0%, #e74c3c 50%, #e67e22 100%)'
+  const barShadow = '0 4px 16px rgba(0,0,0,0.35)'
   const transactionLabel = isPurchase ? 'Purchase' : 'Sale'
 
   // Build chamber/state subtitle
@@ -116,7 +119,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             height: '630px',
             display: 'flex',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            background: 'linear-gradient(145deg, #0a0a1a 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%)',
             padding: '60px',
           }}
         >
@@ -155,11 +158,12 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             {/* Name bar */}
             <div
               style={{
-                background: barColor,
+                background: barGradient,
                 borderRadius: '6px',
                 padding: '24px 32px',
                 display: 'flex',
                 flexDirection: 'column',
+                boxShadow: barShadow,
               }}
             >
               <div
@@ -189,10 +193,11 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             {/* Transaction bar */}
             <div
               style={{
-                background: barColor,
+                background: barGradient,
                 borderRadius: '6px',
                 padding: '20px 32px',
                 display: 'flex',
+                boxShadow: barShadow,
               }}
             >
               <div
@@ -209,10 +214,11 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             {/* Company bar */}
             <div
               style={{
-                background: barColor,
+                background: barGradient,
                 borderRadius: '6px',
                 padding: '20px 32px',
                 display: 'flex',
+                boxShadow: barShadow,
               }}
             >
               <div
