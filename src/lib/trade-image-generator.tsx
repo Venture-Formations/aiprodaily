@@ -121,6 +121,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             alignItems: 'center',
             justifyContent: 'center',
             background: '#0a0a1a',
+            fontFamily: 'Inter, sans-serif',
           }}
         >
           {/* Pill container */}
@@ -245,8 +246,8 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
               >
                 <span
                   style={{
-                    fontSize: '18px',
-                    fontWeight: 600,
+                    fontSize: '20px',
+                    fontWeight: 700,
                     color: 'rgba(255,255,255,0.6)',
                     letterSpacing: '2px',
                     textTransform: 'uppercase',
@@ -256,7 +257,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 </span>
                 <span
                   style={{
-                    fontSize: '24px',
+                    fontSize: '28px',
                     fontWeight: 700,
                     color: tickerColor,
                     letterSpacing: '1px',
@@ -272,7 +273,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 style={{
                   background: buttonBg,
                   borderRadius: '10px',
-                  padding: '14px 40px',
+                  padding: '16px 48px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -286,10 +287,10 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
               >
                 <div
                   style={{
-                    fontSize: '28px',
+                    fontSize: '38px',
                     fontWeight: 700,
                     color: 'white',
-                    letterSpacing: '3px',
+                    letterSpacing: '4px',
                     textShadow: '0 1px 4px rgba(0,0,0,0.3)',
                   }}
                 >
