@@ -3,6 +3,7 @@ import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ArticleExtractor } from '@/lib/article-extractor'
 import { callAIWithPrompt } from '@/lib/openai'
+import { generateAndUploadTradeImage } from '@/lib/trade-image-generator'
 
 type DebugHandler = (context: ApiHandlerContext) => Promise<NextResponse>
 
@@ -760,6 +761,60 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
           { status: 500 }
         )
       }
+    }
+  },
+
+  'trade-image': {
+    GET: async ({ request }) => {
+      const { searchParams } = new URL(request.url)
+      const tradeId = searchParams.get('trade_id')
+
+      // If no trade_id, pick the first trade that has a name
+      let trade: any
+
+      if (tradeId) {
+        const { data, error } = await supabaseAdmin
+          .from('congress_trades')
+          .select('id, ticker, company, name, chamber, state, transaction, image_url')
+          .eq('id', tradeId)
+          .maybeSingle()
+
+        if (error || !data) {
+          return NextResponse.json({ error: 'Trade not found', tradeId }, { status: 404 })
+        }
+        trade = data
+      } else {
+        // Pick the largest trade with a name for demo
+        const { data, error } = await supabaseAdmin
+          .from('congress_trades')
+          .select('id, ticker, company, name, chamber, state, transaction, image_url, trade_size_parsed')
+          .not('name', 'is', null)
+          .order('trade_size_parsed', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (error || !data) {
+          return NextResponse.json({ error: 'No trades found' }, { status: 404 })
+        }
+        trade = data
+      }
+
+      // Generate the image (will skip if already exists)
+      const imageUrl = await generateAndUploadTradeImage(trade)
+
+      return NextResponse.json({
+        trade: {
+          id: trade.id,
+          name: trade.name,
+          ticker: trade.ticker,
+          company: trade.company,
+          chamber: trade.chamber,
+          state: trade.state,
+          transaction: trade.transaction,
+        },
+        imageUrl,
+        alreadyExisted: !!trade.image_url,
+      })
     }
   },
 }
