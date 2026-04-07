@@ -1,195 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import dynamic from 'next/dynamic'
-import 'react-quill-new/dist/quill.snow.css'
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { TeamPhotoManager } from './TeamPhotoManager'
-import type { FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVoteOption, FeedbackTeamMember } from '@/types/database'
+import { useFeedbackModuleSettings } from './feedback-settings/useFeedbackModuleSettings'
+import { GeneralTab } from './feedback-settings/GeneralTab'
+import { BlocksTab } from './feedback-settings/BlocksTab'
+import { ResultsPageTab } from './feedback-settings/ResultsPageTab'
+import type { FeedbackModuleSettingsProps } from './feedback-settings/types'
 
-// Dynamically import ReactQuill to avoid SSR issues
-const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
-
-// Quill toolbar configuration (matches TextBoxModuleSettings)
-const quillModules = {
-  toolbar: [
-    ['bold', 'italic', 'underline'],
-    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-    ['link'],
-    [{ 'color': [] }]
-  ],
-}
-
-const quillFormats = [
-  'bold', 'italic', 'underline',
-  'list',
-  'link',
-  'color'
-]
-
-interface FeedbackModuleSettingsProps {
-  module: FeedbackModuleWithBlocks
-  publicationId: string
-  onUpdate: (updates: Partial<FeedbackModuleWithBlocks>) => Promise<void>
-  onUpdateBlock: (blockId: string, updates: Partial<FeedbackBlock>) => Promise<void>
-  onReorderBlocks: (blockIds: string[]) => Promise<void>
-  onAddBlock?: (blockType: FeedbackBlock['block_type']) => Promise<void>
-  onDeleteBlock?: (blockId: string) => Promise<void>
-  onDelete: () => Promise<void>
-}
-
-// Sortable block item component (matches TextBoxModuleSettings pattern)
-interface SortableBlockItemProps {
-  block: FeedbackBlock
-  isActive: boolean
-  isExpanded: boolean
-  saving: boolean
-  onToggleExpand: () => void
-  onToggleActive: () => void
-  onDelete: () => void
-  onStartEdit: () => void
-  getBlockTypeBadge: (blockType: string) => React.ReactNode
-  children: React.ReactNode
-}
-
-function SortableBlockItem({
-  block,
-  isActive,
-  isExpanded,
-  saving,
-  onToggleExpand,
-  onToggleActive,
-  onDelete,
-  onStartEdit,
-  getBlockTypeBadge,
-  children
-}: SortableBlockItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: block.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 50 : undefined,
-  }
-
-  const getBlockLabel = (blockType: string) => {
-    switch (blockType) {
-      case 'title': return 'Title'
-      case 'static_text': return 'Static Text'
-      case 'vote_options': return 'Vote Options'
-      case 'team_photos': return 'Team Photos'
-      default: return blockType
-    }
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`border rounded-lg overflow-hidden ${
-        isDragging ? 'shadow-lg' : ''
-      } ${isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'}`}
-    >
-      {/* Block Header - Collapsed View */}
-      <div
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
-        onClick={onToggleExpand}
-      >
-        <div className="flex items-center gap-3">
-          {/* Drag Handle */}
-          <button
-            {...attributes}
-            {...listeners}
-            className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing p-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-            </svg>
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className={`text-sm font-medium ${!isActive ? 'text-gray-400' : ''}`}>
-              {block.label || getBlockLabel(block.block_type)}
-            </span>
-            {getBlockTypeBadge(block.block_type)}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* View/Edit button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onStartEdit()
-            }}
-            className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
-          >
-            View/Edit
-          </button>
-
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggleActive() }}
-            disabled={saving}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              isActive ? 'bg-cyan-600' : 'bg-gray-200'
-            } ${saving ? 'opacity-50' : ''}`}
-          >
-            <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                isActive ? 'translate-x-5' : 'translate-x-1'
-              }`}
-            />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete() }}
-            disabled={saving}
-            className="text-gray-400 hover:text-red-500 p-1"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-          <svg
-            className={`w-5 h-5 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </div>
-
-      {/* Expanded Content (passed as children) */}
-      {children}
-    </div>
-  )
-}
+export type { FeedbackModuleSettingsProps }
 
 export function FeedbackModuleSettings({
   module,
@@ -201,486 +18,15 @@ export function FeedbackModuleSettings({
   onDeleteBlock,
   onDelete
 }: FeedbackModuleSettingsProps) {
-  const [localName, setLocalName] = useState(module.name)
-  const [showName, setShowName] = useState(module.show_name ?? true)
-  const [blocks, setBlocks] = useState<FeedbackBlock[]>(module.blocks || [])
-  const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'general' | 'blocks' | 'results'>('general')
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-
-  // Results page config (stored in module.config)
-  const defaultResultsConfig = {
-    confirmation_message: 'Your response has been recorded.',
-    results_header: 'Results',
-    first_vote_message: "You're the first to vote!",
-    feedback_label: 'Additional feedback',
-    feedback_placeholder: 'Elaborate on your answer, or just leave some general feedback...',
-    feedback_success_message: 'Thank you for your feedback!',
-    continue_button_text: 'Continue',
-    submit_button_text: 'Submit Feedback',
-    footer_text: 'You can close this window at any time.'
-  }
-  const [resultsConfig, setResultsConfig] = useState({
-    ...defaultResultsConfig,
-    ...(module.config?.results_page as Record<string, string> || {})
+  const state = useFeedbackModuleSettings({
+    module,
+    onUpdate,
+    onUpdateBlock,
+    onReorderBlocks,
+    onAddBlock,
+    onDeleteBlock,
+    onDelete,
   })
-
-  // Block editing states
-  const [expandedBlock, setExpandedBlock] = useState<string | null>(null)
-  const [editingBlock, setEditingBlock] = useState<string | null>(null)
-
-  // Title editing
-  const [editTitleText, setEditTitleText] = useState('')
-
-  // Static text editing
-  const [editStaticContent, setEditStaticContent] = useState('')
-  const [editTextSize, setEditTextSize] = useState<'small' | 'medium' | 'large'>('medium')
-
-  // Vote options editing
-  const [editVoteOptions, setEditVoteOptions] = useState<FeedbackVoteOption[]>([])
-
-  // Team photos editing
-  const [editTeamPhotos, setEditTeamPhotos] = useState<FeedbackTeamMember[]>([])
-
-  // Drag and drop sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
-  useEffect(() => {
-    setLocalName(module.name)
-    setShowName(module.show_name ?? true)
-    setBlocks(module.blocks || [])
-    setResultsConfig({
-      ...defaultResultsConfig,
-      ...(module.config?.results_page as Record<string, string> || {})
-    })
-  }, [module])
-
-  const handleNameChange = async (newName: string) => {
-    if (newName.trim() && newName !== module.name) {
-      setSaving(true)
-      try {
-        await onUpdate({ name: newName.trim() })
-      } finally {
-        setSaving(false)
-      }
-    }
-  }
-
-  const handleShowNameToggle = async () => {
-    const newValue = !showName
-    setShowName(newValue)
-    setSaving(true)
-    try {
-      await onUpdate({ show_name: newValue })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleResultsConfigChange = (key: string, value: string) => {
-    setResultsConfig(prev => ({ ...prev, [key]: value }))
-  }
-
-  const handleSaveResultsConfig = async () => {
-    setSaving(true)
-    try {
-      await onUpdate({
-        config: {
-          ...module.config,
-          results_page: resultsConfig
-        }
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    setSaving(true)
-    try {
-      await onDelete()
-    } finally {
-      setSaving(false)
-      setShowDeleteConfirm(false)
-    }
-  }
-
-  const handleAddBlock = async (blockType: FeedbackBlock['block_type']) => {
-    if (!onAddBlock) return
-    setSaving(true)
-    try {
-      await onAddBlock(blockType)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDeleteBlock = async (blockId: string) => {
-    if (!onDeleteBlock) return
-    setSaving(true)
-    try {
-      await onDeleteBlock(blockId)
-      setBlocks(prev => prev.filter(b => b.id !== blockId))
-      if (expandedBlock === blockId) setExpandedBlock(null)
-      if (editingBlock === blockId) setEditingBlock(null)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleToggleBlockActive = async (block: FeedbackBlock) => {
-    setSaving(true)
-    try {
-      await onUpdateBlock(block.id, { is_enabled: !block.is_enabled })
-      setBlocks(prev => prev.map(b => b.id === block.id ? { ...b, is_enabled: !b.is_enabled } : b))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
-
-    if (!over || active.id === over.id) return
-
-    const oldIndex = blocks.findIndex(b => b.id === active.id)
-    const newIndex = blocks.findIndex(b => b.id === over.id)
-
-    if (oldIndex === -1 || newIndex === -1) return
-
-    const newBlocks = arrayMove(blocks, oldIndex, newIndex)
-    const updatedBlocks = newBlocks.map((b, i) => ({ ...b, display_order: i }))
-    setBlocks(updatedBlocks)
-
-    // Save to server
-    setSaving(true)
-    try {
-      await onReorderBlocks(updatedBlocks.map(b => b.id))
-    } catch (error) {
-      console.error('Failed to reorder blocks:', error)
-      setBlocks(blocks) // Revert on error
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleStartEdit = (block: FeedbackBlock) => {
-    setEditingBlock(block.id)
-    if (block.block_type === 'title') {
-      setEditTitleText(block.title_text || '')
-    } else if (block.block_type === 'static_text') {
-      setEditStaticContent(block.static_content || '')
-      setEditTextSize((block.text_size as 'small' | 'medium' | 'large') || 'medium')
-    } else if (block.block_type === 'vote_options') {
-      setEditVoteOptions(block.vote_options || [])
-    } else if (block.block_type === 'team_photos') {
-      setEditTeamPhotos(block.team_photos || [])
-    }
-  }
-
-  const handleCancelEdit = () => {
-    setEditingBlock(null)
-    setEditTitleText('')
-    setEditStaticContent('')
-    setEditTextSize('medium')
-    setEditVoteOptions([])
-    setEditTeamPhotos([])
-  }
-
-  const handleSaveBlock = async (block: FeedbackBlock) => {
-    setSaving(true)
-    try {
-      const updateData: Partial<FeedbackBlock> = {}
-
-      if (block.block_type === 'title') {
-        updateData.title_text = editTitleText
-      } else if (block.block_type === 'static_text') {
-        updateData.static_content = editStaticContent
-        updateData.text_size = editTextSize
-      } else if (block.block_type === 'vote_options') {
-        updateData.vote_options = editVoteOptions
-      } else if (block.block_type === 'team_photos') {
-        updateData.team_photos = editTeamPhotos
-      }
-
-      await onUpdateBlock(block.id, updateData)
-      setBlocks(prev => prev.map(b => b.id === block.id ? { ...b, ...updateData } : b))
-      setEditingBlock(null)
-    } catch (error) {
-      console.error('Failed to save block:', error)
-      alert('Failed to save block. Please try again.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const getBlockTypeBadge = (blockType: string) => {
-    switch (blockType) {
-      case 'title':
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Title</span>
-      case 'static_text':
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Static Text</span>
-      case 'vote_options':
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Voting</span>
-      case 'team_photos':
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Team Photos</span>
-      default:
-        return null
-    }
-  }
-
-  // Render expanded content for a block
-  const renderBlockExpandedContent = (block: FeedbackBlock) => (
-    <div className="border-t border-gray-200 p-4 bg-gray-50">
-      {/* ===== TITLE BLOCK ===== */}
-      {block.block_type === 'title' && (
-        <div>
-          {editingBlock === block.id ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Title Text</label>
-                <input
-                  type="text"
-                  value={editTitleText}
-                  onChange={(e) => setEditTitleText(e.target.value)}
-                  placeholder="That's it for today!"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={handleCancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button onClick={() => handleSaveBlock(block)} disabled={saving} className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {block.title_text ? (
-                <div className="text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-200 font-medium">{block.title_text}</div>
-              ) : (
-                <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">No title text set</p>
-              )}
-              <button onClick={() => handleStartEdit(block)} className="mt-3 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Title</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== STATIC TEXT BLOCK ===== */}
-      {block.block_type === 'static_text' && (
-        <div>
-          {editingBlock === block.id ? (
-            <div className="space-y-4">
-              {/* Text Size Dropdown */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Text Size</label>
-                <select
-                  value={editTextSize}
-                  onChange={(e) => setEditTextSize(e.target.value as 'small' | 'medium' | 'large')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm bg-white"
-                >
-                  <option value="small">Small (14px)</option>
-                  <option value="medium">Medium (16px)</option>
-                  <option value="large">Large (20px)</option>
-                </select>
-              </div>
-              {/* Rich Text Editor */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
-                <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
-                  <ReactQuill
-                    theme="snow"
-                    value={editStaticContent}
-                    onChange={setEditStaticContent}
-                    modules={quillModules}
-                    formats={quillFormats}
-                    placeholder="Enter your text content..."
-                    className="feedback-quill-editor"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={handleCancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button onClick={() => handleSaveBlock(block)} disabled={saving} className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center gap-2 mb-2 text-xs text-gray-500">
-                {block.text_size && (
-                  <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded font-medium">
-                    {block.text_size === 'small' ? 'Small (14px)' : block.text_size === 'large' ? 'Large (20px)' : 'Medium (16px)'}
-                  </span>
-                )}
-              </div>
-              {block.static_content ? (
-                <div
-                  className="text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-200 prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: block.static_content }}
-                />
-              ) : (
-                <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">No content yet</p>
-              )}
-              <button onClick={() => handleStartEdit(block)} className="mt-3 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Content</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== VOTE OPTIONS BLOCK ===== */}
-      {block.block_type === 'vote_options' && (
-        <div>
-          {editingBlock === block.id ? (
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="block text-sm font-medium text-gray-700">Vote Options</label>
-                  <button
-                    onClick={() => {
-                      const newValue = editVoteOptions.length > 0
-                        ? Math.max(1, ...editVoteOptions.map(o => o.value)) + 1
-                        : 1
-                      setEditVoteOptions([
-                        ...editVoteOptions,
-                        { value: Math.min(newValue, 5), label: 'New Option', emoji: 'star' as const }
-                      ].sort((a, b) => b.value - a.value))
-                    }}
-                    disabled={editVoteOptions.length >= 5}
-                    className="text-sm text-cyan-600 hover:text-cyan-700 disabled:text-gray-400"
-                  >
-                    + Add Option
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {editVoteOptions.map((option, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-2 w-20">
-                        <span className="text-amber-400 text-lg">{'★'.repeat(Math.min(option.value, 5))}</span>
-                      </div>
-                      <input
-                        type="number"
-                        min="1"
-                        max="5"
-                        value={option.value}
-                        onChange={(e) => {
-                          const newOptions = [...editVoteOptions]
-                          newOptions[index] = { ...newOptions[index], value: parseInt(e.target.value) || 1 }
-                          newOptions.sort((a, b) => b.value - a.value)
-                          setEditVoteOptions(newOptions)
-                        }}
-                        className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                      />
-                      <input
-                        type="text"
-                        value={option.label}
-                        onChange={(e) => {
-                          const newOptions = [...editVoteOptions]
-                          newOptions[index] = { ...newOptions[index], label: e.target.value }
-                          setEditVoteOptions(newOptions)
-                        }}
-                        className="flex-1 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                        placeholder="Option label"
-                      />
-                      <button
-                        onClick={() => {
-                          if (editVoteOptions.length <= 2) {
-                            alert('You must have at least 2 vote options')
-                            return
-                          }
-                          setEditVoteOptions(editVoteOptions.filter((_, i) => i !== index))
-                        }}
-                        className="text-gray-400 hover:text-red-500"
-                        title="Remove option"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  Options are sorted by star count (highest first). Min 2, max 5 options.
-                </p>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={handleCancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button onClick={() => handleSaveBlock(block)} disabled={saving} className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {block.vote_options && block.vote_options.length > 0 ? (
-                <div className="space-y-2">
-                  {block.vote_options.map((option, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
-                      <span className="text-amber-400 text-lg w-20">{'★'.repeat(Math.min(option.value, 5))}</span>
-                      <span className="text-sm text-gray-700">{option.label}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">No vote options configured</p>
-              )}
-              <button onClick={() => handleStartEdit(block)} className="mt-3 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Options</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== TEAM PHOTOS BLOCK ===== */}
-      {block.block_type === 'team_photos' && (
-        <div>
-          {editingBlock === block.id ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Team Photos</label>
-                <p className="text-sm text-gray-500 mb-3">
-                  Add circular photos of your team (1-10 members). These appear at the bottom of the feedback section.
-                </p>
-                <TeamPhotoManager
-                  photos={editTeamPhotos}
-                  onChange={setEditTeamPhotos}
-                  maxPhotos={10}
-                  disabled={saving}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={handleCancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button onClick={() => handleSaveBlock(block)} disabled={saving} className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {block.team_photos && block.team_photos.length > 0 ? (
-                <div className="flex flex-wrap gap-3">
-                  {block.team_photos.map((photo, index) => (
-                    <div key={index} className="text-center">
-                      <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
-                        <img
-                          src={photo.image_url}
-                          alt={photo.name || 'Team member'}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      {photo.name && <p className="mt-1 text-xs text-gray-600 truncate w-16">{photo.name}</p>}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">No team photos added</p>
-              )}
-              <button onClick={() => handleStartEdit(block)} className="mt-3 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Photos</button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
 
   return (
     <div className="space-y-6">
@@ -689,16 +35,16 @@ export function FeedbackModuleSettings({
         <div className="flex-1">
           <input
             type="text"
-            value={localName}
-            onChange={(e) => setLocalName(e.target.value)}
-            onBlur={(e) => handleNameChange(e.target.value)}
+            value={state.localName}
+            onChange={(e) => state.setLocalName(e.target.value)}
+            onBlur={(e) => state.handleNameChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                handleNameChange(localName)
+                state.handleNameChange(state.localName)
                 ;(e.target as HTMLInputElement).blur()
               }
             }}
-            disabled={saving}
+            disabled={state.saving}
             className="w-full text-xl font-semibold text-gray-900 bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-cyan-500 focus:outline-none transition-colors px-1 py-1"
           />
           <span className="text-xs text-cyan-600 font-medium">Feedback Module</span>
@@ -706,18 +52,11 @@ export function FeedbackModuleSettings({
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">Active</span>
           <button
-            onClick={async () => {
-              setSaving(true)
-              try {
-                await onUpdate({ is_active: !module.is_active })
-              } finally {
-                setSaving(false)
-              }
-            }}
-            disabled={saving}
+            onClick={state.handleToggleActive}
+            disabled={state.saving}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               module.is_active ? 'bg-cyan-600' : 'bg-gray-200'
-            } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            } ${state.saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -731,326 +70,89 @@ export function FeedbackModuleSettings({
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('general')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'general'
-                ? 'border-cyan-500 text-cyan-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            General
-          </button>
-          <button
-            onClick={() => setActiveTab('blocks')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'blocks'
-                ? 'border-cyan-500 text-cyan-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Blocks ({blocks.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('results')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'results'
-                ? 'border-cyan-500 text-cyan-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Results Page
-          </button>
+          {(['general', 'blocks', 'results'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => state.setActiveTab(tab)}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                state.activeTab === tab
+                  ? 'border-cyan-500 text-cyan-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab === 'general' ? 'General' : tab === 'blocks' ? `Blocks (${state.blocks.length})` : 'Results Page'}
+            </button>
+          ))}
         </nav>
       </div>
 
       {/* General Tab */}
-      {activeTab === 'general' && (
-        <div className="space-y-6">
-          {/* Show Section Name Toggle */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div>
-              <div className="font-medium text-gray-900">Show Section Name</div>
-              <div className="text-sm text-gray-500">
-                Display the section header in the newsletter.
-              </div>
-            </div>
-            <button
-              onClick={handleShowNameToggle}
-              disabled={saving}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                showName ? 'bg-cyan-600' : 'bg-gray-200'
-              } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  showName ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Module Info */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-sm text-gray-500">
-              <p className="mb-2">Feedback modules support multiple block types:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><strong>Title</strong> - Section heading text</li>
-                <li><strong>Static Text</strong> - Body or sign-off text with formatting</li>
-                <li><strong>Vote Options</strong> - Star-based rating options</li>
-                <li><strong>Team Photos</strong> - Circular photos of your team</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+      {state.activeTab === 'general' && (
+        <GeneralTab
+          showName={state.showName}
+          saving={state.saving}
+          onShowNameToggle={state.handleShowNameToggle}
+        />
       )}
 
       {/* Blocks Tab */}
-      {activeTab === 'blocks' && (
-        <div className="space-y-4">
-          {blocks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p className="mb-4">No blocks yet. Add your first block to get started.</p>
-            </div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={blocks.map(b => b.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-3">
-                  {blocks.map((block) => (
-                    <SortableBlockItem
-                      key={block.id}
-                      block={block}
-                      isActive={block.is_enabled}
-                      isExpanded={expandedBlock === block.id}
-                      saving={saving}
-                      onToggleExpand={() => setExpandedBlock(expandedBlock === block.id ? null : block.id)}
-                      onToggleActive={() => handleToggleBlockActive(block)}
-                      onDelete={() => handleDeleteBlock(block.id)}
-                      onStartEdit={() => {
-                        setExpandedBlock(block.id)
-                        if (editingBlock !== block.id) {
-                          handleStartEdit(block)
-                        }
-                      }}
-                      getBlockTypeBadge={getBlockTypeBadge}
-                    >
-                      {/* Expanded content rendered as children */}
-                      {expandedBlock === block.id && renderBlockExpandedContent(block)}
-                    </SortableBlockItem>
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          )}
-
-          {/* Add Block Buttons */}
-          {onAddBlock && (
-            <div className="flex gap-2 pt-4 border-t">
-              <button
-                onClick={() => handleAddBlock('static_text')}
-                disabled={saving}
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 hover:border-gray-400 text-gray-700 transition-colors disabled:opacity-50"
-              >
-                + Static Text
-              </button>
-              <button
-                onClick={() => handleAddBlock('vote_options')}
-                disabled={saving}
-                className="flex-1 px-3 py-2 text-sm border border-amber-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 text-amber-700 transition-colors disabled:opacity-50"
-              >
-                + Vote Options
-              </button>
-              <button
-                onClick={() => handleAddBlock('team_photos')}
-                disabled={saving}
-                className="flex-1 px-3 py-2 text-sm border border-green-200 rounded-lg hover:bg-green-50 hover:border-green-300 text-green-700 transition-colors disabled:opacity-50"
-              >
-                + Team Photos
-              </button>
-            </div>
-          )}
-        </div>
+      {state.activeTab === 'blocks' && (
+        <BlocksTab
+          blocks={state.blocks}
+          saving={state.saving}
+          sensors={state.sensors}
+          expandedBlock={state.expandedBlock}
+          editingBlock={state.editingBlock}
+          editTitleText={state.editTitleText}
+          setEditTitleText={state.setEditTitleText}
+          editStaticContent={state.editStaticContent}
+          setEditStaticContent={state.setEditStaticContent}
+          editTextSize={state.editTextSize}
+          setEditTextSize={state.setEditTextSize}
+          editVoteOptions={state.editVoteOptions}
+          setEditVoteOptions={state.setEditVoteOptions}
+          editTeamPhotos={state.editTeamPhotos}
+          setEditTeamPhotos={state.setEditTeamPhotos}
+          onDragEnd={state.handleDragEnd}
+          onToggleExpand={(id) => state.setExpandedBlock(state.expandedBlock === id ? null : id)}
+          onToggleBlockActive={state.handleToggleBlockActive}
+          onDeleteBlock={state.handleDeleteBlock}
+          onStartEdit={state.handleStartEdit}
+          onCancelEdit={state.handleCancelEdit}
+          onSaveBlock={state.handleSaveBlock}
+          onAddBlock={onAddBlock ? state.handleAddBlock : undefined}
+        />
       )}
 
       {/* Results Page Tab */}
-      {activeTab === 'results' && (
-        <div className="space-y-6">
-          <p className="text-sm text-gray-500">
-            Customize the text shown on the results page that subscribers see after voting.
-          </p>
-
-          {/* Confirmation Message */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Confirmation Message
-            </label>
-            <input
-              type="text"
-              value={resultsConfig.confirmation_message}
-              onChange={(e) => handleResultsConfigChange('confirmation_message', e.target.value)}
-              placeholder="Your response has been recorded."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">Shown after the checkmark icon</p>
-          </div>
-
-          {/* Results Header */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Results Header
-            </label>
-            <input
-              type="text"
-              value={resultsConfig.results_header}
-              onChange={(e) => handleResultsConfigChange('results_header', e.target.value)}
-              placeholder="Results"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">Header text before vote count, e.g. &quot;Results (5 votes)&quot;</p>
-          </div>
-
-          {/* First Vote Message */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              First Vote Message
-            </label>
-            <input
-              type="text"
-              value={resultsConfig.first_vote_message}
-              onChange={(e) => handleResultsConfigChange('first_vote_message', e.target.value)}
-              placeholder="You're the first to vote!"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">Shown when they&apos;re the first voter on an issue</p>
-          </div>
-
-          {/* Feedback Label */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Feedback Label
-            </label>
-            <input
-              type="text"
-              value={resultsConfig.feedback_label}
-              onChange={(e) => handleResultsConfigChange('feedback_label', e.target.value)}
-              placeholder="Additional feedback"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">Label above the feedback textarea</p>
-          </div>
-
-          {/* Feedback Placeholder */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Feedback Placeholder
-            </label>
-            <input
-              type="text"
-              value={resultsConfig.feedback_placeholder}
-              onChange={(e) => handleResultsConfigChange('feedback_placeholder', e.target.value)}
-              placeholder="Elaborate on your answer..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">Placeholder text inside the feedback textarea</p>
-          </div>
-
-          {/* Feedback Success Message */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Feedback Success Message
-            </label>
-            <input
-              type="text"
-              value={resultsConfig.feedback_success_message}
-              onChange={(e) => handleResultsConfigChange('feedback_success_message', e.target.value)}
-              placeholder="Thank you for your feedback!"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">Shown after submitting additional feedback</p>
-          </div>
-
-          {/* Button Text */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Continue Button Text
-              </label>
-              <input
-                type="text"
-                value={resultsConfig.continue_button_text}
-                onChange={(e) => handleResultsConfigChange('continue_button_text', e.target.value)}
-                placeholder="Continue"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Submit Button Text
-              </label>
-              <input
-                type="text"
-                value={resultsConfig.submit_button_text}
-                onChange={(e) => handleResultsConfigChange('submit_button_text', e.target.value)}
-                placeholder="Submit Feedback"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Footer Text */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Footer Text
-            </label>
-            <input
-              type="text"
-              value={resultsConfig.footer_text}
-              onChange={(e) => handleResultsConfigChange('footer_text', e.target.value)}
-              placeholder="You can close this window at any time."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">Shown at the bottom of the page</p>
-          </div>
-
-          {/* Save Button */}
-          <div className="pt-4 border-t">
-            <button
-              onClick={handleSaveResultsConfig}
-              disabled={saving}
-              className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 text-sm font-medium"
-            >
-              {saving ? 'Saving...' : 'Save Results Page Settings'}
-            </button>
-          </div>
-        </div>
+      {state.activeTab === 'results' && (
+        <ResultsPageTab
+          resultsConfig={state.resultsConfig}
+          saving={state.saving}
+          onConfigChange={state.handleResultsConfigChange}
+          onSave={state.handleSaveResultsConfig}
+        />
       )}
 
       {/* Danger Zone */}
       <div className="pt-6 border-t border-gray-200">
         <h4 className="text-sm font-medium text-red-600 mb-3">Danger Zone</h4>
-        {showDeleteConfirm ? (
+        {state.showDeleteConfirm ? (
           <div className="p-4 bg-red-50 rounded-lg">
             <p className="text-sm text-red-700 mb-3">
               Are you sure you want to delete this module? This will also delete all associated blocks.
             </p>
             <div className="flex gap-2">
               <button
-                onClick={handleDelete}
-                disabled={saving}
+                onClick={state.handleDelete}
+                disabled={state.saving}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
               >
-                {saving ? 'Deleting...' : 'Yes, Delete'}
+                {state.saving ? 'Deleting...' : 'Yes, Delete'}
               </button>
               <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={saving}
+                onClick={() => state.setShowDeleteConfirm(false)}
+                disabled={state.saving}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
               >
                 Cancel
@@ -1059,7 +161,7 @@ export function FeedbackModuleSettings({
           </div>
         ) : (
           <button
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={() => state.setShowDeleteConfirm(true)}
             className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
           >
             Delete Module
