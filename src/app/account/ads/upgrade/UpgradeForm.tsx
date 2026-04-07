@@ -1,9 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Check, Star, Crown, Lock, ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useUpgradeForm } from './useUpgradeForm'
 
 interface UpgradeFormProps {
   tool: {
@@ -32,61 +31,19 @@ export function UpgradeForm({
   categoryHasFeatured,
   pricing
 }: UpgradeFormProps) {
-  const router = useRouter()
-  const [selectedType, setSelectedType] = useState<'paid_placement' | 'featured'>(
-    initialListingType || 'paid_placement'
-  )
-  const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>(
-    initialBillingPeriod || 'monthly'
-  )
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    selectedType,
+    setSelectedType,
+    selectedPeriod,
+    setSelectedPeriod,
+    isLoading,
+    error,
+    handleUpgrade,
+    featuredDisabled,
+    currentPrice
+  } = useUpgradeForm(tool, pricing, categoryHasFeatured, initialListingType, initialBillingPeriod)
 
-  const handleUpgrade = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/account/tools/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          toolId: tool.id,
-          listingType: selectedType,
-          billingPeriod: selectedPeriod
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session')
-      }
-
-      if (data.url) {
-        // Redirect to Stripe Checkout
-        window.location.href = data.url
-      } else {
-        throw new Error('No checkout URL returned')
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
-      setIsLoading(false)
-    }
-  }
-
-  // Can't select featured if category already has one (and it's not this tool)
-  const featuredDisabled = categoryHasFeatured && tool.currentListingType !== 'featured'
-
-  // Use pricing from props
-  const paidPlacementMonthly = pricing.paidPlacementMonthly
-  const paidPlacementYearly = pricing.paidPlacementYearly
-  const featuredMonthly = pricing.featuredMonthly
-  const featuredYearly = pricing.featuredYearly
-
-  const currentPrice = selectedType === 'featured'
-    ? (selectedPeriod === 'yearly' ? featuredYearly : featuredMonthly)
-    : (selectedPeriod === 'yearly' ? paidPlacementYearly : paidPlacementMonthly)
+  const { paidPlacementMonthly, paidPlacementYearly, featuredMonthly, featuredYearly } = pricing
 
   return (
     <div className="space-y-8">

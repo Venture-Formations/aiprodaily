@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import ArticleModuleGeneralTab from './ArticleModuleGeneralTab'
 import ArticleModuleFeedsTab from './ArticleModuleFeedsTab'
 import ArticleModulePromptsTab from './ArticleModulePromptsTab'
+import { useArticleModuleSettings } from './useArticleModuleSettings'
 import type {
   ArticleModule,
   ArticleModuleCriteria,
@@ -23,117 +23,25 @@ interface ArticleModuleSettingsProps {
   onDelete: () => void
 }
 
+const tabs: { id: TabType; label: string }[] = [
+  { id: 'general', label: 'General' },
+  { id: 'feeds', label: 'RSS Feeds' },
+  { id: 'prompts', label: 'AI Prompts' }
+]
+
 export default function ArticleModuleSettings({
   module,
   publicationId,
   onUpdate,
   onDelete
 }: ArticleModuleSettingsProps) {
-  const [localModule, setLocalModule] = useState(module)
-  const [activeTab, setActiveTab] = useState<TabType>('general')
-  const [saving, setSaving] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
-  const [deleteText, setDeleteText] = useState('')
-  const [feedCount, setFeedCount] = useState<number | null>(null)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [showName, setShowName] = useState(module.show_name ?? true)
-
-  // Update local state when module prop changes
-  useEffect(() => {
-    setLocalModule(module)
-    setShowName(module.show_name ?? true)
-    setDeleteConfirm(false)
-    setDeleteText('')
-    fetchFeedCount()
-  }, [module.id])
-
-  const fetchFeedCount = async () => {
-    try {
-      const res = await fetch(`/api/article-modules/${module.id}/feeds`)
-      if (res.ok) {
-        const data = await res.json()
-        setFeedCount(data.assigned?.length || 0)
-      }
-    } catch (error) {
-      console.error('Failed to fetch feed count:', error)
-    }
-  }
-
-  const handleNameChange = async (newName: string) => {
-    if (newName.trim() === module.name) return
-
-    setSaving(true)
-    setSaveStatus('saving')
-    try {
-      await onUpdate({ name: newName.trim() })
-      setLocalModule(prev => ({ ...prev, name: newName.trim() }))
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus('idle'), 2000)
-    } catch (error) {
-      console.error('Failed to update name:', error)
-      setSaveStatus('error')
-      setLocalModule(prev => ({ ...prev, name: module.name }))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleActiveToggle = async () => {
-    setSaving(true)
-    try {
-      await onUpdate({ is_active: !localModule.is_active })
-      setLocalModule(prev => ({ ...prev, is_active: !prev.is_active }))
-    } catch (error) {
-      console.error('Failed to update active status:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleShowNameToggle = async () => {
-    const newValue = !showName
-    setShowName(newValue)
-    setSaving(true)
-    try {
-      await onUpdate({ show_name: newValue })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleModuleUpdate = async (updates: Partial<ArticleModule>) => {
-    setSaving(true)
-    try {
-      await onUpdate(updates)
-      setLocalModule(prev => ({ ...prev, ...updates }))
-    } catch (error) {
-      console.error('Failed to update module:', error)
-      throw error
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (deleteText !== 'DELETE') return
-
-    setSaving(true)
-    try {
-      await onDelete()
-    } catch (error) {
-      console.error('Failed to delete module:', error)
-    } finally {
-      setSaving(false)
-      setDeleteConfirm(false)
-      setDeleteText('')
-    }
-  }
-
-  const tabs: { id: TabType; label: string }[] = [
-    { id: 'general', label: 'General' },
-    { id: 'feeds', label: 'RSS Feeds' },
-    { id: 'prompts', label: 'AI Prompts' }
-  ]
+  const {
+    localModule, activeTab, setActiveTab, saving,
+    deleteConfirm, setDeleteConfirm, deleteText, setDeleteText,
+    feedCount, setFeedCount, saveStatus, showName,
+    handleNameChange, handleActiveToggle, handleShowNameToggle,
+    handleModuleUpdate, handleDelete, setLocalName,
+  } = useArticleModuleSettings({ module, onUpdate, onDelete })
 
   return (
     <div className="space-y-6">
@@ -143,7 +51,7 @@ export default function ArticleModuleSettings({
           <input
             type="text"
             value={localModule.name}
-            onChange={(e) => setLocalModule(prev => ({ ...prev, name: e.target.value }))}
+            onChange={(e) => setLocalName(e.target.value)}
             onBlur={(e) => handleNameChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -154,7 +62,6 @@ export default function ArticleModuleSettings({
             disabled={saving}
             className="text-xl font-semibold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded px-1 -ml-1"
           />
-          {/* Save status indicator */}
           {saveStatus === 'saving' && (
             <span className="text-xs text-emerald-600 flex items-center gap-1">
               <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
@@ -182,21 +89,13 @@ export default function ArticleModuleSettings({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">
-            {localModule.is_active ? 'Active' : 'Inactive'}
-          </span>
+          <span className="text-sm text-gray-500">{localModule.is_active ? 'Active' : 'Inactive'}</span>
           <button
             onClick={handleActiveToggle}
             disabled={saving}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              localModule.is_active ? 'bg-emerald-600' : 'bg-gray-200'
-            } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${localModule.is_active ? 'bg-emerald-600' : 'bg-gray-200'} ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                localModule.is_active ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localModule.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
         </div>
       </div>
@@ -205,22 +104,14 @@ export default function ArticleModuleSettings({
       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
         <div>
           <div className="font-medium text-gray-900">Show Section Name</div>
-          <div className="text-sm text-gray-500">
-            Display the section header in the newsletter.
-          </div>
+          <div className="text-sm text-gray-500">Display the section header in the newsletter.</div>
         </div>
         <button
           onClick={handleShowNameToggle}
           disabled={saving}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            showName ? 'bg-cyan-600' : 'bg-gray-200'
-          } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showName ? 'bg-cyan-600' : 'bg-gray-200'} ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              showName ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showName ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
       </div>
 
@@ -231,17 +122,11 @@ export default function ArticleModuleSettings({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-emerald-500 text-emerald-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
             >
               {tab.label}
               {tab.id === 'feeds' && feedCount !== null && (
-                <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-gray-100 rounded">
-                  {feedCount}
-                </span>
+                <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-gray-100 rounded">{feedCount}</span>
               )}
             </button>
           ))}
@@ -251,21 +136,11 @@ export default function ArticleModuleSettings({
       {/* Tab Content */}
       <div className="min-h-[300px]">
         {activeTab === 'general' && (
-          <ArticleModuleGeneralTab
-            module={localModule}
-            onUpdate={handleModuleUpdate}
-            disabled={saving}
-          />
+          <ArticleModuleGeneralTab module={localModule} onUpdate={handleModuleUpdate} disabled={saving} />
         )}
-
         {activeTab === 'feeds' && (
-          <ArticleModuleFeedsTab
-            moduleId={module.id}
-            publicationId={publicationId}
-            onFeedCountChange={setFeedCount}
-          />
+          <ArticleModuleFeedsTab moduleId={module.id} publicationId={publicationId} onFeedCountChange={setFeedCount} />
         )}
-
         {activeTab === 'prompts' && (
           <ArticleModulePromptsTab
             moduleId={module.id}
@@ -273,9 +148,7 @@ export default function ArticleModuleSettings({
             criteria={localModule.criteria || []}
             prompts={localModule.prompts || []}
             aiImagePrompt={localModule.ai_image_prompt}
-            onAiImagePromptChange={async (prompt) => {
-              await handleModuleUpdate({ ai_image_prompt: prompt })
-            }}
+            onAiImagePromptChange={async (prompt) => { await handleModuleUpdate({ ai_image_prompt: prompt }) }}
           />
         )}
       </div>
@@ -288,47 +161,17 @@ export default function ArticleModuleSettings({
             Deleting this section will unassign {feedCount ?? '...'} RSS feeds. Articles generated for this section will also be removed.
           </p>
         </div>
-
         {!deleteConfirm ? (
           <div className="p-4 bg-white">
-            <button
-              onClick={() => setDeleteConfirm(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Delete Section
-            </button>
+            <button onClick={() => setDeleteConfirm(true)} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Delete Section</button>
           </div>
         ) : (
           <div className="p-4 bg-white space-y-3">
-            <p className="text-sm text-gray-700">
-              Type <strong>DELETE</strong> to confirm deletion of &quot;{localModule.name}&quot;
-            </p>
-            <input
-              type="text"
-              value={deleteText}
-              onChange={(e) => setDeleteText(e.target.value)}
-              placeholder="Type DELETE"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
+            <p className="text-sm text-gray-700">Type <strong>DELETE</strong> to confirm deletion of &quot;{localModule.name}&quot;</p>
+            <input type="text" value={deleteText} onChange={(e) => setDeleteText(e.target.value)} placeholder="Type DELETE" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" />
             <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setDeleteConfirm(false)
-                  setDeleteText('')
-                }}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteText !== 'DELETE' || saving}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  deleteText === 'DELETE' && !saving
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
+              <button onClick={() => { setDeleteConfirm(false); setDeleteText('') }} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+              <button onClick={handleDelete} disabled={deleteText !== 'DELETE' || saving} className={`px-4 py-2 rounded-lg transition-colors ${deleteText === 'DELETE' && !saving ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
                 {saving ? 'Deleting...' : 'Delete'}
               </button>
             </div>
@@ -336,7 +179,6 @@ export default function ArticleModuleSettings({
         )}
       </div>
 
-      {/* Saving indicator */}
       {saving && (
         <div className="fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">

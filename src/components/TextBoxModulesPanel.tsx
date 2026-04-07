@@ -1,174 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import type {
-  TextBoxModule,
-  TextBoxBlock,
-  IssueTextBoxBlock,
-  GenerationTiming
-} from '@/types/database'
+import type { TextBoxBlock, IssueTextBoxBlock } from '@/types/database'
+import {
+  useTextBoxModulesPanel,
+  getBlockContent,
+  getBlockImage,
+  getStatusBadge,
+  STATUS_BADGE_STYLES,
+} from './useTextBoxModulesPanel'
 
 interface TextBoxModulesPanelProps {
   issueId: string
   issueStatus?: string
 }
 
-interface TextBoxSelection {
-  module: TextBoxModule
-  blocks: TextBoxBlock[]
-  issueBlocks: IssueTextBoxBlock[]
-}
-
 export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxModulesPanelProps) {
   const isSent = issueStatus === 'sent'
-  const [loading, setLoading] = useState(true)
-  const [selections, setSelections] = useState<TextBoxSelection[]>([])
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [regenerating, setRegenerating] = useState<string | null>(null)
-  const [editingContent, setEditingContent] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    fetchTextBoxModules()
-  }, [issueId])
-
-  // Auto-expand modules that have AI-generated content
-  useEffect(() => {
-    if (selections.length > 0) {
-      const autoExpand: Record<string, boolean> = {}
-      selections.forEach(selection => {
-        // Auto-expand if module has AI prompt blocks with content
-        const hasAIContent = selection.blocks.some(block => {
-          if (block.block_type === 'ai_prompt' && block.is_active) {
-            const issueBlock = selection.issueBlocks.find(ib => ib.text_box_block_id === block.id)
-            return issueBlock?.generated_content || issueBlock?.override_content
-          }
-          return false
-        })
-        if (hasAIContent) {
-          autoExpand[selection.module.id] = true
-        }
-      })
-      // Only update if there are modules to expand and they're not already set
-      if (Object.keys(autoExpand).length > 0) {
-        setExpanded(prev => {
-          const hasExisting = Object.keys(prev).length > 0
-          return hasExisting ? prev : autoExpand
-        })
-      }
-    }
-  }, [selections])
-
-  const fetchTextBoxModules = async () => {
-    try {
-      const response = await fetch(`/api/campaigns/${issueId}/text-box-modules`)
-      if (response.ok) {
-        const data = await response.json()
-        console.log('[TextBoxModulesPanel] Fetched data:', {
-          modulesCount: data.modules?.length,
-          modules: data.modules?.map((s: any) => ({
-            name: s.module?.name,
-            blocksCount: s.blocks?.length,
-            issueBlocksCount: s.issueBlocks?.length,
-            aiPromptBlocks: s.blocks?.filter((b: any) => b.block_type === 'ai_prompt').map((b: any) => ({
-              id: b.id,
-              is_active: b.is_active,
-              issueBlock: s.issueBlocks?.find((ib: any) => ib.text_box_block_id === b.id)
-            }))
-          }))
-        })
-        setSelections(data.modules || [])
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('[TextBoxModulesPanel] API error:', response.status, errorData)
-      }
-    } catch (error) {
-      console.error('Failed to fetch text box modules:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleRegenerate = async (blockId: string) => {
-    setRegenerating(blockId)
-    try {
-      const response = await fetch(`/api/campaigns/${issueId}/text-box-modules`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate', blockId })
-      })
-
-      if (response.ok) {
-        await fetchTextBoxModules()
-      } else {
-        const error = await response.json()
-        alert(`Failed to regenerate: ${error.error}`)
-      }
-    } catch (error) {
-      console.error('Failed to regenerate:', error)
-      alert('Failed to regenerate content')
-    } finally {
-      setRegenerating(null)
-    }
-  }
-
-  const handleSaveOverride = async (blockId: string, content: string) => {
-    try {
-      const response = await fetch(`/api/campaigns/${issueId}/text-box-modules`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blockId, overrideContent: content || null })
-      })
-
-      if (response.ok) {
-        await fetchTextBoxModules()
-        setEditingContent(prev => {
-          const updated = { ...prev }
-          delete updated[blockId]
-          return updated
-        })
-      } else {
-        const error = await response.json()
-        alert(`Failed to save: ${error.error}`)
-      }
-    } catch (error) {
-      console.error('Failed to save override:', error)
-      alert('Failed to save override')
-    }
-  }
-
-  const toggleExpanded = (moduleId: string) => {
-    setExpanded(prev => ({ ...prev, [moduleId]: !prev[moduleId] }))
-  }
-
-  const getBlockContent = (block: TextBoxBlock, issueBlock?: IssueTextBoxBlock): string => {
-    if (issueBlock?.override_content) return issueBlock.override_content
-    if (block.block_type === 'static_text') return block.static_content || ''
-    if (block.block_type === 'ai_prompt') return issueBlock?.generated_content || ''
-    return ''
-  }
-
-  const getBlockImage = (block: TextBoxBlock, issueBlock?: IssueTextBoxBlock): string => {
-    if (issueBlock?.override_image_url) return issueBlock.override_image_url
-    if (block.image_type === 'static') return block.static_image_url || ''
-    return issueBlock?.generated_image_url || ''
-  }
-
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case 'completed':
-        return <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Generated</span>
-      case 'pending':
-        return <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">Pending</span>
-      case 'generating':
-        return <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">Generating...</span>
-      case 'failed':
-        return <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Failed</span>
-      case 'manual':
-        return <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">Manual Override</span>
-      default:
-        return null
-    }
-  }
+  const {
+    loading,
+    selections,
+    expanded,
+    regenerating,
+    editingContent,
+    setEditingContent,
+    handleRegenerate,
+    handleSaveOverride,
+    toggleExpanded,
+  } = useTextBoxModulesPanel(issueId)
 
   if (loading) {
     return (
@@ -186,9 +44,7 @@ export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxMod
       <div className="bg-white rounded-lg shadow mt-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">Text Box Sections</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Configurable text and image sections
-          </p>
+          <p className="text-sm text-gray-500 mt-1">Configurable text and image sections</p>
         </div>
         <div className="p-6">
           <p className="text-gray-500 text-sm">
@@ -203,9 +59,7 @@ export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxMod
     <div className="bg-white shadow rounded-lg mt-8">
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-medium text-gray-900">Text Box Sections</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Configurable text and image sections
-        </p>
+        <p className="text-sm text-gray-500 mt-1">Configurable text and image sections</p>
       </div>
 
       <div className="divide-y divide-gray-200">
@@ -220,7 +74,6 @@ export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxMod
 
           return (
             <div key={module.id} className="p-4">
-              {/* Module Header */}
               <div
                 className="flex items-center justify-between cursor-pointer"
                 onClick={() => toggleExpanded(module.id)}
@@ -240,172 +93,31 @@ export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxMod
                   )}
                   <svg
                     className={`w-5 h-5 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </div>
 
-              {/* Expanded Content */}
               {isExpanded && (
                 <div className="mt-4 space-y-4">
-                  {activeBlocks.map(block => {
-                    const issueBlock = issueBlocks.find(ib => ib.text_box_block_id === block.id)
-                    const content = getBlockContent(block, issueBlock)
-                    const imageUrl = getBlockImage(block, issueBlock)
-                    const isEditing = editingContent[block.id] !== undefined
-                    const isRegenerating = regenerating === block.id
-
-                    return (
-                      <div
-                        key={block.id}
-                        className="border border-gray-200 rounded-lg p-4"
-                      >
-                        {/* Block Header */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium text-sm text-gray-700">
-                              {block.block_type === 'static_text' && 'Static Text'}
-                              {block.block_type === 'ai_prompt' && 'AI Generated'}
-                              {block.block_type === 'image' && 'Image'}
-                            </span>
-                            {block.block_type === 'ai_prompt' && (
-                              <span className="text-xs text-gray-400">
-                                ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
-                              </span>
-                            )}
-                            {getStatusBadge(issueBlock?.generation_status)}
-                          </div>
-                          {!isSent && block.block_type === 'ai_prompt' && (
-                            <button
-                              onClick={() => handleRegenerate(block.id)}
-                              disabled={isRegenerating}
-                              className="text-sm text-cyan-600 hover:text-cyan-700 flex items-center space-x-1"
-                            >
-                              {isRegenerating ? (
-                                <>
-                                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                  </svg>
-                                  <span>Regenerating...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                                  <span>Regenerate</span>
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Block Content */}
-                        {block.block_type !== 'image' && (
-                          <>
-                            {isEditing ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={editingContent[block.id]}
-                                  onChange={(e) => setEditingContent(prev => ({
-                                    ...prev,
-                                    [block.id]: e.target.value
-                                  }))}
-                                  className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                  placeholder="Enter override content..."
-                                />
-                                <div className="flex justify-end space-x-2">
-                                  <button
-                                    onClick={() => setEditingContent(prev => {
-                                      const updated = { ...prev }
-                                      delete updated[block.id]
-                                      return updated
-                                    })}
-                                    className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => handleSaveOverride(block.id, editingContent[block.id])}
-                                    className="px-3 py-1 text-sm bg-cyan-600 text-white rounded hover:bg-cyan-700"
-                                  >
-                                    Save
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                onClick={() => !isSent && setEditingContent(prev => ({
-                                  ...prev,
-                                  [block.id]: issueBlock?.override_content || content || ''
-                                }))}
-                                className={`p-3 rounded-lg ${
-                                  !isSent ? 'cursor-pointer hover:bg-gray-50' : ''
-                                } ${content ? 'bg-gray-50' : 'bg-yellow-50'}`}
-                              >
-                                {content ? (
-                                  <div
-                                    className="text-sm text-gray-700 whitespace-pre-wrap"
-                                    dangerouslySetInnerHTML={{ __html: content }}
-                                  />
-                                ) : (
-                                  <p className="text-sm text-yellow-600 italic">
-                                    {issueBlock?.generation_status === 'pending'
-                                      ? 'Content will be generated when the workflow runs'
-                                      : issueBlock?.generation_status === 'failed'
-                                        ? `Generation failed: ${issueBlock.generation_error || 'Unknown error'}`
-                                        : 'No content yet'}
-                                  </p>
-                                )}
-                                {!isSent && (
-                                  <p className="text-xs text-gray-400 mt-2">
-                                    Click to edit
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Image Content */}
-                        {block.block_type === 'image' && (
-                          <div className="text-center">
-                            {imageUrl ? (
-                              <img
-                                src={imageUrl}
-                                alt="Block image"
-                                className="max-w-full h-auto rounded-lg mx-auto"
-                                style={{ maxHeight: '200px' }}
-                              />
-                            ) : (
-                              <div className="p-8 bg-gray-100 rounded-lg text-gray-500 text-sm">
-                                {block.image_type === 'ai_generated' && issueBlock?.generation_status === 'pending'
-                                  ? 'Image will be generated when the workflow runs'
-                                  : 'No image'}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Error Display */}
-                        {issueBlock?.generation_error && (
-                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
-                            {issueBlock.generation_error}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-
+                  {activeBlocks.map(block => (
+                    <BlockCard
+                      key={block.id}
+                      block={block}
+                      issueBlock={issueBlocks.find(ib => ib.text_box_block_id === block.id)}
+                      isSent={isSent}
+                      isRegenerating={regenerating === block.id}
+                      editingContent={editingContent[block.id]}
+                      onRegenerate={() => handleRegenerate(block.id)}
+                      onStartEdit={(content) => setEditingContent(prev => ({ ...prev, [block.id]: content }))}
+                      onCancelEdit={() => setEditingContent(prev => { const u = { ...prev }; delete u[block.id]; return u })}
+                      onSave={(content) => handleSaveOverride(block.id, content)}
+                    />
+                  ))}
                   {activeBlocks.length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-4">
-                      No active blocks in this module
-                    </p>
+                    <p className="text-sm text-gray-500 text-center py-4">No active blocks in this module</p>
                   )}
                 </div>
               )}
@@ -413,6 +125,130 @@ export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxMod
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function BlockCard({
+  block, issueBlock, isSent, isRegenerating, editingContent,
+  onRegenerate, onStartEdit, onCancelEdit, onSave,
+}: {
+  block: TextBoxBlock
+  issueBlock?: IssueTextBoxBlock
+  isSent: boolean
+  isRegenerating: boolean
+  editingContent?: string
+  onRegenerate: () => void
+  onStartEdit: (content: string) => void
+  onCancelEdit: () => void
+  onSave: (content: string) => void
+}) {
+  const content = getBlockContent(block, issueBlock)
+  const imageUrl = getBlockImage(block, issueBlock)
+  const isEditing = editingContent !== undefined
+  const statusLabel = getStatusBadge(issueBlock?.generation_status)
+  const statusStyle = issueBlock?.generation_status ? STATUS_BADGE_STYLES[issueBlock.generation_status] : ''
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          <span className="font-medium text-sm text-gray-700">
+            {block.block_type === 'static_text' && 'Static Text'}
+            {block.block_type === 'ai_prompt' && 'AI Generated'}
+            {block.block_type === 'image' && 'Image'}
+          </span>
+          {block.block_type === 'ai_prompt' && (
+            <span className="text-xs text-gray-400">
+              ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
+            </span>
+          )}
+          {statusLabel && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle}`}>{statusLabel}</span>
+          )}
+        </div>
+        {!isSent && block.block_type === 'ai_prompt' && (
+          <button
+            onClick={onRegenerate}
+            disabled={isRegenerating}
+            className="text-sm text-cyan-600 hover:text-cyan-700 flex items-center space-x-1"
+          >
+            {isRegenerating ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>Regenerating...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Regenerate</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      {block.block_type !== 'image' && (
+        <>
+          {isEditing ? (
+            <div className="space-y-2">
+              <textarea
+                value={editingContent}
+                onChange={(e) => onStartEdit(e.target.value)}
+                className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                placeholder="Enter override content..."
+              />
+              <div className="flex justify-end space-x-2">
+                <button onClick={onCancelEdit} className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+                <button onClick={() => onSave(editingContent!)} className="px-3 py-1 text-sm bg-cyan-600 text-white rounded hover:bg-cyan-700">Save</button>
+              </div>
+            </div>
+          ) : (
+            <div
+              onClick={() => !isSent && onStartEdit(issueBlock?.override_content || content || '')}
+              className={`p-3 rounded-lg ${!isSent ? 'cursor-pointer hover:bg-gray-50' : ''} ${content ? 'bg-gray-50' : 'bg-yellow-50'}`}
+            >
+              {content ? (
+                <div className="text-sm text-gray-700 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: content }} />
+              ) : (
+                <p className="text-sm text-yellow-600 italic">
+                  {issueBlock?.generation_status === 'pending'
+                    ? 'Content will be generated when the workflow runs'
+                    : issueBlock?.generation_status === 'failed'
+                      ? `Generation failed: ${issueBlock.generation_error || 'Unknown error'}`
+                      : 'No content yet'}
+                </p>
+              )}
+              {!isSent && <p className="text-xs text-gray-400 mt-2">Click to edit</p>}
+            </div>
+          )}
+        </>
+      )}
+
+      {block.block_type === 'image' && (
+        <div className="text-center">
+          {imageUrl ? (
+            <img src={imageUrl} alt="Block image" className="max-w-full h-auto rounded-lg mx-auto" style={{ maxHeight: '200px' }} />
+          ) : (
+            <div className="p-8 bg-gray-100 rounded-lg text-gray-500 text-sm">
+              {block.image_type === 'ai_generated' && issueBlock?.generation_status === 'pending'
+                ? 'Image will be generated when the workflow runs'
+                : 'No image'}
+            </div>
+          )}
+        </div>
+      )}
+
+      {issueBlock?.generation_error && (
+        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+          {issueBlock.generation_error}
+        </div>
+      )}
     </div>
   )
 }
