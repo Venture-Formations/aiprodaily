@@ -54,7 +54,7 @@ export function useAdSubmitForm() {
       return
     }
 
-    const text = formData.body.replace(/<[^>]*>/g, '').trim()
+    const text = formData.body.replace(/<[^>]*?>/g, '').trim()
     const words = text.split(/\s+/).filter(w => w.length > 0)
     if (words.length > 100) {
       alert('Ad content must be 100 words or less')

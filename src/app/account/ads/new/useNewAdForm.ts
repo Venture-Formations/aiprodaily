@@ -35,7 +35,7 @@ export function calculatePricing(numDays: number) {
 export function useNewAdForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [success] = useState(false)
 
   const [formData, setFormData] = useState({
     companyName: '',
