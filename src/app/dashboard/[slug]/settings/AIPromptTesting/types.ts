@@ -17,6 +17,7 @@ export interface RSSPost {
   publication_date: string | null
   used_in_issue_date?: string
   generated_headline?: string
+  total_score?: number
 }
 
 export interface TestResult {

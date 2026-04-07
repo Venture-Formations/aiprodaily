@@ -3,8 +3,8 @@
 import type { RSSPost, PromptType } from '../types'
 
 interface PostSelectorProps {
-  postSource: 'sent' | 'pool'
-  setPostSource: (s: 'sent' | 'pool') => void
+  postSource: 'sent' | 'pool' | 'scored'
+  setPostSource: (s: 'sent' | 'pool' | 'scored') => void
   promptType: PromptType
   status: string
   loadingPosts: boolean
@@ -53,13 +53,26 @@ export default function PostSelector({
         >
           From RSS Pool
         </button>
+        <button
+          type="button"
+          onClick={() => setPostSource('scored')}
+          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+            postSource === 'scored'
+              ? 'bg-purple-100 text-purple-700 border-purple-300'
+              : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          From Scored Posts
+        </button>
       </div>
       <p className="text-xs text-gray-500 mb-3">
         {postSource === 'pool'
           ? 'Recently ingested posts from RSS feeds (last 7 days)'
-          : promptType === 'custom'
-            ? 'Posts from sent newsletters (last 7 days) - Optional for freeform testing'
-            : 'Posts from sent newsletters (last 7 days)'}
+          : postSource === 'scored'
+            ? 'Posts scored by AI criteria, ordered by total score (last 7 days)'
+            : promptType === 'custom'
+              ? 'Posts from sent newsletters (last 7 days) - Optional for freeform testing'
+              : 'Posts from sent newsletters (last 7 days)'}
       </p>
       {status === 'loading' ? (
         <p className="text-gray-500 text-sm">Authenticating...</p>
@@ -71,7 +84,9 @@ export default function PostSelector({
           <p className="text-xs mt-1">
             {postSource === 'pool'
               ? 'No RSS posts ingested in the last 7 days.'
-              : 'No newsletters have been sent in the last 7 days.'}
+              : postSource === 'scored'
+                ? 'No scored posts found in the last 7 days.'
+                : 'No newsletters have been sent in the last 7 days.'}
           </p>
         </div>
       ) : (
@@ -84,9 +99,11 @@ export default function PostSelector({
           >
             {recentPosts.map(post => (
               <option key={post.id} value={post.id}>
-                {post.used_in_issue_date
-                  ? `[${new Date(post.used_in_issue_date).toLocaleDateString()}] `
-                  : ''}
+                {post.total_score != null
+                  ? `[Score: ${Math.round(post.total_score)}] `
+                  : post.used_in_issue_date
+                    ? `[${new Date(post.used_in_issue_date).toLocaleDateString()}] `
+                    : ''}
                 {post.title.substring(0, 70)}...
               </option>
             ))}
@@ -94,6 +111,11 @@ export default function PostSelector({
           {selectedPost && (
             <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded border border-gray-200">
               <p className="font-medium mb-1">{selectedPost.title}</p>
+              {selectedPost.total_score != null && (
+                <p className="text-xs text-purple-600 mb-1">
+                  Total Score: {Math.round(selectedPost.total_score)}
+                </p>
+              )}
               {selectedPost.used_in_issue_date && (
                 <p className="text-xs text-green-600 mb-1">
                   Used in issue: {new Date(selectedPost.used_in_issue_date).toLocaleDateString()}

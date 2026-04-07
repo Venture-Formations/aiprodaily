@@ -23,7 +23,7 @@ export function useAIPromptTesting(slug: string, status: string) {
   const [loadingModules, setLoadingModules] = useState(true)
 
   // Post source toggle
-  const [postSource, setPostSource] = useState<'sent' | 'pool'>('sent')
+  const [postSource, setPostSource] = useState<'sent' | 'pool' | 'scored'>('sent')
 
   // Data state
   const [recentPosts, setRecentPosts] = useState<RSSPost[]>([])
