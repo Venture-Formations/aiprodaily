@@ -76,7 +76,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   }
 
   return (
-    <div className="flex gap-6 h-[600px]">
+    <div className="flex gap-6">
       {/* Left Panel - Section List */}
       <div className="w-80 flex-shrink-0 flex flex-col">
         <div className="mb-4 flex items-center justify-between">
@@ -92,7 +92,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -122,7 +122,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
       </div>
 
       {/* Right Panel - Settings */}
-      <div className="flex-1 bg-gray-50 rounded-lg p-6 overflow-y-auto">
+      <div className="flex-1 bg-gray-50 rounded-lg p-6">
         <SelectedItemPanel
           selectedItem={selectedItem}
           publicationId={publicationId}
