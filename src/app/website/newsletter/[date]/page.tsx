@@ -2,23 +2,17 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { newsletterArchiver } from '@/lib/newsletter-archiver'
-import type { ArchivedNewsletter } from '@/types/database'
 import { Header } from "@/components/salient/Header"
 import { Footer } from "@/components/salient/Footer"
 import { Container } from "@/components/salient/Container"
 import { supabaseAdmin } from "@/lib/supabase"
 import { resolvePublicationFromRequest } from '@/lib/publication-settings'
+import { formatLocalDate, buildRenderItems, SECTION_IDS } from './types'
+import RenderItemList from './components/RenderItemList'
+import AdvertorialSection from './components/AdvertorialSection'
 
 interface PageProps {
   params: Promise<{ date: string }>
-}
-
-// Helper function to clean email merge tags for website display
-function cleanMergeTags(text: string): string {
-  // Replace {$name|default:'Accounting Pro'} with "Accounting Pro"
-  return text.replace(/\{\$name\|default:"([^"]+)"\}/g, '$1')
-    // Handle other merge tag patterns if needed
-    .replace(/\{\$[^}]+\}/g, '') // Remove any other merge tags
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -28,19 +22,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const newsletter = await newsletterArchiver.getArchivedNewsletter(date, publicationId)
 
   if (!newsletter) {
-    return {
-      title: 'Newsletter Not Found'
-    }
+    return { title: 'Newsletter Not Found' }
   }
 
-  // Parse date as local date to avoid timezone offset issues
-  const [year, month, day] = newsletter.issue_date.split('-').map(Number)
-  const formattedDate = new Date(year, month - 1, day).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
+  const formattedDate = formatLocalDate(newsletter.issue_date)
 
   return {
     title: `${newsletter.subject_line} - ${newsletterName}`,
@@ -75,6 +60,7 @@ export default async function NewsletterPage({ params }: PageProps) {
     newsletterSectionsConfig = liveSections
   }
 
+  // Settings
   const headerImageUrl = settings.website_header_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'Newsletter'
@@ -82,121 +68,37 @@ export default async function NewsletterPage({ params }: PageProps) {
   const currentYear = new Date().getFullYear()
   const siteUrl = `https://${host}`
   const showToolsLink = settings.tools_directory_enabled !== 'false'
+  const formattedDate = formatLocalDate(newsletter.issue_date)
 
-  // Parse date as local date to avoid timezone offset issues
-  const [year, month, day] = newsletter.issue_date.split('-').map(Number)
-  const formattedDate = new Date(year, month - 1, day).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-
+  // Extract sections data
   const articles = newsletter.articles || []
   const secondaryArticles = newsletter.secondary_articles || []
-  const aiApps = newsletter.sections?.ai_apps || []
-  const poll = newsletter.sections?.poll
-  const roadWork = newsletter.sections?.road_work
-  const welcome = newsletter.sections?.welcome // Legacy - deprecated in favor of text_box_modules
-  const advertorial = newsletter.sections?.advertorial
-  const adModules = newsletter.sections?.ad_modules || []
-  const pollModules = newsletter.sections?.poll_modules || []
-  const aiAppModules = newsletter.sections?.ai_app_modules || []
-  const promptModules = newsletter.sections?.prompt_modules || []
-  const articleModules = newsletter.sections?.article_modules || []
-  const textBoxModules = newsletter.sections?.text_box_modules || []
-  const legacyPrompt = newsletter.sections?.prompt // Legacy single prompt
+  const sections = newsletter.sections || {}
+  const aiApps = sections.ai_apps || []
+  const poll = sections.poll
+  const roadWork = sections.road_work
+  const welcome = sections.welcome
+  const advertorial = sections.advertorial
+  const adModules = sections.ad_modules || []
+  const pollModules = sections.poll_modules || []
+  const aiAppModules = sections.ai_app_modules || []
+  const promptModules = sections.prompt_modules || []
+  const articleModules = sections.article_modules || []
+  const textBoxModules = sections.text_box_modules || []
+  const legacyPrompt = sections.prompt
 
-  // Section IDs for stable matching
-  const SECTION_IDS = {
-    AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-    PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
-    ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
-  }
-
-  // Get display_order for legacy sections from newsletterSectionsConfig
-  const getDisplayOrder = (sectionId: string): number => {
-    const section = newsletterSectionsConfig?.find((s: any) => s.id === sectionId)
-    return section?.display_order ?? 999
-  }
-
-  // Combine all renderable items and sort by display_order
-  type RenderItem =
-    | { type: 'section'; data: any; display_order: number }
-    | { type: 'ad_module'; data: any; display_order: number }
-    | { type: 'poll_module'; data: any; display_order: number }
-    | { type: 'ai_app_module'; data: any; display_order: number }
-    | { type: 'prompt_module'; data: any; display_order: number }
-    | { type: 'article_module'; data: any; display_order: number }
-    | { type: 'text_box_module'; data: any; display_order: number }
-    | { type: 'legacy_ai_apps'; data: any; display_order: number }
-    | { type: 'legacy_prompt'; data: any; display_order: number }
-
-  // Check if any modules have actual content (not just empty module entries)
-  const hasValidAiAppModules = aiAppModules.some((m: any) => m.apps && m.apps.length > 0)
-  const hasValidPromptModules = promptModules.some((m: any) => m.prompt)
-  const hasValidArticleModules = articleModules.some((m: any) => m.articles && m.articles.length > 0)
-
-  const allRenderItems: RenderItem[] = [
-    // Newsletter sections (excluding Advertisement, AI Applications, Prompt Ideas, and article sections which are handled by modules/legacy)
-    // Also exclude primary_articles and secondary_articles if we have valid article modules
-    ...(newsletterSectionsConfig || [])
-      .filter((s: any) => {
-        if (s.id === SECTION_IDS.ADVERTISEMENT || s.id === SECTION_IDS.AI_APPLICATIONS || s.id === SECTION_IDS.PROMPT_IDEAS) {
-          return false
-        }
-        // Exclude legacy article sections if we have article modules with content
-        if (hasValidArticleModules && (s.section_type === 'primary_articles' || s.section_type === 'secondary_articles')) {
-          return false
-        }
-        return true
-      })
-      .map((s: any) => ({ type: 'section' as const, data: s, display_order: s.display_order ?? 999 })),
-    // Ad modules
-    ...adModules.map((m: any) => ({ type: 'ad_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // Poll modules
-    ...pollModules.map((m: any) => ({ type: 'poll_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // AI App modules (new system) - only include if they have apps
-    ...aiAppModules
-      .filter((m: any) => m.apps && m.apps.length > 0)
-      .map((m: any) => ({ type: 'ai_app_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // Legacy AI Apps (only if no valid ai_app_modules with actual apps)
-    ...(aiApps.length > 0 && !hasValidAiAppModules ? [{
-      type: 'legacy_ai_apps' as const,
-      data: aiApps,
-      display_order: getDisplayOrder(SECTION_IDS.AI_APPLICATIONS)
-    }] : []),
-    // Prompt modules (new system) - only include if they have a prompt
-    ...promptModules
-      .filter((m: any) => m.prompt)
-      .map((m: any) => ({ type: 'prompt_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // Legacy Prompt (only if no valid prompt_modules with actual prompts)
-    ...(legacyPrompt && !hasValidPromptModules ? [{
-      type: 'legacy_prompt' as const,
-      data: legacyPrompt,
-      display_order: getDisplayOrder(SECTION_IDS.PROMPT_IDEAS)
-    }] : []),
-    // Article modules (new dynamic article sections)
-    ...articleModules
-      .filter((m: any) => m.articles && m.articles.length > 0)
-      .map((m: any) => ({ type: 'article_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // Text box modules (replaces legacy welcome section)
-    ...textBoxModules
-      .filter((m: any) => m.blocks && m.blocks.length > 0)
-      .map((m: any) => ({ type: 'text_box_module' as const, data: m, display_order: m.display_order ?? 999 }))
-  ].sort((a, b) => a.display_order - b.display_order)
-
-  // CTA rendering helper for archive page
-  const renderCtaLink = (ctaText: string | null | undefined, url: string) => {
-    if (!ctaText || !url || url === '#') return null
-    return (
-      <div className="mt-2">
-        <a href={url} target="_blank" rel="noopener noreferrer sponsored" className="underline font-bold text-slate-900">
-          {ctaText}
-        </a>
-      </div>
-    )
-  }
+  // Build sorted render items
+  const allRenderItems = buildRenderItems(
+    newsletterSectionsConfig,
+    adModules,
+    pollModules,
+    aiAppModules,
+    promptModules,
+    articleModules,
+    textBoxModules,
+    aiApps,
+    legacyPrompt
+  )
 
   // JSON-LD structured data for NewsArticle
   const newsArticleSchema = {
@@ -223,6 +125,9 @@ export default async function NewsletterPage({ params }: PageProps) {
     },
     "description": `${newsletterName} newsletter from ${formattedDate}`
   }
+
+  const hasTextBoxModules = textBoxModules && textBoxModules.length > 0
+  const showAdvertorialFallback = advertorial && !newsletterSectionsConfig?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT)
 
   return (
     <main className="min-h-screen bg-white">
@@ -265,659 +170,18 @@ export default async function NewsletterPage({ params }: PageProps) {
       <section className="py-12">
         <Container>
           <div className="mx-auto max-w-4xl">
-          {/* Render all items in display_order (sections, ad modules, poll modules combined) */}
-          {allRenderItems.map((item) => {
-            // Render newsletter sections
-            if (item.type === 'section') {
-              const section = item.data
+            <RenderItemList
+              items={allRenderItems}
+              articles={articles}
+              secondaryArticles={secondaryArticles}
+              welcome={welcome}
+              poll={poll}
+              roadWork={roadWork}
+              hasTextBoxModules={hasTextBoxModules}
+            />
 
-              // Welcome Section (legacy - only render if no text_box_modules)
-              const hasTextBoxModules = textBoxModules && textBoxModules.length > 0
-              if (section.section_type === 'welcome' && !hasTextBoxModules && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
-                return (
-                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6 ring-1 ring-slate-200">
-                    <div className="p-6 sm:p-8">
-                    {/* Cover Image */}
-                    <div className="mb-4">
-                      <img
-                        src="/images/accounting_website/ai_accounting_daily_cover_image.jpg"
-                        alt="AI Accounting Daily"
-                        className="mx-auto max-w-full rounded-lg"
-                        style={{ maxHeight: '400px' }}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <div className="text-slate-900 leading-relaxed">
-                        Hey, Accounting Pros!
-                      </div>
-                      {welcome.tagline && (
-                        <div className="text-slate-900 leading-relaxed font-bold whitespace-pre-wrap">
-                          {cleanMergeTags(welcome.tagline)}
-                        </div>
-                      )}
-                      {welcome.summary && (
-                        <div className="text-slate-900 leading-relaxed whitespace-pre-wrap">
-                          {cleanMergeTags(welcome.summary)}
-                        </div>
-                      )}
-                    </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              // Primary Articles Section
-              if (section.section_type === 'primary_articles' && articles.length > 0) {
-                return (
-                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                    <div className="p-6 sm:p-8">
-                    <div className="space-y-8">
-                      {articles.map((article: any, index: number) => (
-                        <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                              {index + 1}
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
-                                {article.headline}
-                              </h3>
-
-                              <div className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
-                                {article.content}
-                              </div>
-
-                              {article.rss_post?.source_url && (
-                                <a
-                                  href={article.rss_post.source_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
-                                >
-                                  Read full story
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                  </svg>
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              // Secondary Articles Section
-              if (section.section_type === 'secondary_articles' && secondaryArticles.length > 0) {
-                return (
-                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                    <div className="p-6 sm:p-8">
-                    <div className="space-y-8">
-                      {secondaryArticles.map((article: any, index: number) => (
-                        <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                              {index + 1}
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
-                                {article.headline}
-                              </h3>
-
-                              <div className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
-                                {article.content}
-                              </div>
-
-                              {article.rss_post?.source_url && (
-                                <a
-                                  href={article.rss_post.source_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
-                                >
-                                  Read full story
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                  </svg>
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              // Poll Section (legacy)
-              if (section.section_type === 'poll' && poll) {
-                return (
-                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                    <div className="p-6 sm:p-8">
-                    <div className="text-xl font-bold text-center text-slate-900 mb-4">{poll.question}</div>
-                    <p className="text-slate-900/60 text-sm text-center">
-                      This poll was available in the email newsletter.
-                    </p>
-                    </div>
-                  </div>
-                )
-              }
-
-              // Road Work Section
-              if (section.name === 'Road Work' && roadWork) {
-                return (
-                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                    <div className="p-6 sm:p-8">
-                    <div className="space-y-3">
-                      {roadWork.items && roadWork.items.map((item: any, index: number) => (
-                        <div key={index} className="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
-                          <div className="font-bold text-slate-900">{item.title}</div>
-                          <div className="text-slate-900/80 text-sm mt-1">{item.description}</div>
-                        </div>
-                      ))}
-                    </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              return null
-            }
-
-            // Render Ad Modules
-            if (item.type === 'ad_module') {
-              const adModule = item.data
-              const ad = adModule.ad
-              if (!ad) return null
-
-              const blockOrder: string[] = adModule.block_order || ['title', 'image', 'body', 'button']
-
-              return (
-                <div key={`ad-${adModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{adModule.module_name}</h2>
-                  <div className="p-6 sm:p-8">
-                    <div className="text-center">
-                      {blockOrder.map((blockType: string) => {
-                        switch (blockType) {
-                          case 'title':
-                            return ad.title ? (
-                              <h3 key="title" className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{ad.title}</h3>
-                            ) : null
-                          case 'image':
-                            if (!ad.image_url) return null
-                            return ad.button_url ? (
-                              <div key="image" className="mb-4">
-                                <a href={ad.button_url} target="_blank" rel="noopener noreferrer sponsored">
-                                  <img
-                                    src={ad.image_url}
-                                    alt={ad.title || adModule.module_name}
-                                    className="mx-auto max-w-full rounded-lg hover:opacity-90 transition-opacity"
-                                    style={{ maxHeight: '400px' }}
-                                  />
-                                </a>
-                              </div>
-                            ) : (
-                              <div key="image" className="mb-4">
-                                <img
-                                  src={ad.image_url}
-                                  alt={ad.title || adModule.module_name}
-                                  className="mx-auto max-w-full rounded-lg"
-                                  style={{ maxHeight: '400px' }}
-                                />
-                              </div>
-                            )
-                          case 'body':
-                            return ad.body ? (
-                              <div
-                                key="body"
-                                className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none mb-4 [&_a]:underline"
-                                dangerouslySetInnerHTML={{ __html: ad.body }}
-                              />
-                            ) : null
-                          case 'cta':
-                            return <div key="cta">{renderCtaLink(ad.cta_text, ad.button_url)}</div>
-                          case 'button':
-                            return ad.button_url ? (
-                              <div key="button" className="mt-4">
-                                <a
-                                  href={ad.button_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer sponsored"
-                                  className="inline-block px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                  {ad.button_text || 'Learn More'}
-                                </a>
-                              </div>
-                            ) : null
-                          default:
-                            return null
-                        }
-                      })}
-                      {adModule.advertiser?.company_name && (
-                        <div className="mt-4 text-xs text-slate-500">
-                          Sponsored by {adModule.advertiser.company_name}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Render Poll Modules
-            if (item.type === 'poll_module') {
-              const pollModule = item.data
-              const modulePoll = pollModule.poll
-              if (!modulePoll) return null
-
-              const blockOrder: string[] = pollModule.block_order || ['title', 'question', 'image', 'options']
-
-              return (
-                <div key={`poll-${pollModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-purple-600 text-white">{pollModule.module_name}</h2>
-                  <div className="p-6 sm:p-8">
-                    <div className="text-center">
-                      {blockOrder.map((blockType: string) => {
-                        switch (blockType) {
-                          case 'title':
-                            return modulePoll.title ? (
-                              <h3 key="title" className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{modulePoll.title}</h3>
-                            ) : null
-                          case 'question':
-                            return modulePoll.question ? (
-                              <div key="question" className="text-lg text-slate-700 mb-4">{modulePoll.question}</div>
-                            ) : null
-                          case 'image':
-                            if (!modulePoll.image_url) return null
-                            return (
-                              <div key="image" className="mb-4">
-                                <img
-                                  src={modulePoll.image_url}
-                                  alt={modulePoll.title || pollModule.module_name}
-                                  className="mx-auto max-w-full rounded-lg"
-                                  style={{ maxHeight: '400px' }}
-                                />
-                              </div>
-                            )
-                          case 'options':
-                            return modulePoll.options && modulePoll.options.length > 0 ? (
-                              <div key="options" className="mt-4">
-                                <div className="text-sm text-slate-500 mb-2">Poll options:</div>
-                                <div className="flex flex-wrap justify-center gap-2">
-                                  {modulePoll.options.map((option: string, idx: number) => (
-                                    <span
-                                      key={idx}
-                                      className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
-                                    >
-                                      {option}
-                                    </span>
-                                  ))}
-                                </div>
-                                <div className="mt-4 text-xs text-slate-500">
-                                  This poll was available in the email newsletter.
-                                </div>
-                              </div>
-                            ) : null
-                          default:
-                            return null
-                        }
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Render AI App Modules (matching email template format)
-            if (item.type === 'ai_app_module') {
-              const aiAppModule = item.data
-              const apps = aiAppModule.apps
-              if (!apps || apps.length === 0) return null
-
-              const blockOrder: string[] = aiAppModule.block_order || ['title', 'description']
-
-              // Helper to get emoji based on category (matching email template)
-              const getAppEmoji = (app: any): string => {
-                const category = (app.category || '').toLowerCase()
-                if (category.includes('accounting') || category.includes('bookkeeping')) return '📊'
-                if (category.includes('tax') || category.includes('compliance')) return '📋'
-                if (category.includes('payroll')) return '💰'
-                if (category.includes('finance') || category.includes('analysis')) return '📈'
-                if (category.includes('expense')) return '🧾'
-                if (category.includes('client')) return '🤝'
-                if (category.includes('productivity')) return '⚡'
-                if (category.includes('hr') || category.includes('human')) return '👥'
-                if (category.includes('banking') || category.includes('payment')) return '🏦'
-                return '✨'
-              }
-
-              return (
-                <div key={`ai-app-${aiAppModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{aiAppModule.module_name}</h2>
-                  <div className="px-4 sm:px-6 py-2">
-                    {apps.map((app: any, index: number) => (
-                      <p key={app.id || index} className="py-3 text-base leading-relaxed">
-                        <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
-                        {app.app_url ? (
-                          <a
-                            href={app.app_url}
-                            target="_blank"
-                            rel="noopener noreferrer sponsored"
-                            className="text-red-600 hover:text-red-700 underline font-bold"
-                          >
-                            {app.app_name}
-                          </a>
-                        ) : (
-                          <span className="font-bold text-slate-900">{app.app_name}</span>
-                        )}{' '}
-                        <span className="text-slate-800">{app.description || ''}</span>
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )
-            }
-
-            // Render Prompt Modules
-            if (item.type === 'prompt_module') {
-              const promptModule = item.data
-              const prompt = promptModule.prompt
-              if (!prompt) return null
-
-              const blockOrder: string[] = promptModule.block_order || ['title', 'body']
-
-              return (
-                <div key={`prompt-${promptModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{promptModule.module_name}</h2>
-                  <div className="p-6 sm:p-8">
-                    <div className="text-center">
-                      {blockOrder.map((blockType: string) => {
-                        switch (blockType) {
-                          case 'title':
-                            return prompt.title ? (
-                              <div key="title" className="text-xl font-bold text-slate-900 mb-4">{prompt.title}</div>
-                            ) : null
-                          case 'body':
-                            return prompt.prompt_text ? (
-                              <div key="body" className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800 text-left">
-                                {prompt.prompt_text}
-                              </div>
-                            ) : null
-                          default:
-                            return null
-                        }
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Render Article Modules (new dynamic article sections)
-            if (item.type === 'article_module') {
-              const articleModule = item.data
-              const moduleArticles = articleModule.articles
-              if (!moduleArticles || moduleArticles.length === 0) return null
-
-              const blockOrder: string[] = articleModule.block_order || ['title', 'body']
-
-              return (
-                <div key={`article-module-${articleModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{articleModule.module_name}</h2>
-                  <div className="p-6 sm:p-8">
-                    <div className="space-y-8">
-                      {moduleArticles.map((article: any, index: number) => (
-                        <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                              {index + 1}
-                            </div>
-                            <div className="flex-1">
-                              {blockOrder.map((blockType: string) => {
-                                switch (blockType) {
-                                  case 'source_image':
-                                    return article.rss_post?.image_url ? (
-                                      <div key="source_image" className="mb-4">
-                                        <img
-                                          src={article.rss_post.image_url}
-                                          alt={article.headline}
-                                          className="w-full max-w-md rounded-lg"
-                                        />
-                                      </div>
-                                    ) : null
-                                  case 'ai_image':
-                                    return article.ai_image_url ? (
-                                      <div key="ai_image" className="mb-4">
-                                        <img
-                                          src={article.ai_image_url}
-                                          alt={article.headline}
-                                          className="w-full max-w-md rounded-lg"
-                                        />
-                                      </div>
-                                    ) : null
-                                  case 'title':
-                                    return (
-                                      <h3 key="title" className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
-                                        {article.headline}
-                                      </h3>
-                                    )
-                                  case 'body':
-                                    return (
-                                      <div key="body" className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
-                                        {article.content}
-                                      </div>
-                                    )
-                                  default:
-                                    return null
-                                }
-                              })}
-
-                              {article.rss_post?.source_url && (
-                                <a
-                                  href={article.rss_post.source_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
-                                >
-                                  Read full story
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                  </svg>
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Render Text Box Module (replaces legacy welcome section)
-            if (item.type === 'text_box_module') {
-              const textBoxModule = item.data
-              const blocks = textBoxModule.blocks || []
-              if (blocks.length === 0) return null
-
-              // Text size styling
-              const getTextSizeClass = (size: string) => {
-                switch (size) {
-                  case 'small': return 'text-sm'
-                  case 'large': return 'text-xl font-semibold'
-                  default: return 'text-base'
-                }
-              }
-
-              return (
-                <div key={`text-box-module-${textBoxModule.module_id}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  {textBoxModule.show_name && (
-                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{textBoxModule.module_name}</h2>
-                  )}
-                  <div className="p-6 sm:p-8">
-                    <div className="space-y-4">
-                      {blocks.map((block: any, index: number) => {
-                        // Get content based on block type
-                        let content = ''
-                        if (block.block_type === 'static_text') {
-                          content = block.static_content || ''
-                        } else if (block.block_type === 'ai_prompt') {
-                          content = block.generated_content || ''
-                        }
-
-                        // Clean merge tags for website display
-                        if (content) {
-                          content = cleanMergeTags(content)
-                        }
-
-                        // Render based on block type
-                        if (block.block_type === 'image') {
-                          const imageUrl = block.static_image_url || block.generated_image_url
-                          if (!imageUrl) return null
-                          return (
-                            <div key={block.id || index} className="text-center">
-                              <img
-                                src={imageUrl}
-                                alt=""
-                                className="max-w-full h-auto rounded-lg mx-auto"
-                              />
-                            </div>
-                          )
-                        }
-
-                        // Text content (static or AI-generated)
-                        if (!content) return null
-                        return (
-                          <div
-                            key={block.id || index}
-                            className={`${getTextSizeClass(block.text_size)} text-slate-900/80 leading-relaxed`}
-                            dangerouslySetInnerHTML={{ __html: content }}
-                          />
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Render Legacy AI Apps (in correct position based on newsletter_sections)
-            if (item.type === 'legacy_ai_apps') {
-              const apps = item.data
-              const getAppEmoji = (app: any): string => {
-                const category = (app.category || '').toLowerCase()
-                if (category.includes('accounting') || category.includes('bookkeeping')) return '📊'
-                if (category.includes('tax') || category.includes('compliance')) return '📋'
-                if (category.includes('payroll')) return '💰'
-                if (category.includes('finance') || category.includes('analysis')) return '📈'
-                if (category.includes('expense')) return '🧾'
-                if (category.includes('client')) return '🤝'
-                if (category.includes('productivity')) return '⚡'
-                if (category.includes('hr') || category.includes('human')) return '👥'
-                if (category.includes('banking') || category.includes('payment')) return '🏦'
-                return '✨'
-              }
-              return (
-                <div key="legacy-ai-apps" className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">AI Applications</h2>
-                  <div className="px-4 sm:px-6 py-2">
-                    {apps.map((appItem: any, index: number) => {
-                      const app = appItem.app
-                      if (!app) return null
-                      return (
-                        <p key={app.id || index} className="py-3 text-base leading-relaxed">
-                          <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
-                          {app.app_url ? (
-                            <a href={app.app_url} target="_blank" rel="noopener noreferrer sponsored"
-                              className="text-red-600 hover:text-red-700 underline font-bold">
-                              {app.app_name}
-                            </a>
-                          ) : (
-                            <span className="font-bold text-slate-900">{app.app_name}</span>
-                          )}{' '}
-                          <span className="text-slate-800">{app.description || app.tagline || ''}</span>
-                        </p>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            }
-
-            // Render Legacy Prompt (in correct position based on newsletter_sections)
-            if (item.type === 'legacy_prompt') {
-              const prompt = item.data
-              return (
-                <div key="legacy-prompt" className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">Prompt Ideas</h2>
-                  <div className="p-6 sm:p-8">
-                    {prompt.title && (
-                      <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{prompt.title}</h3>
-                    )}
-                    {prompt.prompt_text && (
-                      <div className="mx-auto bg-black text-white p-4 rounded-lg font-mono leading-relaxed whitespace-pre-wrap prose prose-sm prose-invert text-left" style={{ maxWidth: '710px' }}>
-                        {prompt.prompt_text}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            }
-
-            return null
-          })}
-
-          {/* Legacy fallbacks are now rendered in the main loop with correct display_order */}
-
-          {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
-          {advertorial && !newsletterSectionsConfig?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {
-            return (
-              <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">Presented By</h2>
-                <div className="p-6 sm:p-8">
-                  <div className="text-center">
-                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{advertorial.title}</h3>
-                    {advertorial.image_url && advertorial.button_url ? (
-                      <div className="mb-4">
-                        <a href={advertorial.button_url} target="_blank" rel="noopener noreferrer sponsored">
-                          <img
-                            src={advertorial.image_url}
-                            alt={advertorial.title}
-                            className="mx-auto max-w-full rounded-lg hover:opacity-90 transition-opacity"
-                            style={{ maxHeight: '400px' }}
-                          />
-                        </a>
-                      </div>
-                    ) : advertorial.image_url ? (
-                      <div className="mb-4">
-                        <img
-                          src={advertorial.image_url}
-                          alt={advertorial.title}
-                          className="mx-auto max-w-full rounded-lg"
-                          style={{ maxHeight: '400px' }}
-                        />
-                      </div>
-                    ) : null}
-                    <div
-                      className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-none [&_ol]:pl-0 [&_li]:mb-1 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
-                      dangerouslySetInnerHTML={{ __html: advertorial.body }}
-                    />
-                    {renderCtaLink(advertorial.cta_text, advertorial.button_url)}
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
+            {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
+            {showAdvertorialFallback && <AdvertorialSection advertorial={advertorial} />}
           </div>
         </Container>
       </section>
