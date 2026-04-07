@@ -124,6 +124,7 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
               editingWeight={h.editingWeight}
               editingCriteriaName={h.editingCriteriaName}
               editingMinimum={h.editingMinimum}
+              editingEvalOrder={h.editingEvalOrder}
               prettyPrint={h.prettyPrint}
               testingPrompt={h.testingPrompt}
               testResult={h.testResult}
@@ -132,6 +133,7 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
               setEditingWeight={h.setEditingWeight}
               setEditingCriteriaName={h.setEditingCriteriaName}
               setEditingMinimum={h.setEditingMinimum}
+              setEditingEvalOrder={h.setEditingEvalOrder}
               setPrettyPrint={h.setPrettyPrint}
               onNameEdit={h.handleNameEdit}
               onNameSave={h.handleNameSave}
@@ -140,6 +142,8 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
               onToggleEnforceMinimum={h.handleToggleEnforceMinimum}
               onMinimumEdit={h.handleMinimumEdit}
               onMinimumSave={h.handleMinimumSave}
+              onEvalOrderEdit={h.handleEvalOrderEdit}
+              onEvalOrderSave={h.handleEvalOrderSave}
               onEdit={h.handleEdit}
               onCancel={h.handleCancel}
               onSaveCriterionPrompt={h.handleSaveCriterionPrompt}

@@ -72,7 +72,8 @@ export const POST = withApiHandler(
         ai_prompt: body.ai_prompt ?? null,
         is_active: body.is_active ?? true,
         enforce_minimum: body.enforce_minimum ?? false,
-        minimum_score: body.minimum_score ?? null
+        minimum_score: body.minimum_score ?? null,
+        evaluation_order: body.evaluation_order ?? nextNumber
       })
       .select()
       .single()
@@ -122,6 +123,7 @@ export const PATCH = withApiHandler(
         if (item.is_active !== undefined) updates.is_active = item.is_active
         if (item.enforce_minimum !== undefined) updates.enforce_minimum = item.enforce_minimum
         if (item.minimum_score !== undefined) updates.minimum_score = item.minimum_score
+        if (item.evaluation_order !== undefined) updates.evaluation_order = item.evaluation_order
 
         if (Object.keys(updates).length > 0) {
           updates.updated_at = new Date().toISOString()
@@ -157,6 +159,16 @@ export const PATCH = withApiHandler(
       }
     }
 
+    // Validate evaluation_order if provided
+    if (body.evaluation_order !== undefined && body.evaluation_order !== null) {
+      if (body.evaluation_order < 1 || body.evaluation_order > 5) {
+        return NextResponse.json(
+          { error: 'evaluation_order must be between 1 and 5' },
+          { status: 400 }
+        )
+      }
+    }
+
     const updates: Record<string, any> = {}
     if (body.name !== undefined) updates.name = body.name
     if (body.weight !== undefined) updates.weight = body.weight
@@ -164,6 +176,7 @@ export const PATCH = withApiHandler(
     if (body.is_active !== undefined) updates.is_active = body.is_active
     if (body.enforce_minimum !== undefined) updates.enforce_minimum = body.enforce_minimum
     if (body.minimum_score !== undefined) updates.minimum_score = body.minimum_score
+    if (body.evaluation_order !== undefined) updates.evaluation_order = body.evaluation_order
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(

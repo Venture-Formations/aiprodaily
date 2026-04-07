@@ -11,6 +11,7 @@ export interface CriterionCardProps {
   editingWeight: { key: string; value: string } | null
   editingCriteriaName: { id: string; value: string } | null
   editingMinimum: { id: string; value: string } | null
+  editingEvalOrder: { id: string; value: string } | null
   prettyPrint: boolean
   testingPrompt: boolean
   testResult: any
@@ -21,6 +22,7 @@ export interface CriterionCardProps {
   setEditingWeight: (val: { key: string; value: string } | null) => void
   setEditingCriteriaName: (val: { id: string; value: string } | null) => void
   setEditingMinimum: (val: { id: string; value: string } | null) => void
+  setEditingEvalOrder: (val: { id: string; value: string } | null) => void
   setPrettyPrint: (val: boolean) => void
 
   // Handlers
@@ -31,6 +33,8 @@ export interface CriterionCardProps {
   onToggleEnforceMinimum: (criterion: ArticleModuleCriteria, checked: boolean) => void
   onMinimumEdit: (criterion: ArticleModuleCriteria) => void
   onMinimumSave: (criterion: ArticleModuleCriteria) => void
+  onEvalOrderEdit: (criterion: ArticleModuleCriteria) => void
+  onEvalOrderSave: (criterion: ArticleModuleCriteria) => void
   onEdit: (key: string, value: string) => void
   onCancel: () => void
   onSaveCriterionPrompt: (criterion: ArticleModuleCriteria) => void
@@ -47,6 +51,7 @@ export function CriterionCard({
   editingWeight,
   editingCriteriaName,
   editingMinimum,
+  editingEvalOrder,
   prettyPrint,
   testingPrompt,
   testResult,
@@ -55,6 +60,7 @@ export function CriterionCard({
   setEditingWeight,
   setEditingCriteriaName,
   setEditingMinimum,
+  setEditingEvalOrder,
   setPrettyPrint,
   onNameEdit,
   onNameSave,
@@ -63,6 +69,8 @@ export function CriterionCard({
   onToggleEnforceMinimum,
   onMinimumEdit,
   onMinimumSave,
+  onEvalOrderEdit,
+  onEvalOrderSave,
   onEdit,
   onCancel,
   onSaveCriterionPrompt,
@@ -76,6 +84,7 @@ export function CriterionCard({
   const isSaving = saving === criterion.id
   const isEditingWeight = editingWeight?.key === criterion.id
   const isEditingName = editingCriteriaName?.id === criterion.id
+  const isEditingEvalOrder = editingEvalOrder?.id === criterion.id
 
   return (
     <div className="p-4">
@@ -126,6 +135,51 @@ export function CriterionCard({
                 >
                   Edit Name
                 </button>
+              </>
+            )}
+          </div>
+
+          {/* Evaluation Order */}
+          <div className="mt-2 flex items-center space-x-3">
+            <label className="text-sm font-medium text-gray-700">Eval Order:</label>
+            {isEditingEvalOrder ? (
+              <>
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  step="1"
+                  value={editingEvalOrder?.value || '1'}
+                  onChange={(e) => setEditingEvalOrder({ id: criterion.id, value: e.target.value })}
+                  className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                />
+                <button
+                  onClick={() => onEvalOrderSave(criterion)}
+                  disabled={saving === `eval_order_${criterion.id}`}
+                  className="text-xs px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {saving === `eval_order_${criterion.id}` ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setEditingEvalOrder(null)}
+                  disabled={saving === `eval_order_${criterion.id}`}
+                  className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-sm font-semibold text-blue-600">{criterion.evaluation_order || criterion.criteria_number}</span>
+                <button
+                  onClick={() => onEvalOrderEdit(criterion)}
+                  className="text-xs text-emerald-600 hover:text-emerald-800"
+                >
+                  Edit
+                </button>
+                <span className="text-xs text-gray-500">
+                  (Lower number runs first)
+                </span>
               </>
             )}
           </div>

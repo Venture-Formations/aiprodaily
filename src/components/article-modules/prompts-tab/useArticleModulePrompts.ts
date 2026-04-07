@@ -37,6 +37,7 @@ export function useArticleModulePrompts({
   const [editingWeight, setEditingWeight] = useState<{key: string, value: string} | null>(null)
   const [editingCriteriaName, setEditingCriteriaName] = useState<{id: string, value: string} | null>(null)
   const [editingMinimum, setEditingMinimum] = useState<{id: string, value: string} | null>(null)
+  const [editingEvalOrder, setEditingEvalOrder] = useState<{id: string, value: string} | null>(null)
   const [prettyPrint, setPrettyPrint] = useState(true)
 
   // RSS Posts for testing
@@ -284,6 +285,40 @@ export function useArticleModulePrompts({
       await fetchData()
       setEditingMinimum(null)
       setMessage('Minimum score updated successfully')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Handle evaluation order edit
+  const handleEvalOrderEdit = (criterion: ArticleModuleCriteria) => {
+    setEditingEvalOrder({ id: criterion.id, value: (criterion.evaluation_order || criterion.criteria_number).toString() })
+  }
+
+  const handleEvalOrderSave = async (criterion: ArticleModuleCriteria) => {
+    if (!editingEvalOrder) return
+    const value = parseInt(editingEvalOrder.value)
+    if (isNaN(value) || value < 1 || value > 5) {
+      setError('Evaluation order must be between 1 and 5')
+      return
+    }
+
+    setSaving(`eval_order_${criterion.id}`)
+    try {
+      const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          criteria_id: criterion.id,
+          evaluation_order: value
+        })
+      })
+      if (!res.ok) throw new Error('Failed to update evaluation order')
+      await fetchData()
+      setEditingEvalOrder(null)
+      setMessage('Evaluation order updated successfully')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -582,6 +617,8 @@ export function useArticleModulePrompts({
     setEditingCriteriaName,
     editingMinimum,
     setEditingMinimum,
+    editingEvalOrder,
+    setEditingEvalOrder,
     prettyPrint,
     setPrettyPrint,
 
@@ -623,6 +660,8 @@ export function useArticleModulePrompts({
     handleToggleEnforceMinimum,
     handleMinimumEdit,
     handleMinimumSave,
+    handleEvalOrderEdit,
+    handleEvalOrderSave,
 
     // Prompt handlers
     handleEdit,
