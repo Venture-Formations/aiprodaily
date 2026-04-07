@@ -1,35 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-
-interface TestResult {
-  timestamp: Date
-  provider: 'openai' | 'claude'
-  model: string
-  promptType: string
-  response: string | { raw?: string; [key: string]: any }
-  tokensUsed?: number
-  duration: number
-  apiRequest?: any
-  isMultiple?: boolean
-  responses?: string[]
-  fullApiResponse?: any
-  fullApiResponses?: any[]
-  sourcePosts?: Array<{
-    id: string
-    title: string
-    description: string | null
-    content: string | null
-    source_url: string | null
-    publication_date: string | null
-  }>
-  sourceIssues?: Array<{
-    id: string
-    date: string
-    sent_at: string
-  }>
-  isCustomFreeform?: boolean
-}
+import type { TestResult } from '../types'
 
 interface TestResultsModalProps {
   currentResponse: TestResult

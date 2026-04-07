@@ -1,0 +1,49 @@
+'use client'
+
+interface GeneralTabProps {
+  showName: boolean
+  saving: boolean
+  onShowNameToggle: () => void
+}
+
+export function GeneralTab({ showName, saving, onShowNameToggle }: GeneralTabProps) {
+  return (
+    <div className="space-y-6">
+      {/* Show Section Name Toggle */}
+      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+        <div>
+          <div className="font-medium text-gray-900">Show Section Name</div>
+          <div className="text-sm text-gray-500">
+            Display the section header in the newsletter.
+          </div>
+        </div>
+        <button
+          onClick={onShowNameToggle}
+          disabled={saving}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            showName ? 'bg-cyan-600' : 'bg-gray-200'
+          } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              showName ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* Module Info */}
+      <div className="p-4 bg-gray-50 rounded-lg">
+        <div className="text-sm text-gray-500">
+          <p className="mb-2">Feedback modules support multiple block types:</p>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong>Title</strong> - Section heading text</li>
+            <li><strong>Static Text</strong> - Body or sign-off text with formatting</li>
+            <li><strong>Vote Options</strong> - Star-based rating options</li>
+            <li><strong>Team Photos</strong> - Circular photos of your team</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  )
+}
