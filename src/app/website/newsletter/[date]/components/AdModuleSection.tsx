@@ -8,6 +8,7 @@ interface AdModuleSectionProps {
       body?: string
       button_url?: string
       button_text?: string
+      cta_text?: string
     } | null
     advertiser?: {
       company_name?: string
@@ -63,6 +64,15 @@ export default function AdModuleSection({ adModule }: AdModuleSectionProps) {
                     dangerouslySetInnerHTML={{ __html: ad.body }}
                   />
                 ) : null
+              case 'cta':
+                if (!ad.cta_text || !ad.button_url || ad.button_url === '#') return null
+                return (
+                  <div key="cta" className="mt-2">
+                    <a href={ad.button_url} target="_blank" rel="noopener noreferrer sponsored" className="underline font-bold text-slate-900">
+                      {ad.cta_text}
+                    </a>
+                  </div>
+                )
               case 'button':
                 return ad.button_url ? (
                   <div key="button" className="mt-4">
