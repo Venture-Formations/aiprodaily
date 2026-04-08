@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -68,18 +68,29 @@ function SortableOrderItem({ criterion, position }: { criterion: ArticleModuleCr
 }
 
 export function EvaluationOrderList({ criteria, saving, onReorder }: EvaluationOrderListProps) {
-  const sorted = [...criteria]
-    .filter(c => c.is_active)
-    .sort((a, b) => (a.evaluation_order || a.criteria_number) - (b.evaluation_order || b.criteria_number))
+  const sorted = useMemo(() =>
+    [...criteria]
+      .filter(c => c.is_active)
+      .sort((a, b) => (a.evaluation_order || a.criteria_number) - (b.evaluation_order || b.criteria_number)),
+    [criteria]
+  )
 
   const [items, setItems] = useState(sorted)
+  const pendingSave = useRef(false)
 
-  // Sync if criteria change externally
-  const sortedIds = sorted.map(c => c.id).join(',')
-  const itemIds = items.map(c => c.id).join(',')
-  if (sortedIds !== itemIds && saving !== 'eval_order') {
-    setItems(sorted)
-  }
+  // Sync from props only when not in the middle of a save
+  useEffect(() => {
+    if (!pendingSave.current) {
+      setItems(sorted)
+    }
+  }, [sorted])
+
+  // Clear pending flag when save completes
+  useEffect(() => {
+    if (saving !== 'eval_order' && pendingSave.current) {
+      pendingSave.current = false
+    }
+  }, [saving])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -93,6 +104,7 @@ export function EvaluationOrderList({ criteria, saving, onReorder }: EvaluationO
     const oldIndex = items.findIndex(c => c.id === active.id)
     const newIndex = items.findIndex(c => c.id === over.id)
     const reordered = arrayMove(items, oldIndex, newIndex)
+    pendingSave.current = true
     setItems(reordered)
     onReorder(reordered.map(c => c.id))
   }
