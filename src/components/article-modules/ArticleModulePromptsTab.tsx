@@ -3,6 +3,7 @@
 import type { ArticleModuleCriteria, ArticleModulePrompt } from '@/types/database'
 import { useArticleModulePrompts } from './prompts-tab/useArticleModulePrompts'
 import { CriterionCard } from './prompts-tab/CriterionCard'
+import { EvaluationOrderList } from './prompts-tab/EvaluationOrderList'
 import { ArticlePromptCard } from './ArticlePromptCard'
 import { GlobalPromptCard } from './GlobalPromptCard'
 import { AIImagePromptModal } from './AIImagePromptModal'
@@ -113,22 +114,11 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
           </div>
         </div>
 
-        {(() => {
-          const activeCriteria = h.criteria.filter(c => c.is_active)
-          const evalOrders = activeCriteria.map(c => c.evaluation_order || c.criteria_number)
-          const hasDuplicates = new Set(evalOrders).size < evalOrders.length
-          if (hasDuplicates) {
-            return (
-              <div className="mx-4 mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700 flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Two or more criteria share the same evaluation order. Ties are broken by criteria number, which may not be the order you intend.
-              </div>
-            )
-          }
-          return null
-        })()}
+        <EvaluationOrderList
+          criteria={h.criteria}
+          saving={h.saving}
+          onReorder={h.handleReorderEvalOrder}
+        />
 
         <div className="divide-y divide-gray-200">
           {h.criteria.filter(c => c.is_active).map((criterion) => (
@@ -141,7 +131,6 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
               editingWeight={h.editingWeight}
               editingCriteriaName={h.editingCriteriaName}
               editingMinimum={h.editingMinimum}
-              editingEvalOrder={h.editingEvalOrder}
               prettyPrint={h.prettyPrint}
               testingPrompt={h.testingPrompt}
               testResult={h.testResult}
@@ -150,7 +139,6 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
               setEditingWeight={h.setEditingWeight}
               setEditingCriteriaName={h.setEditingCriteriaName}
               setEditingMinimum={h.setEditingMinimum}
-              setEditingEvalOrder={h.setEditingEvalOrder}
               setPrettyPrint={h.setPrettyPrint}
               onNameEdit={h.handleNameEdit}
               onNameSave={h.handleNameSave}
@@ -159,8 +147,6 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
               onToggleEnforceMinimum={h.handleToggleEnforceMinimum}
               onMinimumEdit={h.handleMinimumEdit}
               onMinimumSave={h.handleMinimumSave}
-              onEvalOrderEdit={h.handleEvalOrderEdit}
-              onEvalOrderSave={h.handleEvalOrderSave}
               onEdit={h.handleEdit}
               onCancel={h.handleCancel}
               onSaveCriterionPrompt={h.handleSaveCriterionPrompt}
