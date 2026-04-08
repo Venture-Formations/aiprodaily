@@ -11,6 +11,10 @@ export interface ArticleExtractionResult {
   status: ExtractionStatus  // Explicit extraction status for tracking
 }
 
+// Firecrawl configuration
+const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY
+const FIRECRAWL_API_URL = 'https://api.firecrawl.dev/v1/scrape'
+
 // Paywall patterns - ONLY used when content extraction produces short/truncated content
 // These are specific phrases that indicate the article itself is locked, not just site-wide CTAs
 const PAYWALL_PATTERNS = [
@@ -210,8 +214,7 @@ export class ArticleExtractor {
       }
     }
 
-    // Always try Jina fallback - paywall/login patterns can be false positives from marketing CTAs
-    // Jina will confirm if content is actually restricted
+    // Fallback 2: Try Jina AI (browser rendering, handles JS-heavy pages)
     if (detectedStatus === 'blocked' || detectedStatus === 'login_required' || detectedStatus === 'paywall') {
       console.log(`[Extract] Trying Jina fallback for ${detectedStatus} site: ${new URL(url).hostname}`)
     }
@@ -230,6 +233,25 @@ export class ArticleExtractor {
       lastError = `Readability failed, Jina AI error: ${jinaError}`
     }
 
+    // Fallback 3: Try Firecrawl (headless Chrome, strongest anti-bot)
+    if (FIRECRAWL_API_KEY) {
+      try {
+        console.log(`[Extract] Trying Firecrawl fallback for: ${new URL(url).hostname}`)
+        const firecrawlResult = await this.extractWithFirecrawl(url)
+
+        if (firecrawlResult.success) {
+          return firecrawlResult
+        }
+
+        lastError = `Readability + Jina + Firecrawl all failed: ${firecrawlResult.error}`
+        detectedStatus = firecrawlResult.status
+      } catch (error) {
+        const fcError = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`[Extract] Firecrawl error:`, fcError)
+        lastError = `All extractors failed. Firecrawl: ${fcError}`
+      }
+    }
+
     return {
       success: false,
       status: detectedStatus,
@@ -245,11 +267,73 @@ export class ArticleExtractor {
   }
 
   /**
+   * Try to decode a Google News URL offline using base64 + protobuf parsing.
+   * Works for old-format URLs that start with CBMi (URL is embedded in the payload).
+   * Returns null for new-format AU_yqL URLs (require network round-trip).
+   */
+  private tryOfflineDecode(sourceUrl: string): string | null {
+    try {
+      const url = new URL(sourceUrl)
+      const pathSegments = url.pathname.split('/')
+      const base64Str = pathSegments[pathSegments.length - 1]
+
+      if (!base64Str || !base64Str.startsWith('CBMi')) {
+        return null // New format or unrecognized — can't decode offline
+      }
+
+      // URL-safe base64 → standard base64
+      const standardBase64 = base64Str.replace(/-/g, '+').replace(/_/g, '/')
+      const decoded = Buffer.from(standardBase64, 'base64')
+
+      // Strip protobuf prefix [0x08, 0x13, 0x22] if present
+      let offset = 0
+      if (decoded[0] === 0x08 && decoded[1] === 0x13 && decoded[2] === 0x22) {
+        offset = 3
+      }
+
+      // Read length-prefixed URL string
+      const len = decoded[offset]
+      if (len === undefined) return null
+
+      let urlStart: number
+      let urlLen: number
+      if (len >= 0x80) {
+        // Multi-byte varint length (for URLs > 127 chars)
+        const secondByte = decoded[offset + 1]
+        if (secondByte === undefined) return null
+        urlLen = (len & 0x7f) | (secondByte << 7)
+        urlStart = offset + 2
+      } else {
+        urlLen = len
+        urlStart = offset + 1
+      }
+
+      const extracted = decoded.subarray(urlStart, urlStart + urlLen).toString('utf-8')
+
+      // Validate it looks like a URL
+      if (extracted.startsWith('http://') || extracted.startsWith('https://')) {
+        return extracted
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  /**
    * Resolve a Google News redirect URL to the actual article URL.
-   * Uses google-news-decoder which calls Google's internal endpoint
-   * to decode the protobuf-encoded article ID.
+   * Fast path: offline protobuf decode for CBMi URLs (no network call).
+   * Slow path: google-news-decoder for AU_yqL URLs (2 HTTP calls to Google).
    */
   private async resolveGoogleNewsUrl(url: string): Promise<string | null> {
+    // Fast path: try offline decode first (zero latency, no rate limits)
+    const offlineResult = this.tryOfflineDecode(url)
+    if (offlineResult) {
+      console.log(`[Extract] Offline decoded Google News URL`)
+      return offlineResult
+    }
+
+    // Slow path: use google-news-decoder (network call to Google's batchexecute)
     try {
       // @ts-ignore — no type declarations for google-news-decoder
       const GoogleNewsDecoder = (await import('google-news-decoder')).default
@@ -422,12 +506,16 @@ export class ArticleExtractor {
       const headers: Record<string, string> = {
         'Accept': 'text/plain',
         'User-Agent': this.USER_AGENT,
+        'X-No-Cache': 'true',       // Force fresh fetch, avoid stale Jina cache
+        'X-Timeout': '30',          // Wait longer for JS-heavy pages
       }
 
       // Jina requires an API key for server-side requests
       const jinaApiKey = process.env.JINA_API_KEY
       if (jinaApiKey) {
         headers['Authorization'] = `Bearer ${jinaApiKey}`
+      } else {
+        console.warn(`[Extract] JINA_API_KEY not set — Jina may rate-limit or reject requests`)
       }
 
       const response = await fetch(jinaUrl, {
@@ -528,14 +616,105 @@ export class ArticleExtractor {
   }
 
   /**
-   * Extract articles in parallel batches
+   * Extract article using Firecrawl API (third fallback method)
+   * Uses headless Chrome rendering, handles anti-bot and JS-rendered pages.
+   * Only called when both Readability and Jina fail.
+   */
+  private async extractWithFirecrawl(url: string): Promise<ArticleExtractionResult> {
+    if (!FIRECRAWL_API_KEY) {
+      return { success: false, status: 'failed', error: 'FIRECRAWL_API_KEY not configured' }
+    }
+
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
+
+      const response = await fetch(FIRECRAWL_API_URL, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          url,
+          formats: ['markdown'],
+          onlyMainContent: true,
+          waitFor: 3000, // Wait 3s for JS rendering
+        }),
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        return {
+          success: false,
+          status: 'failed',
+          error: `Firecrawl HTTP ${response.status}`
+        }
+      }
+
+      const data = await response.json() as {
+        success?: boolean
+        data?: { markdown?: string; metadata?: { title?: string } }
+      }
+
+      if (!data.success || !data.data?.markdown) {
+        return {
+          success: false,
+          status: 'failed',
+          error: 'Firecrawl returned no content'
+        }
+      }
+
+      const markdown = data.data.markdown
+
+      // Strip markdown formatting for plain text
+      const fullText = markdown
+        .replace(/^#+\s+/gm, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+        .trim()
+
+      if (!fullText || fullText.length < 200) {
+        return {
+          success: false,
+          status: 'failed',
+          error: `Firecrawl text too short (${fullText.length} chars)`
+        }
+      }
+
+      const title = data.data.metadata?.title || undefined
+
+      return {
+        success: true,
+        status: 'success',
+        fullText,
+        title,
+        excerpt: fullText.substring(0, 200) + '...'
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          return { success: false, status: 'timeout', error: 'Firecrawl request timeout' }
+        }
+        return { success: false, status: 'failed', error: `Firecrawl error: ${error.message}` }
+      }
+      return { success: false, status: 'failed', error: 'Firecrawl unknown error' }
+    }
+  }
+
+  /**
+   * Extract articles in controlled batches with staggered concurrency.
+   * Limits parallel requests to avoid rate-limiting from Jina/Firecrawl/Google.
    * @param urls - Array of URLs to extract
-   * @param batchSize - Number of concurrent extractions (default: 5)
+   * @param batchSize - Number of concurrent extractions (default: 3, reduced from 5)
    * @returns Map of URL to extraction result
    */
   async extractBatch(
     urls: string[],
-    batchSize: number = 5
+    batchSize: number = 3
   ): Promise<Map<string, ArticleExtractionResult>> {
     const results = new Map<string, ArticleExtractionResult>()
 
@@ -544,7 +723,12 @@ export class ArticleExtractor {
       const batchNum = Math.floor(i / batchSize) + 1
       const totalBatches = Math.ceil(urls.length / batchSize)
 
-      const batchPromises = batch.map(async (url) => {
+      // Stagger starts within each batch to avoid simultaneous API hits
+      const batchPromises = batch.map(async (url, index) => {
+        // Stagger each request within the batch by 500ms
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, index * 500))
+        }
         const result = await this.extractArticle(url)
         results.set(url, result)
         return { url, result }
@@ -561,9 +745,9 @@ export class ArticleExtractor {
 
       console.log(`[Extract] Batch ${batchNum}/${totalBatches}: ${batchSuccess} success, ${batchPaywall} paywall, ${batchLogin} login, ${batchBlocked} blocked, ${batchFailed} failed`)
 
-      // Small delay between batches to be polite to servers
+      // Longer delay between batches to avoid rate limiting (2s instead of 1s)
       if (i + batchSize < urls.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 2000))
       }
     }
 
