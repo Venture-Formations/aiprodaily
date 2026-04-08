@@ -42,6 +42,7 @@ export function getColumnWidthClass(width?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'): s
 }
 
 export function getColumnValue(post: ScoredPost, key: string): string {
+  if (key === 'companyName') return post.companyName || '-'
   const value = post[key as keyof ScoredPost]
   if (value === null || value === undefined) return ''
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'

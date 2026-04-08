@@ -19,6 +19,7 @@ interface FilterBarProps {
   showColumnSelector: boolean
   filteredPosts: { length: number }
   posts: { length: number }
+  csvExporting?: boolean
   currentPage: number
   totalPages: number
   totalPosts: number
@@ -56,6 +57,7 @@ export default function FilterBar({
   showColumnSelector,
   filteredPosts,
   posts,
+  csvExporting,
   currentPage,
   totalPages,
   totalPosts,
@@ -208,7 +210,7 @@ export default function FilterBar({
 
       <div className="mt-4 flex justify-between items-center">
         <div className="text-sm text-gray-600">
-          Showing {filteredPosts.length} of {posts.length} scored posts (page {currentPage} of {totalPages}, {totalPosts} total)
+          Showing {filteredPosts.length} of {totalPosts} scored posts (page {currentPage} of {totalPages})
           {sortColumn && (
             <span className="ml-2 text-gray-500">
               | Sorted by {columns.find(c => c.key === sortColumn)?.label} ({sortDirection === 'desc' ? 'Z->A / High->Low' : 'A->Z / Low->High'})
@@ -238,9 +240,10 @@ export default function FilterBar({
           </button>
           <button
             onClick={onExportCSV}
-            className="text-sm bg-brand-primary hover:bg-blue-700 text-white px-3 py-1 rounded"
+            disabled={csvExporting}
+            className="text-sm bg-brand-primary hover:bg-blue-700 text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Download CSV
+            {csvExporting ? 'Exporting...' : 'Download CSV'}
           </button>
         </div>
       </div>

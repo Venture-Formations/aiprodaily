@@ -38,6 +38,7 @@ export interface ScoredPost {
   criteria5Enabled: boolean
   totalScore: number | null
   finalPosition: number | null
+  companyName: string
 }
 
 export interface Column {

@@ -12,6 +12,7 @@ export const DEFAULT_COLUMNS: Column[] = [
   { key: 'originalFullText', label: 'Original Full Text', enabled: false, exportable: true, width: 'xl' },
   { key: 'publicationDate', label: 'Pub Date', enabled: false, exportable: true, width: 'sm' },
   { key: 'author', label: 'Author', enabled: false, exportable: true, width: 'md' },
+  { key: 'companyName', label: 'Company', enabled: false, exportable: true, width: 'md' },
   { key: 'sourceName', label: 'Source', enabled: true, exportable: true, width: 'md' },
   { key: 'sourceUrl', label: 'Source URL', enabled: false, exportable: true, width: 'xs' },
   { key: 'imageUrl', label: 'Image', enabled: false, exportable: true, width: 'xs' },

@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Column, DatePreset, ScoredPost } from './types'
 import { DEFAULT_COLUMNS } from './constants'
 import { DATE_REGEX } from './constants'
@@ -6,11 +8,11 @@ import { getDateRange, getColumnValue } from './utils'
 
 export function useArticlesTab(slug: string) {
   const [posts, setPosts] = useState<ScoredPost[]>([])
-  const [filteredPosts, setFilteredPosts] = useState<ScoredPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
+  const [csvExporting, setCsvExporting] = useState(false)
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -31,6 +33,7 @@ export function useArticlesTab(slug: string) {
   const [feedTypeFilter, setFeedTypeFilter] = useState<string>('all')
   const [positionFilter, setPositionFilter] = useState<'all' | 'all_used' | number>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [minScore, setMinScore] = useState<number | ''>('')
   const [maxScore, setMaxScore] = useState<number | ''>('')
 
@@ -41,39 +44,63 @@ export function useArticlesTab(slug: string) {
   // Column visibility
   const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS)
 
-  // Derived values
-  const uniquePositions = Array.from(
-    new Set(posts.filter(a => a.finalPosition !== null).map(a => a.finalPosition as number))
-  ).sort((a, b) => a - b)
-
-  const uniqueFeedTypes = Array.from(new Set(posts.map(a => a.feedType))).filter(Boolean).sort()
+  // Server-provided filter options (from all data, not just current page)
+  const [uniqueFeedTypes, setUniqueFeedTypes] = useState<string[]>([])
+  const [uniquePositions, setUniquePositions] = useState<number[]>([])
 
   const enabledColumns = columns.filter(col => col.enabled)
 
-  // Effects
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Fetch when any filter/sort/page changes
   useEffect(() => {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
     fetchPosts(controller.signal)
     return () => controller.abort()
-  }, [slug, dateFrom, dateTo, currentPage])
+  }, [slug, dateFrom, dateTo, currentPage, feedTypeFilter, positionFilter, debouncedSearch, minScore, maxScore, sortColumn, sortDirection])
+
+  // Reset to page 1 when filters change
+  const resetPage = useCallback(() => {
+    setCurrentPage(1)
+  }, [])
 
   useEffect(() => {
-    applyFiltersAndSort()
-  }, [posts, feedTypeFilter, positionFilter, searchTerm, minScore, maxScore, sortColumn, sortDirection])
+    resetPage()
+  }, [feedTypeFilter, positionFilter, debouncedSearch, minScore, maxScore])
+
+  // Build query params shared between fetch and export
+  const buildParams = useCallback((overrides?: { exportAll?: boolean }) => {
+    const params = new URLSearchParams({
+      publication_id: slug,
+      page: String(overrides?.exportAll ? 1 : currentPage),
+      page_size: String(pageSize),
+    })
+    if (dateFrom) params.set('start_date', dateFrom)
+    if (dateTo) params.set('end_date', dateTo)
+    if (feedTypeFilter !== 'all') params.set('feed_type', feedTypeFilter)
+    if (positionFilter !== 'all') params.set('position', String(positionFilter))
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (minScore !== '') params.set('min_score', String(minScore))
+    if (maxScore !== '') params.set('max_score', String(maxScore))
+    if (sortColumn) params.set('sort_column', sortColumn)
+    params.set('sort_direction', sortDirection)
+    if (overrides?.exportAll) params.set('export_all', 'true')
+    return params
+  }, [slug, currentPage, dateFrom, dateTo, feedTypeFilter, positionFilter, debouncedSearch, minScore, maxScore, sortColumn, sortDirection])
 
   // Data fetching
   const fetchPosts = async (signal?: AbortSignal) => {
     try {
       setLoading(true)
-      const params = new URLSearchParams({
-        publication_id: slug,
-        page: String(currentPage),
-        page_size: String(pageSize),
-      })
-      if (dateFrom) params.set('start_date', dateFrom)
-      if (dateTo) params.set('end_date', dateTo)
+      const params = buildParams()
       const response = await fetch(`/api/databases/articles?${params}`, { signal })
       if (!response.ok) {
         throw new Error('Failed to fetch scored posts')
@@ -82,74 +109,14 @@ export function useArticlesTab(slug: string) {
       setPosts(result.data || [])
       setTotalPosts(result.total || 0)
       setTotalPages(result.totalPages || 0)
+      if (result.allFeedTypes) setUniqueFeedTypes(result.allFeedTypes)
+      if (result.allPositions) setUniquePositions(result.allPositions)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)
     }
-  }
-
-  // Filtering and sorting
-  const applyFiltersAndSort = () => {
-    let filtered = [...posts]
-
-    if (feedTypeFilter !== 'all') {
-      filtered = filtered.filter(a => a.feedType === feedTypeFilter)
-    }
-
-    if (positionFilter === 'all_used') {
-      filtered = filtered.filter(a => a.finalPosition !== null)
-    } else if (typeof positionFilter === 'number') {
-      filtered = filtered.filter(a => a.finalPosition === positionFilter)
-    }
-
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      filtered = filtered.filter(a =>
-        a.originalTitle.toLowerCase().includes(term) ||
-        a.author.toLowerCase().includes(term) ||
-        a.feedName.toLowerCase().includes(term) ||
-        a.sourceName.toLowerCase().includes(term)
-      )
-    }
-
-    if (minScore !== '') {
-      filtered = filtered.filter(a => (a.totalScore || 0) >= minScore)
-    }
-    if (maxScore !== '') {
-      filtered = filtered.filter(a => (a.totalScore || 0) <= maxScore)
-    }
-
-    if (sortColumn) {
-      filtered.sort((a, b) => {
-        const aVal = a[sortColumn as keyof ScoredPost]
-        const bVal = b[sortColumn as keyof ScoredPost]
-
-        if (aVal === null || aVal === undefined || aVal === '') {
-          return sortDirection === 'asc' ? 1 : -1
-        }
-        if (bVal === null || bVal === undefined || bVal === '') {
-          return sortDirection === 'asc' ? -1 : 1
-        }
-
-        if (sortColumn === 'ingestDate' || sortColumn === 'publicationDate') {
-          const dateA = new Date(aVal as string).getTime()
-          const dateB = new Date(bVal as string).getTime()
-          return sortDirection === 'asc' ? dateA - dateB : dateB - dateA
-        }
-
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
-        }
-
-        const strA = String(aVal).toLowerCase()
-        const strB = String(bVal).toLowerCase()
-        return sortDirection === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA)
-      })
-    }
-
-    setFilteredPosts(filtered)
   }
 
   // Handlers
@@ -207,35 +174,49 @@ export function useArticlesTab(slug: string) {
     setSortDirection('desc')
   }
 
-  const exportToCSV = () => {
-    const exportColumns = columns.filter(col => col.enabled && col.exportable)
-    const headers = exportColumns.map(col => col.label).join(',')
-    const rows = filteredPosts.map(post => {
-      return exportColumns.map(col => {
-        const value = getColumnValue(post, col.key)
-        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-          return `"${value.replace(/"/g, '""')}"`
-        }
-        return value
-      }).join(',')
-    })
+  const exportToCSV = async () => {
+    try {
+      setCsvExporting(true)
+      // Fetch ALL filtered data (no pagination) for export
+      const params = buildParams({ exportAll: true })
+      const response = await fetch(`/api/databases/articles?${params}`)
+      if (!response.ok) throw new Error('Failed to fetch export data')
+      const result = await response.json()
+      const allData: ScoredPost[] = result.data || []
 
-    const csv = [headers, ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `scored-posts-export-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+      const exportColumns = columns.filter(col => col.enabled && col.exportable)
+      const headers = exportColumns.map(col => col.label).join(',')
+      const rows = allData.map(post => {
+        return exportColumns.map(col => {
+          const value = getColumnValue(post, col.key)
+          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+            return `"${value.replace(/"/g, '""')}"`
+          }
+          return value
+        }).join(',')
+      })
+
+      const csv = [headers, ...rows].join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `scored-posts-export-${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err) {
+      console.error('CSV export failed:', err)
+    } finally {
+      setCsvExporting(false)
+    }
   }
 
   return {
     // State
     posts,
-    filteredPosts,
+    filteredPosts: posts, // posts are already filtered server-side
     loading,
     error,
     expandedRow,
@@ -257,6 +238,7 @@ export function useArticlesTab(slug: string) {
     enabledColumns,
     uniquePositions,
     uniqueFeedTypes,
+    csvExporting,
 
     // Setters
     setShowColumnSelector,

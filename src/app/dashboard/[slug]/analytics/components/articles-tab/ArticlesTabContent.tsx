@@ -32,6 +32,7 @@ export default function ArticlesTabContent({ slug }: ArticlesTabProps) {
     posts,
     uniquePositions,
     uniqueFeedTypes,
+    csvExporting,
 
     setShowColumnSelector,
     setCurrentPage,
@@ -103,6 +104,7 @@ export default function ArticlesTabContent({ slug }: ArticlesTabProps) {
         showColumnSelector={showColumnSelector}
         filteredPosts={filteredPosts}
         posts={posts}
+        csvExporting={csvExporting}
         currentPage={currentPage}
         totalPages={totalPages}
         totalPosts={totalPosts}
