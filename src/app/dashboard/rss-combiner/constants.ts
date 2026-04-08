@@ -72,4 +72,5 @@ export const DEFAULT_EDIT_SETTINGS = {
   secondary_sale_url_template: '',
   secondary_purchase_url_template: '',
   min_posts_per_trade: 20,
+  secondary_templates_enabled: true,
 }

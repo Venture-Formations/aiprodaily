@@ -111,6 +111,7 @@ export function useRSSCombinerData() {
           secondary_sale_url_template: s.secondary_sale_url_template || '',
           secondary_purchase_url_template: s.secondary_purchase_url_template || '',
           min_posts_per_trade: s.min_posts_per_trade ?? 20,
+          secondary_templates_enabled: s.secondary_templates_enabled ?? true,
         })
       }
     }

@@ -571,7 +571,7 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 1. Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_trades, sale_url_template, purchase_url_template, secondary_sale_url_template, secondary_purchase_url_template, min_posts_per_trade, max_age_days, trade_freshness_days, max_trades_per_member')
+    .select('max_trades, sale_url_template, purchase_url_template, secondary_sale_url_template, secondary_purchase_url_template, min_posts_per_trade, secondary_templates_enabled, max_age_days, trade_freshness_days, max_trades_per_member')
     .limit(1)
     .single()
 
@@ -581,6 +581,7 @@ export async function runIngestion(): Promise<IngestionResult> {
   const secondarySaleTemplate = settings?.secondary_sale_url_template || ''
   const secondaryPurchaseTemplate = settings?.secondary_purchase_url_template || ''
   const minPostsPerTrade = settings?.min_posts_per_trade ?? 20
+  const secondaryTemplatesEnabled = settings?.secondary_templates_enabled ?? true
   const maxAgeDays = settings?.max_age_days ?? 7
   const tradeFreshnessDays = settings?.trade_freshness_days ?? 7
   const maxTradesPerMember = settings?.max_trades_per_member ?? 5
@@ -764,7 +765,7 @@ export async function runIngestion(): Promise<IngestionResult> {
 
   // 7. Secondary fetch pass — for trades below min_posts_per_trade threshold
   const hasSecondaryTemplates = secondarySaleTemplate || secondaryPurchaseTemplate
-  if (hasSecondaryTemplates && tradesWithNames.length > 0) {
+  if (hasSecondaryTemplates && secondaryTemplatesEnabled && tradesWithNames.length > 0) {
     // Count existing approved articles per ticker
     const tradeTickers = Array.from(new Set(tradesWithNames.map(t => t.ticker)))
     const articlesPerTrade = new Map<string, number>()

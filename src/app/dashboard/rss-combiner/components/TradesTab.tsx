@@ -229,7 +229,21 @@ export function TradesTab({
             </div>
 
             <div className="border-t border-gray-200 pt-3 mt-3">
-              <p className="text-xs font-medium text-gray-500 mb-2">Secondary Templates (Fallback)</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-gray-500">Secondary Templates (Fallback)</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-xs text-gray-500">{editSettings.secondary_templates_enabled ? 'Enabled' : 'Disabled'}</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={editSettings.secondary_templates_enabled}
+                    onClick={() => setEditSettings({ ...editSettings, secondary_templates_enabled: !editSettings.secondary_templates_enabled })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${editSettings.secondary_templates_enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${editSettings.secondary_templates_enabled ? 'translate-x-4' : 'translate-x-1'}`} />
+                  </button>
+                </label>
+              </div>
               <p className="text-xs text-gray-400 mb-3">Broader templates used when the primary returns fewer than the minimum posts per trade. Supports {'{company_name}'} and {'{ticker}'} placeholders.</p>
               <div className="space-y-3">
                 <div>
