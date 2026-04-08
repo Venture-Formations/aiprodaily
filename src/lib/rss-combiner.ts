@@ -766,7 +766,7 @@ export async function runIngestion(): Promise<IngestionResult> {
   const hasSecondaryTemplates = secondarySaleTemplate || secondaryPurchaseTemplate
   if (hasSecondaryTemplates && tradesWithNames.length > 0) {
     // Count existing approved articles per ticker
-    const tradeTickers = [...new Set(tradesWithNames.map(t => t.ticker))]
+    const tradeTickers = Array.from(new Set(tradesWithNames.map(t => t.ticker)))
     const articlesPerTrade = new Map<string, number>()
 
     for (const ticker of tradeTickers) {
