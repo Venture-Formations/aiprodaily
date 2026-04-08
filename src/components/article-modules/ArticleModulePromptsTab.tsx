@@ -3,6 +3,7 @@
 import type { ArticleModuleCriteria, ArticleModulePrompt } from '@/types/database'
 import { useArticleModulePrompts } from './prompts-tab/useArticleModulePrompts'
 import { CriterionCard } from './prompts-tab/CriterionCard'
+import { EvaluationOrderList } from './prompts-tab/EvaluationOrderList'
 import { ArticlePromptCard } from './ArticlePromptCard'
 import { GlobalPromptCard } from './GlobalPromptCard'
 import { AIImagePromptModal } from './AIImagePromptModal'
@@ -112,6 +113,12 @@ export default function ArticleModulePromptsTab(props: ArticleModulePromptsTabPr
             </div>
           </div>
         </div>
+
+        <EvaluationOrderList
+          criteria={h.criteria}
+          saving={h.saving}
+          onReorder={h.handleReorderEvalOrder}
+        />
 
         <div className="divide-y divide-gray-200">
           {h.criteria.filter(c => c.is_active).map((criterion) => (

@@ -77,7 +77,7 @@ export class Scoring {
           const criteriaScores = (evaluation as any).criteria_scores
           if (criteriaScores && Array.isArray(criteriaScores)) {
             for (let k = 0; k < criteriaScores.length && k < 5; k++) {
-              const criterionNum = k + 1
+              const criterionNum = criteriaScores[k].criteria_number || (k + 1)
               ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[k].score
               ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[k].reason
               ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[k].weight
@@ -123,9 +123,10 @@ export class Scoring {
 
     const { data: moduleCriteria, error: moduleError } = await supabaseAdmin
       .from('article_module_criteria')
-      .select('criteria_number, name, weight, ai_prompt, is_active, enforce_minimum, minimum_score')
+      .select('criteria_number, name, weight, ai_prompt, is_active, enforce_minimum, minimum_score, evaluation_order')
       .eq('article_module_id', moduleId)
       .eq('is_active', true)
+      .order('evaluation_order', { ascending: true })
       .order('criteria_number', { ascending: true })
 
     if (moduleError) {
@@ -160,7 +161,7 @@ export class Scoring {
     }
 
     // Evaluate post against each enabled criterion
-    const criteriaScores: Array<{ score: number; reason: string; weight: number }> = []
+    const criteriaScores: Array<{ score: number; reason: string; weight: number; criteria_number: number }> = []
 
     for (const criterion of criteria) {
       try {
@@ -200,7 +201,8 @@ export class Scoring {
         criteriaScores.push({
           score,
           reason,
-          weight: criterion.weight
+          weight: criterion.weight,
+          criteria_number: criterion.number
         })
 
         // Early termination: if this criterion enforces a minimum and the score is below it,

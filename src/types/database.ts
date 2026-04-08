@@ -1594,6 +1594,7 @@ export interface ArticleModuleCriteria {
   expected_output: string | null
   is_active: boolean
   display_order: number
+  evaluation_order: number
   enforce_minimum: boolean
   minimum_score: number | null
   created_at: string

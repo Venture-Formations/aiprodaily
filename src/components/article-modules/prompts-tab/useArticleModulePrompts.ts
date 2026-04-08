@@ -291,6 +291,35 @@ export function useArticleModulePrompts({
     }
   }
 
+  // Handle evaluation order reorder (bulk update after drag-and-drop)
+  // Optimistically updates local state instead of calling fetchData(),
+  // which would set loading=true and unmount the entire component tree.
+  const handleReorderEvalOrder = async (orderedCriteriaIds: string[]) => {
+    setSaving('eval_order')
+    try {
+      const updates = orderedCriteriaIds.map((id, index) => ({
+        id,
+        evaluation_order: index + 1
+      }))
+      const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ criteria: updates })
+      })
+      if (!res.ok) throw new Error('Failed to update evaluation order')
+      // Optimistic update: apply new evaluation_order to local criteria state
+      const orderMap = new Map(updates.map(u => [u.id, u.evaluation_order]))
+      setCriteria(prev => prev.map(c => orderMap.has(c.id) ? { ...c, evaluation_order: orderMap.get(c.id)! } : c))
+      setMessage('Evaluation order updated')
+    } catch (err: any) {
+      setError(err.message)
+      // On error, refetch to restore correct state
+      await fetchData()
+    } finally {
+      setSaving(null)
+    }
+  }
+
   // Handle prompt edit (inline editing like Settings page)
   const handleEdit = (key: string, value: string) => {
     setEditingPrompt({ key, value })
@@ -623,6 +652,7 @@ export function useArticleModulePrompts({
     handleToggleEnforceMinimum,
     handleMinimumEdit,
     handleMinimumSave,
+    handleReorderEvalOrder,
 
     // Prompt handlers
     handleEdit,

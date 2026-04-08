@@ -76,7 +76,6 @@ export function CriterionCard({
   const isSaving = saving === criterion.id
   const isEditingWeight = editingWeight?.key === criterion.id
   const isEditingName = editingCriteriaName?.id === criterion.id
-
   return (
     <div className="p-4">
       <div className="flex items-start justify-between mb-2">
