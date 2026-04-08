@@ -76,6 +76,9 @@ export interface FeedSettings {
   max_trades_per_member: number
   feed_article_age_days: number
   min_articles_per_company: number
+  secondary_sale_url_template: string | null
+  secondary_purchase_url_template: string | null
+  min_posts_per_trade: number
 }
 
 export interface StagingStatus {
@@ -99,4 +102,7 @@ export interface EditSettings {
   max_trades_per_member: number
   feed_article_age_days: number
   min_articles_per_company: number
+  secondary_sale_url_template: string
+  secondary_purchase_url_template: string
+  min_posts_per_trade: number
 }

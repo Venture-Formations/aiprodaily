@@ -69,4 +69,7 @@ export const DEFAULT_EDIT_SETTINGS = {
   max_trades_per_member: 5,
   feed_article_age_days: 14,
   min_articles_per_company: 2,
+  secondary_sale_url_template: '',
+  secondary_purchase_url_template: '',
+  min_posts_per_trade: 20,
 }

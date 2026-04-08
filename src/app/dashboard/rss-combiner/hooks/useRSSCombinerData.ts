@@ -108,6 +108,9 @@ export function useRSSCombinerData() {
           max_trades_per_member: s.max_trades_per_member ?? 5,
           feed_article_age_days: s.feed_article_age_days ?? 14,
           min_articles_per_company: s.min_articles_per_company ?? 2,
+          secondary_sale_url_template: s.secondary_sale_url_template || '',
+          secondary_purchase_url_template: s.secondary_purchase_url_template || '',
+          min_posts_per_trade: s.min_posts_per_trade ?? 20,
         })
       }
     }
