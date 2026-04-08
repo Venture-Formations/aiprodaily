@@ -101,15 +101,18 @@ export const PATCH = withApiHandler(
 
     // Bulk update mode
     if (body.criteria && Array.isArray(body.criteria)) {
-      // Validate total weight sums to ~1.0 for active criteria
-      const activeCriteria = body.criteria.filter((c: any) => c.is_active !== false)
-      const totalWeight = activeCriteria.reduce((sum: number, c: any) => sum + (c.weight || 0), 0)
+      // Validate total weight sums to ~1.0 for active criteria (only when weights are being updated)
+      const hasWeightUpdates = body.criteria.some((c: any) => c.weight !== undefined)
+      if (hasWeightUpdates) {
+        const activeCriteria = body.criteria.filter((c: any) => c.is_active !== false)
+        const totalWeight = activeCriteria.reduce((sum: number, c: any) => sum + (c.weight || 0), 0)
 
-      if (Math.abs(totalWeight - 1.0) > 0.01 && activeCriteria.length > 0) {
-        return NextResponse.json(
-          { error: `Weights must sum to 100%. Current sum: ${(totalWeight * 100).toFixed(1)}%` },
-          { status: 400 }
-        )
+        if (Math.abs(totalWeight - 1.0) > 0.01 && activeCriteria.length > 0) {
+          return NextResponse.json(
+            { error: `Weights must sum to 100%. Current sum: ${(totalWeight * 100).toFixed(1)}%` },
+            { status: 400 }
+          )
+        }
       }
 
       // Update each criterion
