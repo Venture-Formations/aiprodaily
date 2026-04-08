@@ -292,6 +292,8 @@ export function useArticleModulePrompts({
   }
 
   // Handle evaluation order reorder (bulk update after drag-and-drop)
+  // Optimistically updates local state instead of calling fetchData(),
+  // which would set loading=true and unmount the entire component tree.
   const handleReorderEvalOrder = async (orderedCriteriaIds: string[]) => {
     setSaving('eval_order')
     try {
@@ -305,10 +307,14 @@ export function useArticleModulePrompts({
         body: JSON.stringify({ criteria: updates })
       })
       if (!res.ok) throw new Error('Failed to update evaluation order')
-      await fetchData()
+      // Optimistic update: apply new evaluation_order to local criteria state
+      const orderMap = new Map(updates.map(u => [u.id, u.evaluation_order]))
+      setCriteria(prev => prev.map(c => orderMap.has(c.id) ? { ...c, evaluation_order: orderMap.get(c.id)! } : c))
       setMessage('Evaluation order updated')
     } catch (err: any) {
       setError(err.message)
+      // On error, refetch to restore correct state
+      await fetchData()
     } finally {
       setSaving(null)
     }
