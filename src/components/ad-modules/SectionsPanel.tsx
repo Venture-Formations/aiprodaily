@@ -92,7 +92,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           </button>
         </div>
 
-        <div className="flex-1">
+        <div>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
