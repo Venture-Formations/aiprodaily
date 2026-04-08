@@ -227,6 +227,60 @@ export function TradesTab({
               />
               <p className="text-xs text-gray-400 mt-1">For Purchase transactions. Use {'{company_name}'} as placeholder.</p>
             </div>
+
+            <div className="border-t border-gray-200 pt-3 mt-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-gray-500">Secondary Templates (Fallback)</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-xs text-gray-500">{editSettings.secondary_templates_enabled ? 'Enabled' : 'Disabled'}</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={editSettings.secondary_templates_enabled}
+                    onClick={() => setEditSettings({ ...editSettings, secondary_templates_enabled: !editSettings.secondary_templates_enabled })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${editSettings.secondary_templates_enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${editSettings.secondary_templates_enabled ? 'translate-x-4' : 'translate-x-1'}`} />
+                  </button>
+                </label>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">Broader templates used when the primary returns fewer than the minimum posts per trade. Supports {'{company_name}'} and {'{ticker}'} placeholders.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Secondary Sale URL Template</label>
+                  <input
+                    type="text"
+                    value={editSettings.secondary_sale_url_template}
+                    onChange={(e) => setEditSettings({ ...editSettings, secondary_sale_url_template: e.target.value })}
+                    placeholder="https://news.google.com/rss/search?q={ticker}+stock..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Secondary Purchase URL Template</label>
+                  <input
+                    type="text"
+                    value={editSettings.secondary_purchase_url_template}
+                    onChange={(e) => setEditSettings({ ...editSettings, secondary_purchase_url_template: e.target.value })}
+                    placeholder="https://news.google.com/rss/search?q={ticker}+stock..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Min Posts Per Trade</label>
+                  <input
+                    type="number"
+                    value={editSettings.min_posts_per_trade}
+                    onChange={(e) => setEditSettings({ ...editSettings, min_posts_per_trade: parseInt(e.target.value) || 1 })}
+                    min={1}
+                    max={100}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">If a trade has fewer approved articles than this, the secondary template is used.</p>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs text-gray-500 mb-1">Total Trades for Feed</label>
               <input

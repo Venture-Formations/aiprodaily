@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { z } from 'zod'
 import { invalidateCache, invalidateTradesCache } from '@/lib/rss-combiner'
 
-const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade, last_ingestion_at, updated_at, upload_schedule_day, upload_schedule_time, staged_upload_at, last_activation_at, trade_freshness_days, max_trades_per_member, feed_article_age_days, min_articles_per_company' as const
+const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, secondary_sale_url_template, secondary_purchase_url_template, min_posts_per_trade, secondary_templates_enabled, max_trades, max_articles_per_trade, last_ingestion_at, updated_at, upload_schedule_day, upload_schedule_time, staged_upload_at, last_activation_at, trade_freshness_days, max_trades_per_member, feed_article_age_days, min_articles_per_company' as const
 
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/settings' },
@@ -30,6 +30,10 @@ const patchSchema = z.object({
   url_template: z.string().min(1).max(2000).optional(),
   sale_url_template: z.string().max(2000).optional(),
   purchase_url_template: z.string().max(2000).optional(),
+  secondary_sale_url_template: z.string().max(2000).optional(),
+  secondary_purchase_url_template: z.string().max(2000).optional(),
+  min_posts_per_trade: z.number().int().min(1).max(100).optional(),
+  secondary_templates_enabled: z.boolean().optional(),
   max_trades: z.number().int().min(1).max(200).optional(),
   max_articles_per_trade: z.number().int().min(1).max(100).optional(),
   upload_schedule_day: z.number().int().min(0).max(6).optional(),

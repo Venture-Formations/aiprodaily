@@ -396,11 +396,14 @@ function generateFeedUrls(
     } else {
       continue // skip trades that aren't sale or purchase
     }
-    // Replace %22{company_name}%22 with quoted name + date filter outside quotes
-    const url = template.replace(
-      '%22{company_name}%22',
-      '%22' + encodeURIComponent(trade.company_name) + '%22' + dateFilter
-    )
+    // Replace placeholders: {company_name} (quoted or unquoted) and {ticker}
+    const url = template
+      .replace(
+        '%22{company_name}%22',
+        '%22' + encodeURIComponent(trade.company_name) + '%22' + dateFilter
+      )
+      .replace('{company_name}', encodeURIComponent(trade.company_name) + dateFilter)
+      .replace('{ticker}', encodeURIComponent(trade.ticker) + dateFilter)
     entries.push({ trade, url })
   }
 
@@ -568,13 +571,17 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 1. Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_trades, sale_url_template, purchase_url_template, max_age_days, trade_freshness_days, max_trades_per_member')
+    .select('max_trades, sale_url_template, purchase_url_template, secondary_sale_url_template, secondary_purchase_url_template, min_posts_per_trade, secondary_templates_enabled, max_age_days, trade_freshness_days, max_trades_per_member')
     .limit(1)
     .single()
 
   const maxTrades = settings?.max_trades ?? 21
   const saleTemplate = settings?.sale_url_template || ''
   const purchaseTemplate = settings?.purchase_url_template || ''
+  const secondarySaleTemplate = settings?.secondary_sale_url_template || ''
+  const secondaryPurchaseTemplate = settings?.secondary_purchase_url_template || ''
+  const minPostsPerTrade = settings?.min_posts_per_trade ?? 20
+  const secondaryTemplatesEnabled = settings?.secondary_templates_enabled ?? true
   const maxAgeDays = settings?.max_age_days ?? 7
   const tradeFreshnessDays = settings?.trade_freshness_days ?? 7
   const maxTradesPerMember = settings?.max_trades_per_member ?? 5
@@ -756,7 +763,136 @@ export async function runIngestion(): Promise<IngestionResult> {
     }
   }
 
-  // 7. Update last_ingestion_at
+  // 7. Secondary fetch pass — for trades below min_posts_per_trade threshold
+  const hasSecondaryTemplates = secondarySaleTemplate || secondaryPurchaseTemplate
+  if (hasSecondaryTemplates && secondaryTemplatesEnabled && tradesWithNames.length > 0) {
+    // Count existing approved articles per ticker
+    const tradeTickers = Array.from(new Set(tradesWithNames.map(t => t.ticker)))
+    const articlesPerTrade = new Map<string, number>()
+
+    for (const ticker of tradeTickers) {
+      const { count } = await supabaseAdmin
+        .from('congress_feed_articles')
+        .select('id', { count: 'exact', head: true })
+        .eq('ticker', ticker)
+
+      articlesPerTrade.set(ticker, count ?? 0)
+    }
+
+    // Find trades below threshold
+    const tradesToRetry = tradesWithNames.filter(t => {
+      const count = articlesPerTrade.get(t.ticker) ?? 0
+      return count < minPostsPerTrade
+    })
+
+    if (tradesToRetry.length > 0) {
+      console.log(`[RSS-Combiner] Secondary fetch: ${tradesToRetry.length} trades below threshold (min_posts_per_trade=${minPostsPerTrade})`)
+      for (const t of tradesToRetry) {
+        console.log(`[RSS-Combiner]   ${t.ticker} (${t.company_name}): ${articlesPerTrade.get(t.ticker) ?? 0} articles`)
+      }
+
+      const secondaryEntries = generateFeedUrls(tradesToRetry, secondarySaleTemplate, secondaryPurchaseTemplate, maxAgeDays)
+      let secondaryStored = 0
+
+      for (let i = 0; i < secondaryEntries.length; i++) {
+        if (i > 0) await new Promise((r) => setTimeout(r, DELAY_MS))
+
+        const { trade, url } = secondaryEntries[i]
+        let lastError = ''
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 2000))
+          try {
+            const feed = await fetchRssFeed(url)
+            const items = feed.items
+            let storedForTrade = 0
+
+            for (const item of items) {
+              const sourceName = extractSourceName(item)
+              const sourceDomain = extractSourceDomain(item)
+              const title = item.title || 'Untitled'
+              const link = item.link || ''
+              const pubDate = item.pubDate ? new Date(item.pubDate) : new Date()
+
+              if (!sourceDomain || !approvedDomains.has(sourceDomain.toLowerCase())) {
+                articlesFiltered++
+                continue
+              }
+              const titleLower = title.toLowerCase()
+              if (excludedKeywords.some((kw) => titleLower.includes(kw))) {
+                articlesFiltered++
+                continue
+              }
+              if (pubDate < cutoff) {
+                articlesFiltered++
+                continue
+              }
+              if (!link) {
+                articlesFiltered++
+                continue
+              }
+
+              const { error } = await supabaseAdmin
+                .from('congress_feed_articles')
+                .upsert(
+                  {
+                    ticker: trade.ticker,
+                    company_name: trade.company_name,
+                    transaction_type: trade.transaction,
+                    article_title: title,
+                    article_url: link,
+                    article_description: item.description || null,
+                    source_name: sourceName || null,
+                    source_domain: sourceDomain || null,
+                    published_at: pubDate.toISOString(),
+                    trade_meta: {
+                      member: trade.name,
+                      party: trade.party,
+                      chamber: trade.chamber,
+                      state: trade.state,
+                      district: trade.district,
+                      traded: trade.traded,
+                    },
+                    ingested_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'article_url' }
+                )
+
+              if (error) {
+                if (error.code === '23505') {
+                  articlesSkippedDuplicate++
+                } else {
+                  console.error(`[RSS-Combiner] Secondary upsert failed for ${link}:`, error.message)
+                }
+              } else {
+                storedForTrade++
+                secondaryStored++
+                articlesStored++
+              }
+            }
+
+            feedsFetched++
+            console.log(`[RSS-Combiner] Secondary ${trade.ticker} (${trade.company_name}): ${storedForTrade} stored, ${items.length - storedForTrade} filtered/skipped`)
+            lastError = ''
+            break
+          } catch (err: any) {
+            lastError = err.message
+          }
+        }
+
+        if (lastError) {
+          feedsFailed++
+          console.error(`[RSS-Combiner] Secondary ${trade.ticker} failed: ${lastError}`)
+        }
+      }
+
+      console.log(`[RSS-Combiner] Secondary fetch complete: ${secondaryStored} additional articles stored`)
+    } else {
+      console.log(`[RSS-Combiner] All trades meet threshold (min_posts_per_trade=${minPostsPerTrade}), skipping secondary fetch`)
+    }
+  }
+
+  // 8. Update last_ingestion_at
   await supabaseAdmin
     .from('combined_feed_settings')
     .update({ last_ingestion_at: new Date().toISOString() })
