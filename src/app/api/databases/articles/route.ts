@@ -19,6 +19,16 @@ export const GET = withApiHandler(
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
     const pageSize = Math.min(500, Math.max(1, parseInt(searchParams.get('page_size') || '100')));
 
+    // Filter params (applied server-side before pagination)
+    const feedTypeFilter = searchParams.get('feed_type') || 'all';
+    const positionFilter = searchParams.get('position') || 'all';
+    const searchTermParam = searchParams.get('search') || '';
+    const minScoreParam = searchParams.get('min_score');
+    const maxScoreParam = searchParams.get('max_score');
+    const sortColumnParam = searchParams.get('sort_column') || 'ingestDate';
+    const sortDirectionParam = searchParams.get('sort_direction') || 'desc';
+    const exportAll = searchParams.get('export_all') === 'true';
+
     if (!newsletterSlug) {
       return NextResponse.json(
         { error: 'publication_id is required' },
@@ -110,7 +120,8 @@ export const GET = withApiHandler(
             author,
             source_url,
             image_url,
-            processed_at
+            processed_at,
+            ticker
           `)
           .in('feed_id', feedChunk);
 
@@ -143,6 +154,21 @@ export const GET = withApiHandler(
     }
 
     console.log('[API] Found RSS posts:', allRssPosts.length);
+
+    // Build ticker -> company_name lookup
+    const uniqueTickers = Array.from(new Set(allRssPosts.map(p => p.ticker).filter(Boolean))) as string[];
+    const companyMap = new Map<string, string>();
+    if (uniqueTickers.length > 0) {
+      for (let i = 0; i < uniqueTickers.length; i += CHUNK_SIZE) {
+        const chunk = uniqueTickers.slice(i, i + CHUNK_SIZE);
+        const { data: tickerData } = await supabase
+          .from('ticker_company_names')
+          .select('ticker, company_name')
+          .in('ticker', chunk);
+        tickerData?.forEach(t => companyMap.set(t.ticker, t.company_name));
+      }
+    }
+    console.log('[API] Company map size:', companyMap.size);
 
     const allPostIds = allRssPosts.map(p => p.id);
 
@@ -254,6 +280,7 @@ export const GET = withApiHandler(
         feedType,
         feedName: feed?.name || 'Unknown',
         ingestDate: post.processed_at || '',
+        companyName: (post.ticker && companyMap.get(post.ticker)) || '',
 
         criteria1Score: rating?.criteria_1_score ?? null,
         criteria1Weight: parseFloat(criteriaConfig.criteria_1_weight || '1.0'),
@@ -290,22 +317,82 @@ export const GET = withApiHandler(
       };
     });
 
-    // Sort by ingest date (most recent first), then by score
-    allScoredPosts.sort((a, b) => {
-      const dateCompare = (b.ingestDate || '').localeCompare(a.ingestDate || '');
-      if (dateCompare !== 0) return dateCompare;
+    // Collect unique feed types and positions before filtering (for filter dropdowns)
+    const allFeedTypes = Array.from(new Set(allScoredPosts.map(p => p.feedType).filter(Boolean))).sort();
+    const allPositions = Array.from(new Set(allScoredPosts.filter(p => p.finalPosition !== null).map(p => p.finalPosition as number))).sort((a, b) => a - b);
 
-      const scoreA = a.totalScore || 0;
-      const scoreB = b.totalScore || 0;
-      return scoreB - scoreA;
+    // Apply server-side filters
+    let filteredPosts = allScoredPosts;
+
+    if (feedTypeFilter !== 'all') {
+      filteredPosts = filteredPosts.filter(a => a.feedType === feedTypeFilter);
+    }
+
+    if (positionFilter === 'all_used') {
+      filteredPosts = filteredPosts.filter(a => a.finalPosition !== null);
+    } else if (positionFilter !== 'all') {
+      const posNum = parseInt(positionFilter);
+      if (!isNaN(posNum)) {
+        filteredPosts = filteredPosts.filter(a => a.finalPosition === posNum);
+      }
+    }
+
+    if (searchTermParam) {
+      const term = searchTermParam.toLowerCase();
+      filteredPosts = filteredPosts.filter(a =>
+        a.originalTitle.toLowerCase().includes(term) ||
+        a.author.toLowerCase().includes(term) ||
+        a.feedName.toLowerCase().includes(term) ||
+        a.sourceName.toLowerCase().includes(term) ||
+        a.companyName.toLowerCase().includes(term)
+      );
+    }
+
+    if (minScoreParam) {
+      const minScore = parseFloat(minScoreParam);
+      if (!isNaN(minScore)) {
+        filteredPosts = filteredPosts.filter(a => (a.totalScore || 0) >= minScore);
+      }
+    }
+    if (maxScoreParam) {
+      const maxScore = parseFloat(maxScoreParam);
+      if (!isNaN(maxScore)) {
+        filteredPosts = filteredPosts.filter(a => (a.totalScore || 0) <= maxScore);
+      }
+    }
+
+    // Sort
+    filteredPosts.sort((a, b) => {
+      const col = sortColumnParam as keyof typeof a;
+      const dir = sortDirectionParam === 'asc' ? 1 : -1;
+      const aVal = a[col];
+      const bVal = b[col];
+
+      if (aVal === null || aVal === undefined || aVal === '') return dir;
+      if (bVal === null || bVal === undefined || bVal === '') return -dir;
+
+      if (col === 'ingestDate' || col === 'publicationDate') {
+        return dir * ((aVal as string).localeCompare(bVal as string));
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return dir * (aVal - bVal);
+      }
+      return dir * String(aVal).toLowerCase().localeCompare(String(bVal).toLowerCase());
     });
 
-    const total = allScoredPosts.length;
+    const total = filteredPosts.length;
     const totalPages = Math.ceil(total / pageSize);
-    const startIndex = (page - 1) * pageSize;
-    const paginatedPosts = allScoredPosts.slice(startIndex, startIndex + pageSize);
 
-    console.log(`[API] Scored posts: ${total} total, page ${page}/${totalPages} (${paginatedPosts.length} returned)`);
+    // For CSV export, return all filtered results without pagination
+    if (exportAll) {
+      console.log(`[API] Export all: ${total} filtered posts`);
+      return NextResponse.json({ data: filteredPosts, total, page: 1, pageSize: total, totalPages: 1, allFeedTypes, allPositions });
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const paginatedPosts = filteredPosts.slice(startIndex, startIndex + pageSize);
+
+    console.log(`[API] Scored posts: ${allScoredPosts.length} total, ${total} filtered, page ${page}/${totalPages} (${paginatedPosts.length} returned)`);
 
     // Check for debug parameter
     const debug = searchParams.get('debug') === 'true';
@@ -326,6 +413,6 @@ export const GET = withApiHandler(
       });
     }
 
-    return NextResponse.json({ data: paginatedPosts, total, page, pageSize, totalPages });
+    return NextResponse.json({ data: paginatedPosts, total, page, pageSize, totalPages, allFeedTypes, allPositions });
   }
 );

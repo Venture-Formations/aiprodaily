@@ -47,6 +47,8 @@ function renderCellContent(post: ScoredPost, columnKey: string) {
       const num = post.finalPosition
       return num !== null ? num.toLocaleString() : '-'
     }
+    case 'companyName':
+      return post.companyName || '-'
     case 'originalTitle':
       return post.originalTitle || ''
     case 'sourceUrl':
