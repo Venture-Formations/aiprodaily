@@ -12,26 +12,23 @@ export const GET = withApiHandler(
     console.log('issue ID:', id)
 
     console.log('Fetching issue with ID:', id)
-    // Fetch issue with active articles and events
+    // Fetch issue with active module_articles and events
+    // Uses broad select because generateFullNewsletterHtml needs many issue fields for template rendering
     const { data: issue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
       .select(`
         *,
-        articles(
-          id,
-          headline,
-          content,
-          word_count,
-          fact_check_score,
-          is_active,
-          rank,
+        module_articles:module_articles(
+          *,
           rss_post:rss_posts(
             source_url,
             image_url,
             author,
             rss_feed:rss_feeds(name)
-          )
+          ),
+          article_module:article_modules(name, display_order)
         ),
+        manual_articles:manual_articles(*),
         issue_events(
           id,
           event_date,
@@ -68,17 +65,17 @@ export const GET = withApiHandler(
       return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    console.log('issue found, articles count:', issue.articles?.length || 0)
+    console.log('issue found, module_articles count:', issue.module_articles?.length || 0)
     console.log('issue events count:', issue.issue_events?.length || 0)
 
-    // Filter to only active articles (max 5)
-    if (issue.articles) {
-      const beforeFilter = issue.articles.length
-      issue.articles = issue.articles
+    // Filter to only active module_articles (max 5)
+    if (issue.module_articles) {
+      const beforeFilter = issue.module_articles.length
+      issue.module_articles = issue.module_articles
         .filter((article: any) => article.is_active)
-        .sort((a: any, b: any) => (b.rss_post?.post_rating?.[0]?.total_score || 0) - (a.rss_post?.post_rating?.[0]?.total_score || 0))
+        .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
         .slice(0, 5) // Limit to 5 articles maximum
-      console.log('Active articles after filter:', issue.articles.length, 'from', beforeFilter, '(max 5)')
+      console.log('Active module_articles after filter:', issue.module_articles.length, 'from', beforeFilter, '(max 5)')
     }
 
     // Filter to only selected events and group by date
