@@ -98,9 +98,26 @@ interface CardParams {
   photoDataUrl: string
 }
 
+/**
+ * Pick a font size that will fit the member name on a single line.
+ * Available width is ~440px at the default 48px font size.
+ * Scales down in steps based on character count.
+ */
+function getMemberNameFontSize(name: string): number {
+  const len = name.length
+  if (len <= 14) return 48
+  if (len <= 17) return 42
+  if (len <= 20) return 38
+  if (len <= 23) return 34
+  if (len <= 26) return 30
+  if (len <= 30) return 26
+  return 22
+}
+
 async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
   const { memberName, chamber, state, transaction, companyName, ticker, photoDataUrl } = params
 
+  const memberNameFontSize = getMemberNameFontSize(memberName)
   const isPurchase = transaction.toLowerCase().includes('purchase')
   const tickerColor = isPurchase ? '#00ff88' : '#ff4444'
   const buttonBg = isPurchase
@@ -215,11 +232,13 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
             >
               <div
                 style={{
-                  fontSize: '48px',
+                  fontSize: `${memberNameFontSize}px`,
                   fontWeight: 900,
                   color: 'white',
                   letterSpacing: '1px',
                   textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
                 }}
               >
                 {memberName}
