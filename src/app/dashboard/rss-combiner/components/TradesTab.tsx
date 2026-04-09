@@ -17,6 +17,7 @@ interface TradesTabProps {
   ingesting: boolean
   ingestionResult: IngestionStats | null
   handleRunIngestion: () => void
+  handleRunIngestionWorkflow: () => void
   stagingStatus: StagingStatus | null
   activating: boolean
   activationResult: any
@@ -39,6 +40,7 @@ export function TradesTab({
   ingesting,
   ingestionResult,
   handleRunIngestion,
+  handleRunIngestionWorkflow,
   stagingStatus,
   activating,
   activationResult,
@@ -59,13 +61,24 @@ export function TradesTab({
               )}
             </p>
           </div>
-          <button
-            onClick={handleRunIngestion}
-            disabled={ingesting}
-            className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
-          >
-            {ingesting ? 'Ingesting...' : 'Ingest Now'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRunIngestion}
+              disabled={ingesting}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+              title="Runs synchronously — may time out for large ingestions (> 600s)"
+            >
+              {ingesting ? 'Ingesting...' : 'Ingest Now'}
+            </button>
+            <button
+              onClick={handleRunIngestionWorkflow}
+              disabled={ingesting}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+              title="Starts a durable workflow with separate 800s timeouts per step. Runs in background."
+            >
+              {ingesting ? 'Starting...' : 'Ingest (Workflow)'}
+            </button>
+          </div>
         </div>
         {ingestionResult && (
           <div className="mt-3 p-3 rounded bg-gray-50 text-sm grid grid-cols-2 sm:grid-cols-5 gap-3">
