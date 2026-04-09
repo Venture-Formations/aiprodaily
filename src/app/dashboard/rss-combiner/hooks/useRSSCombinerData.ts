@@ -59,6 +59,8 @@ export function useRSSCombinerData() {
   // Ingestion state
   const [ingesting, setIngesting] = useState(false)
   const [ingestionResult, setIngestionResult] = useState<IngestionStats | null>(null)
+  const [workflowStatus, setWorkflowStatus] = useState<'idle' | 'starting' | 'started' | 'failed'>('idle')
+  const [workflowStartedAt, setWorkflowStartedAt] = useState<string | null>(null)
 
   // Excluded keywords state
   const [excludedKeywords, setExcludedKeywords] = useState<ExcludedKeyword[]>([])
@@ -565,6 +567,34 @@ export function useRSSCombinerData() {
     }
   }
 
+  // Triggers the durable workflow which handles ingestion across multiple steps,
+  // each with its own 800s timeout. Returns immediately; workflow runs in background.
+  // Sets workflowStatus so the UI can distinguish "started" from "failed" — the
+  // fire-and-forget nature means we don't know the actual stats until the workflow
+  // finishes and last_ingestion_at updates.
+  const handleRunIngestionWorkflow = async () => {
+    setIngesting(true)
+    setIngestionResult(null)
+    setWorkflowStatus('starting')
+    setWorkflowStartedAt(null)
+    try {
+      const res = await fetch('/api/workflows/rss-combiner-ingestion', { method: 'POST' })
+      if (res.ok) {
+        setWorkflowStatus('started')
+        setWorkflowStartedAt(new Date().toISOString())
+      } else {
+        const data = await res.json().catch(() => ({}))
+        console.error('Workflow start failed:', data.error)
+        setWorkflowStatus('failed')
+      }
+    } catch (error) {
+      console.error('Workflow start error:', error)
+      setWorkflowStatus('failed')
+    } finally {
+      setIngesting(false)
+    }
+  }
+
   const handleDiscardStaged = async () => {
     if (!confirm('Discard all staged data?')) return
     const res = await fetch('/api/admin/rss-combiner/staging', { method: 'DELETE' })
@@ -703,6 +733,9 @@ export function useRSSCombinerData() {
     ingesting,
     ingestionResult,
     handleRunIngestion,
+    handleRunIngestionWorkflow,
+    workflowStatus,
+    workflowStartedAt,
 
     // Staging
     stagingStatus,

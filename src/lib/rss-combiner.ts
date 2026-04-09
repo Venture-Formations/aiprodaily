@@ -411,6 +411,136 @@ function generateFeedUrls(
 }
 
 /**
+ * Reusable fetch + filter + upsert helper used by both the primary and secondary
+ * fetch passes. Exposed so the workflow steps can import and call it.
+ */
+export async function fetchFeedsAndUpsert(params: {
+  trades: TradeWithCompanyName[]
+  saleTemplate: string
+  purchaseTemplate: string
+  maxAgeDays: number
+  approvedDomains: Set<string>
+  excludedKeywords: string[]
+  label?: string
+}): Promise<{
+  feedsFetched: number
+  feedsFailed: number
+  articlesStored: number
+  articlesFiltered: number
+  articlesSkippedDuplicate: number
+}> {
+  const label = params.label || 'Ingest'
+  const feedEntries = generateFeedUrls(
+    params.trades,
+    params.saleTemplate,
+    params.purchaseTemplate,
+    params.maxAgeDays
+  )
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - params.maxAgeDays)
+
+  const DELAY_MS = 500
+  let feedsFetched = 0
+  let feedsFailed = 0
+  let articlesStored = 0
+  let articlesFiltered = 0
+  let articlesSkippedDuplicate = 0
+
+  for (let i = 0; i < feedEntries.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, DELAY_MS))
+
+    const { trade, url } = feedEntries[i]
+    let lastError = ''
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 2000))
+      try {
+        const feed = await fetchRssFeed(url)
+        const items = feed.items
+        let storedForTrade = 0
+
+        for (const item of items) {
+          const sourceName = extractSourceName(item)
+          const sourceDomain = extractSourceDomain(item)
+          const title = item.title || 'Untitled'
+          const link = item.link || ''
+          const pubDate = item.pubDate ? new Date(item.pubDate) : new Date()
+
+          if (!sourceDomain || !params.approvedDomains.has(sourceDomain.toLowerCase())) {
+            articlesFiltered++
+            continue
+          }
+          const titleLower = title.toLowerCase()
+          if (params.excludedKeywords.some((kw) => titleLower.includes(kw))) {
+            articlesFiltered++
+            continue
+          }
+          if (pubDate < cutoff) {
+            articlesFiltered++
+            continue
+          }
+          if (!link) {
+            articlesFiltered++
+            continue
+          }
+
+          const { error } = await supabaseAdmin
+            .from('congress_feed_articles')
+            .insert({
+              ticker: trade.ticker,
+              company_name: trade.company_name,
+              transaction_type: trade.transaction,
+              article_title: title,
+              article_url: link,
+              article_description: item.description || null,
+              source_name: sourceName || null,
+              source_domain: sourceDomain || null,
+              published_at: pubDate.toISOString(),
+              trade_meta: {
+                member: trade.name,
+                party: trade.party,
+                chamber: trade.chamber,
+                state: trade.state,
+                district: trade.district,
+                traded: trade.traded,
+              },
+              ingested_at: new Date().toISOString(),
+            })
+
+          if (error) {
+            if (error.code === '23505') {
+              articlesSkippedDuplicate++
+            } else {
+              console.error(`[RSS-Combiner] ${label} insert failed for ${link}:`, error.message)
+            }
+          } else {
+            storedForTrade++
+            articlesStored++
+          }
+        }
+
+        feedsFetched++
+        console.log(
+          `[RSS-Combiner] ${label} ${trade.ticker} (${trade.company_name}): ${storedForTrade} stored, ${items.length - storedForTrade} filtered/skipped`
+        )
+        lastError = ''
+        break
+      } catch (err: any) {
+        lastError = err.message
+      }
+    }
+
+    if (lastError) {
+      feedsFailed++
+      console.error(`[RSS-Combiner] ${label} ${trade.ticker} failed: ${lastError}`)
+    }
+  }
+
+  return { feedsFetched, feedsFailed, articlesStored, articlesFiltered, articlesSkippedDuplicate }
+}
+
+/**
  * Fetch feeds, filter, enrich with trade metadata, deduplicate by article URL.
  * Retained for testing/manual use; no longer called by getCombinedFeed.
  */
@@ -769,17 +899,21 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 7. Secondary fetch pass — for trades below min_posts_per_trade threshold
   const hasSecondaryTemplates = secondarySaleTemplate || secondaryPurchaseTemplate
   if (hasSecondaryTemplates && secondaryTemplatesEnabled && tradesWithNames.length > 0) {
-    // Count existing approved articles per ticker
+    // Count existing articles per ticker with a single query, then tally in memory.
+    // Faster than N sequential count queries when there are many tickers.
     const tradeTickers = Array.from(new Set(tradesWithNames.map(t => t.ticker)))
     const articlesPerTrade = new Map<string, number>()
+    for (const ticker of tradeTickers) articlesPerTrade.set(ticker, 0)
 
-    for (const ticker of tradeTickers) {
-      const { count } = await supabaseAdmin
-        .from('congress_feed_articles')
-        .select('id', { count: 'exact', head: true })
-        .eq('ticker', ticker)
+    const { data: existingRows } = await supabaseAdmin
+      .from('congress_feed_articles')
+      .select('ticker')
+      .in('ticker', tradeTickers)
 
-      articlesPerTrade.set(ticker, count ?? 0)
+    for (const row of existingRows || []) {
+      if (row.ticker) {
+        articlesPerTrade.set(row.ticker, (articlesPerTrade.get(row.ticker) ?? 0) + 1)
+      }
     }
 
     // Find trades below threshold

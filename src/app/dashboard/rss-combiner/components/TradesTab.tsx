@@ -17,6 +17,9 @@ interface TradesTabProps {
   ingesting: boolean
   ingestionResult: IngestionStats | null
   handleRunIngestion: () => void
+  handleRunIngestionWorkflow: () => void
+  workflowStatus: 'idle' | 'starting' | 'started' | 'failed'
+  workflowStartedAt: string | null
   stagingStatus: StagingStatus | null
   activating: boolean
   activationResult: any
@@ -39,6 +42,9 @@ export function TradesTab({
   ingesting,
   ingestionResult,
   handleRunIngestion,
+  handleRunIngestionWorkflow,
+  workflowStatus,
+  workflowStartedAt,
   stagingStatus,
   activating,
   activationResult,
@@ -59,15 +65,36 @@ export function TradesTab({
               )}
             </p>
           </div>
-          <button
-            onClick={handleRunIngestion}
-            disabled={ingesting}
-            className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
-          >
-            {ingesting ? 'Ingesting...' : 'Ingest Now'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRunIngestion}
+              disabled={ingesting}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+              title="Runs synchronously — may time out for large ingestions (> 600s)"
+            >
+              {ingesting ? 'Ingesting...' : 'Ingest Now'}
+            </button>
+            <button
+              onClick={handleRunIngestionWorkflow}
+              disabled={ingesting}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+              title="Starts a durable workflow with separate 800s timeouts per step. Runs in background."
+            >
+              {ingesting ? 'Starting...' : 'Ingest (Workflow)'}
+            </button>
+          </div>
         </div>
-        {ingestionResult && (
+        {workflowStatus === 'started' && (
+          <div className="mt-3 p-3 rounded bg-blue-50 border border-blue-200 text-sm text-blue-800">
+            Workflow started{workflowStartedAt ? ` at ${new Date(workflowStartedAt).toLocaleTimeString()}` : ''}. Running in background — check back in a few minutes. The &quot;Last run&quot; timestamp above will update when it completes.
+          </div>
+        )}
+        {workflowStatus === 'failed' && (
+          <div className="mt-3 p-3 rounded bg-red-50 border border-red-200 text-sm text-red-800">
+            Failed to start workflow. Check console for details.
+          </div>
+        )}
+        {ingestionResult && workflowStatus === 'idle' && (
           <div className="mt-3 p-3 rounded bg-gray-50 text-sm grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div>
               <div className="text-xs text-gray-500">Feeds Fetched</div>

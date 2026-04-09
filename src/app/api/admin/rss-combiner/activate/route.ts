@@ -32,4 +32,7 @@ export const POST = withApiHandler(
   }
 )
 
-export const maxDuration = 300
+// Extended from 300s to 600s (project max per vercel.json) because this runs
+// full ingestion which processes ~70 trades with RSS fetching, image generation,
+// and secondary fetches.
+export const maxDuration = 600
