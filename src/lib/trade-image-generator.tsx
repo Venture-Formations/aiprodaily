@@ -7,6 +7,8 @@
  * Dimensions: 1200x630.
  */
 import { ImageResponse } from '@vercel/og'
+import { readFile } from 'fs/promises'
+import path from 'path'
 import { resolveBioguideId, fetchMemberPhoto, formatDisplayName } from './congress-photos'
 import { SupabaseImageStorage } from './supabase-image-storage'
 import { supabaseAdmin } from './supabase'
@@ -22,6 +24,39 @@ interface TradeInput {
 }
 
 const imageStorage = new SupabaseImageStorage()
+
+// Module-level font cache — the Inter Black font ships with the repo under
+// public/fonts/Inter-Black.ttf and is loaded once per process. This eliminates
+// the Google Fonts dependency entirely.
+let cachedFontData: ArrayBuffer | null = null
+let fontLoadPromise: Promise<ArrayBuffer | null> | null = null
+
+async function getInterBlackFont(): Promise<ArrayBuffer | null> {
+  if (cachedFontData) return cachedFontData
+  if (fontLoadPromise) return fontLoadPromise
+
+  fontLoadPromise = (async () => {
+    try {
+      const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Inter-Black.ttf')
+      const buffer = await readFile(fontPath)
+      cachedFontData = buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength
+      ) as ArrayBuffer
+      return cachedFontData
+    } catch (err) {
+      console.error(
+        '[trade-image] Failed to load bundled font:',
+        err instanceof Error ? err.message : 'Unknown'
+      )
+      return null
+    }
+  })()
+
+  const result = await fontLoadPromise
+  fontLoadPromise = null
+  return result
+}
 
 /**
  * Generate a trade card image and upload to Supabase storage.
@@ -128,21 +163,9 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
   const subtitle = [chamber, state].filter(Boolean).join(' · ')
 
   try {
-    // Load Inter Black (900) for thick, bold letters
-    let fontData: ArrayBuffer | null = null
-    try {
-      const fontRes = await fetch(
-        'https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYMZg.ttf',
-        { signal: AbortSignal.timeout(5_000) }
-      )
-      if (fontRes.ok) {
-        fontData = await fontRes.arrayBuffer()
-      } else {
-        console.error(`[trade-image] Font fetch failed: HTTP ${fontRes.status}`)
-      }
-    } catch (fontErr) {
-      console.error('[trade-image] Font fetch error:', fontErr)
-    }
+    // Load Inter Black (900) — cached at module level so we only hit Google
+    // Fonts once per process, not once per image generation.
+    const fontData = await getInterBlackFont()
 
     const response = new ImageResponse(
       (
