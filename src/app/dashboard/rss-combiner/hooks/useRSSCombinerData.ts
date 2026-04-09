@@ -551,11 +551,20 @@ export function useRSSCombinerData() {
   const handleActivateNow = async () => {
     setActivating(true)
     setActivationResult(null)
+    setWorkflowStatus('idle')
     try {
       const res = await fetch('/api/admin/rss-combiner/activate', { method: 'POST' })
       const data = await res.json()
       setActivationResult(data)
       if (data.activated) {
+        // Activation now triggers the ingestion workflow in the background.
+        // Surface that state so the UI can display "workflow started".
+        if (data.workflowStarted) {
+          setWorkflowStatus('started')
+          setWorkflowStartedAt(new Date().toISOString())
+        } else if (data.workflowError) {
+          setWorkflowStatus('failed')
+        }
         fetchTrades()
         fetchStagingStatus()
         fetchSettings()
