@@ -709,38 +709,37 @@ export async function runIngestion(): Promise<IngestionResult> {
             continue
           }
 
-          // Upsert into congress_feed_articles
+          // Insert into congress_feed_articles (unique constraint on article_url)
+          // Using .insert() instead of .upsert() so duplicate URLs return 23505,
+          // letting us accurately distinguish new articles from duplicates.
           const { error } = await supabaseAdmin
             .from('congress_feed_articles')
-            .upsert(
-              {
-                ticker: trade.ticker,
-                company_name: trade.company_name,
-                transaction_type: trade.transaction,
-                article_title: title,
-                article_url: link,
-                article_description: item.description || null,
-                source_name: sourceName || null,
-                source_domain: sourceDomain || null,
-                published_at: pubDate.toISOString(),
-                trade_meta: {
-                  member: trade.name,
-                  party: trade.party,
-                  chamber: trade.chamber,
-                  state: trade.state,
-                  district: trade.district,
-                  traded: trade.traded,
-                },
-                ingested_at: new Date().toISOString(),
+            .insert({
+              ticker: trade.ticker,
+              company_name: trade.company_name,
+              transaction_type: trade.transaction,
+              article_title: title,
+              article_url: link,
+              article_description: item.description || null,
+              source_name: sourceName || null,
+              source_domain: sourceDomain || null,
+              published_at: pubDate.toISOString(),
+              trade_meta: {
+                member: trade.name,
+                party: trade.party,
+                chamber: trade.chamber,
+                state: trade.state,
+                district: trade.district,
+                traded: trade.traded,
               },
-              { onConflict: 'article_url' }
-            )
+              ingested_at: new Date().toISOString(),
+            })
 
           if (error) {
             if (error.code === '23505') {
               articlesSkippedDuplicate++
             } else {
-              console.error(`[RSS-Combiner] Upsert failed for ${link}:`, error.message)
+              console.error(`[RSS-Combiner] Insert failed for ${link}:`, error.message)
             }
           } else {
             storedForTrade++
@@ -834,35 +833,32 @@ export async function runIngestion(): Promise<IngestionResult> {
 
               const { error } = await supabaseAdmin
                 .from('congress_feed_articles')
-                .upsert(
-                  {
-                    ticker: trade.ticker,
-                    company_name: trade.company_name,
-                    transaction_type: trade.transaction,
-                    article_title: title,
-                    article_url: link,
-                    article_description: item.description || null,
-                    source_name: sourceName || null,
-                    source_domain: sourceDomain || null,
-                    published_at: pubDate.toISOString(),
-                    trade_meta: {
-                      member: trade.name,
-                      party: trade.party,
-                      chamber: trade.chamber,
-                      state: trade.state,
-                      district: trade.district,
-                      traded: trade.traded,
-                    },
-                    ingested_at: new Date().toISOString(),
+                .insert({
+                  ticker: trade.ticker,
+                  company_name: trade.company_name,
+                  transaction_type: trade.transaction,
+                  article_title: title,
+                  article_url: link,
+                  article_description: item.description || null,
+                  source_name: sourceName || null,
+                  source_domain: sourceDomain || null,
+                  published_at: pubDate.toISOString(),
+                  trade_meta: {
+                    member: trade.name,
+                    party: trade.party,
+                    chamber: trade.chamber,
+                    state: trade.state,
+                    district: trade.district,
+                    traded: trade.traded,
                   },
-                  { onConflict: 'article_url' }
-                )
+                  ingested_at: new Date().toISOString(),
+                })
 
               if (error) {
                 if (error.code === '23505') {
                   articlesSkippedDuplicate++
                 } else {
-                  console.error(`[RSS-Combiner] Secondary upsert failed for ${link}:`, error.message)
+                  console.error(`[RSS-Combiner] Secondary insert failed for ${link}:`, error.message)
                 }
               } else {
                 storedForTrade++
