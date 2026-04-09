@@ -8,11 +8,15 @@
  *
  * Steps:
  *   1. Load context (settings, approved sources, excluded keywords, top trades)
- *   2. Generate primary trade card images (parallel batches)
- *   3. Primary RSS fetch + upsert
- *   4. Secondary RSS fetch (for trades below min_posts_per_trade, if enabled)
- *   5. Feed-window image generation (for tickers in feed output missing images)
- *   6. Finalize (update last_ingestion_at, invalidate cache)
+ *   2. Primary RSS fetch + upsert
+ *   3. Secondary RSS fetch (for trades below min_posts_per_trade, if enabled)
+ *   4. Feed-window image generation (for all tickers in feed output missing images)
+ *   5. Finalize (update last_ingestion_at, invalidate cache)
+ *
+ * Note: Image generation runs AFTER fetching so the feed-window step covers
+ * every ticker appearing in the combined feed output, not just the current
+ * top trades. The primary fetch pass does not use trade.image_url, so there
+ * is no functional reason to generate images before fetching.
  */
 
 export interface IngestionWorkflowInput {
@@ -38,11 +42,16 @@ export async function rssCombinerIngestionWorkflow(
   const ctx = await loadIngestionContext()
   console.log(`[Combiner Workflow] Loaded ${ctx.trades.length} top trades`)
 
-  // Step 2: Generate primary trade card images
-  const primaryImagesGenerated = await generatePrimaryImages(ctx.trades)
-  console.log(`[Combiner Workflow] Generated ${primaryImagesGenerated} primary trade images`)
+  // Note: primary image generation is handled by feedWindowImageGeneration
+  // (step 4 below). That step covers all tickers appearing in the combined
+  // feed output, which is a superset of the current top trades. Running
+  // image generation twice (once before RSS fetch, once after) is redundant
+  // and caused the workflow to hang — @vercel/og / payload serialization
+  // issues between steps. The primary fetch pass does NOT use trade.image_url,
+  // so we skip image generation here entirely.
 
-  // Step 3: Primary RSS fetch + upsert
+  // Step 2: Primary RSS fetch + upsert
+  console.log(`[Combiner Workflow] Starting primary RSS fetch`)
   const primaryStats = await primaryFetchPass({
     trades: ctx.trades,
     saleTemplate: ctx.saleTemplate,
@@ -51,6 +60,7 @@ export async function rssCombinerIngestionWorkflow(
     approvedDomains: ctx.approvedDomains,
     excludedKeywords: ctx.excludedKeywords,
   })
+  console.log(`[Combiner Workflow] Primary fetch complete: ${primaryStats.articlesStored} stored`)
 
   // Step 4: Secondary RSS fetch (if enabled + templates configured)
   let secondaryStats: IngestionStats = {
@@ -61,6 +71,7 @@ export async function rssCombinerIngestionWorkflow(
     articlesSkippedDuplicate: 0,
   }
   if (ctx.secondaryTemplatesEnabled && (ctx.secondarySaleTemplate || ctx.secondaryPurchaseTemplate)) {
+    console.log(`[Combiner Workflow] Starting secondary RSS fetch`)
     secondaryStats = await secondaryFetchPass({
       trades: ctx.trades,
       secondarySaleTemplate: ctx.secondarySaleTemplate,
@@ -70,12 +81,15 @@ export async function rssCombinerIngestionWorkflow(
       approvedDomains: ctx.approvedDomains,
       excludedKeywords: ctx.excludedKeywords,
     })
+    console.log(`[Combiner Workflow] Secondary fetch complete: ${secondaryStats.articlesStored} stored`)
   }
 
-  // Step 5: Feed-window image generation
+  // Step 4: Generate trade card images for all tickers in the feed window
+  console.log(`[Combiner Workflow] Starting feed-window image generation`)
   await feedWindowImageGeneration()
+  console.log(`[Combiner Workflow] Image generation complete`)
 
-  // Step 6: Finalize
+  // Step 5: Finalize
   await finalizeIngestion()
 
   const stats: IngestionStats = {
@@ -169,45 +183,6 @@ async function loadIngestionContext(): Promise<{
     approvedDomains,
     excludedKeywords,
   }
-}
-
-async function generatePrimaryImages(trades: any[]): Promise<number> {
-  "use step"
-
-  // Note: in-memory mutations to trade.image_url within this step are not
-  // persisted back to the workflow context (each step runs as a separate
-  // invocation). That's intentional — generateAndUploadTradeImage() already
-  // writes image_url to congress_trades as the source of truth, and no
-  // downstream step reads trade.image_url from the in-memory object.
-  const { generateAndUploadTradeImage } = await import('@/lib/trade-image-generator')
-
-  const BATCH_SIZE = 10
-  const tradesNeedingImages = trades.filter((t) => !t.image_url)
-  let imagesGenerated = 0
-
-  for (let i = 0; i < tradesNeedingImages.length; i += BATCH_SIZE) {
-    const batch = tradesNeedingImages.slice(i, i + BATCH_SIZE)
-    const results = await Promise.allSettled(
-      batch.map((trade) =>
-        generateAndUploadTradeImage({
-          ...trade,
-          company: trade.company_name,
-        })
-      )
-    )
-    for (let j = 0; j < results.length; j++) {
-      const result = results[j]
-      const trade = batch[j]
-      if (result.status === 'fulfilled' && result.value) {
-        trade.image_url = result.value
-        imagesGenerated++
-      } else if (result.status === 'rejected') {
-        console.error(`[Combiner Workflow] Image gen failed for ${trade.id}:`, result.reason)
-      }
-    }
-  }
-
-  return imagesGenerated
 }
 
 async function primaryFetchPass(params: {
