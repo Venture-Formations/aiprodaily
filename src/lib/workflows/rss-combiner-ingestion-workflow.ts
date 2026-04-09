@@ -350,9 +350,16 @@ async function feedWindowImageGeneration(): Promise<void> {
       ticker: row.ticker,
     }))
 
-    const BATCH_SIZE = 10
+    // Smaller batch size + inter-batch delay to avoid overwhelming
+    // Supabase Storage / Tinify with 80+ concurrent uploads (caused 502/504
+    // gateway errors returned as HTML that failed JSON parsing).
+    const BATCH_SIZE = 5
+    const BATCH_DELAY_MS = 500
     let feedImagesGenerated = 0
     for (let i = 0; i < tradesToGenerate.length; i += BATCH_SIZE) {
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+      }
       const batch = tradesToGenerate.slice(i, i + BATCH_SIZE)
       const results = await Promise.allSettled(
         batch.map((t) => generateAndUploadTradeImage(t))

@@ -741,11 +741,17 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 4b. Generate trade card images for trades missing image_url
   // Runs in parallel batches to fit within Vercel's function timeout.
   // Uses resolved company names from ticker_company_names table.
-  const IMAGE_BATCH_SIZE = 10
+  // Batch size is 5 + 500ms inter-batch delay to avoid overwhelming
+  // Supabase Storage / Tinify (which returned HTML error pages under load).
+  const IMAGE_BATCH_SIZE = 5
+  const IMAGE_BATCH_DELAY_MS = 500
   const tradesNeedingImages = tradesWithNames.filter((t) => !t.image_url)
   let imagesGenerated = 0
 
   for (let i = 0; i < tradesNeedingImages.length; i += IMAGE_BATCH_SIZE) {
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, IMAGE_BATCH_DELAY_MS))
+    }
     const batch = tradesNeedingImages.slice(i, i + IMAGE_BATCH_SIZE)
     const results = await Promise.allSettled(
       batch.map((trade) =>
@@ -1097,10 +1103,14 @@ export async function runIngestion(): Promise<IngestionResult> {
           ticker: row.ticker,
         }))
 
-        // Generate in parallel batches
-        const FEED_IMAGE_BATCH_SIZE = 10
+        // Generate in parallel batches with delay to avoid overwhelming storage
+        const FEED_IMAGE_BATCH_SIZE = 5
+        const FEED_IMAGE_DELAY_MS = 500
         let feedImagesGenerated = 0
         for (let i = 0; i < tradesToGenerate.length; i += FEED_IMAGE_BATCH_SIZE) {
+          if (i > 0) {
+            await new Promise((r) => setTimeout(r, FEED_IMAGE_DELAY_MS))
+          }
           const batch = tradesToGenerate.slice(i, i + FEED_IMAGE_BATCH_SIZE)
           const results = await Promise.allSettled(batch.map(t => generateAndUploadTradeImage(t)))
           for (const result of results) {
