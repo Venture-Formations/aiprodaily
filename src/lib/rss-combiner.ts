@@ -609,33 +609,37 @@ export async function runIngestion(): Promise<IngestionResult> {
   const tradesWithNames = await resolveTickerNames(trades)
 
   // 4b. Generate trade card images for trades missing image_url
-  // Uses resolved company names from ticker_company_names table
-  const TRADE_IMAGE_DELAY_MS = 300
+  // Runs in parallel batches to fit within Vercel's function timeout.
+  // Uses resolved company names from ticker_company_names table.
+  const IMAGE_BATCH_SIZE = 10
+  const tradesNeedingImages = tradesWithNames.filter((t) => !t.image_url)
   let imagesGenerated = 0
-  for (let i = 0; i < tradesWithNames.length; i++) {
-    const trade = tradesWithNames[i]
-    if (trade.image_url) continue // already generated
 
-    if (i > 0 && imagesGenerated > 0) {
-      await new Promise((r) => setTimeout(r, TRADE_IMAGE_DELAY_MS))
-    }
+  for (let i = 0; i < tradesNeedingImages.length; i += IMAGE_BATCH_SIZE) {
+    const batch = tradesNeedingImages.slice(i, i + IMAGE_BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map((trade) =>
+        generateAndUploadTradeImage({
+          ...trade,
+          company: trade.company_name,
+        })
+      )
+    )
 
-    try {
-      const imageUrl = await generateAndUploadTradeImage({
-        ...trade,
-        company: trade.company_name,
-      })
-      if (imageUrl) {
-        trade.image_url = imageUrl
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j]
+      const trade = batch[j]
+      if (result.status === 'fulfilled' && result.value) {
+        trade.image_url = result.value
         imagesGenerated++
+      } else if (result.status === 'rejected') {
+        console.error(`[RSS-Combiner] Failed to generate image for trade ${trade.id}:`, result.reason)
       }
-    } catch (error) {
-      console.error(`[RSS-Combiner] Failed to generate image for trade ${trade.id}:`, error)
     }
   }
 
   if (imagesGenerated > 0) {
-    console.log(`[RSS-Combiner] Generated ${imagesGenerated} trade card images`)
+    console.log(`[RSS-Combiner] Generated ${imagesGenerated} trade card images (of ${tradesNeedingImages.length} attempted)`)
   }
   const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate, maxAgeDays)
 
@@ -925,58 +929,55 @@ export async function runIngestion(): Promise<IngestionResult> {
       if (tickersMissingImages.length > 0) {
         console.log(`[RSS-Combiner] Generating missing trade images for ${tickersMissingImages.length} tickers in feed window`)
 
-        // For each missing ticker, find the largest trade row and generate an image
+        // Fetch the largest trade row for each missing ticker in one batched query
+        const { data: allRows } = await supabaseAdmin
+          .from('congress_trades')
+          .select('id, ticker, name, chamber, state, transaction, company, trade_size_parsed')
+          .in('ticker', tickersMissingImages)
+          .order('trade_size_parsed', { ascending: false, nullsFirst: false })
+
+        // Pick the largest row per ticker
+        const largestByTicker = new Map<string, any>()
+        for (const row of allRows || []) {
+          if (!largestByTicker.has(row.ticker)) {
+            largestByTicker.set(row.ticker, row)
+          }
+        }
+
+        // Batch-resolve company names
+        const { data: nameMappings } = await supabaseAdmin
+          .from('ticker_company_names')
+          .select('ticker, company_name')
+          .in('ticker', tickersMissingImages.map(t => t.toUpperCase()))
+
+        const nameMap = new Map((nameMappings || []).map(n => [n.ticker.toUpperCase(), n.company_name]))
+
+        // Build the list of trades to generate images for
+        const tradesToGenerate = Array.from(largestByTicker.values()).map(row => ({
+          id: row.id,
+          name: row.name,
+          chamber: row.chamber,
+          state: row.state,
+          transaction: row.transaction,
+          company: nameMap.get(row.ticker.toUpperCase()) || row.company || row.ticker,
+          ticker: row.ticker,
+        }))
+
+        // Generate in parallel batches
+        const FEED_IMAGE_BATCH_SIZE = 10
         let feedImagesGenerated = 0
-        for (const ticker of tickersMissingImages) {
-          // Find the largest trade row for this ticker (any age)
-          const { data: tradeRow } = await supabaseAdmin
-            .from('congress_trades')
-            .select('id, ticker, name, chamber, state, transaction, company, trade_size_parsed')
-            .eq('ticker', ticker)
-            .order('trade_size_parsed', { ascending: false, nullsFirst: false })
-            .limit(1)
-            .maybeSingle()
-
-          if (!tradeRow) {
-            console.log(`[RSS-Combiner] No congress_trades row for ticker ${ticker}, skipping image`)
-            continue
-          }
-
-          // Resolve clean company name
-          const { data: nameMapping } = await supabaseAdmin
-            .from('ticker_company_names')
-            .select('company_name')
-            .eq('ticker', ticker.toUpperCase())
-            .maybeSingle()
-
-          const companyName = nameMapping?.company_name || tradeRow.company || ticker
-
-          if (feedImagesGenerated > 0) {
-            await new Promise(r => setTimeout(r, 300))
-          }
-
-          try {
-            const imageUrl = await generateAndUploadTradeImage({
-              id: tradeRow.id,
-              name: tradeRow.name,
-              chamber: tradeRow.chamber,
-              state: tradeRow.state,
-              transaction: tradeRow.transaction,
-              company: companyName,
-              ticker: tradeRow.ticker,
-            })
-            if (imageUrl) {
+        for (let i = 0; i < tradesToGenerate.length; i += FEED_IMAGE_BATCH_SIZE) {
+          const batch = tradesToGenerate.slice(i, i + FEED_IMAGE_BATCH_SIZE)
+          const results = await Promise.allSettled(batch.map(t => generateAndUploadTradeImage(t)))
+          for (const result of results) {
+            if (result.status === 'fulfilled' && result.value) {
               feedImagesGenerated++
-              console.log(`[RSS-Combiner] Generated feed image for ${ticker}`)
             }
-          } catch (error) {
-            console.error(`[RSS-Combiner] Failed to generate feed image for ${ticker}:`, error)
           }
         }
 
         if (feedImagesGenerated > 0) {
           console.log(`[RSS-Combiner] Generated ${feedImagesGenerated} feed trade images`)
-          // Invalidate feed cache since images changed
           invalidateCache()
         }
       }

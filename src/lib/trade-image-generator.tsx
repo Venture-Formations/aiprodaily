@@ -7,7 +7,7 @@
  * Dimensions: 1200x630.
  */
 import { ImageResponse } from '@vercel/og'
-import { resolveBioguideId, fetchMemberPhoto } from './congress-photos'
+import { resolveBioguideId, fetchMemberPhoto, formatDisplayName } from './congress-photos'
 import { SupabaseImageStorage } from './supabase-image-storage'
 import { supabaseAdmin } from './supabase'
 
@@ -59,7 +59,7 @@ export async function generateAndUploadTradeImage(trade: TradeInput): Promise<st
 
   // Generate the trade card image
   const imageBuffer = await renderTradeCard({
-    memberName: trade.name,
+    memberName: formatDisplayName(trade.name),
     chamber: trade.chamber || '',
     state: trade.state || '',
     transaction: trade.transaction || 'Purchase',
