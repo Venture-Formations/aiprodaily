@@ -23,6 +23,51 @@ interface TradeInput {
 
 const imageStorage = new SupabaseImageStorage()
 
+// Module-level font cache — the Inter Black font is fetched from Google Fonts
+// once per process and reused across all image generations. Without this cache,
+// each image generation makes its own HTTP request which hammered Google Fonts
+// and caused timeouts when generating 80+ images in a row.
+const FONT_URL =
+  'https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYMZg.ttf'
+let cachedFontData: ArrayBuffer | null = null
+let fontFetchPromise: Promise<ArrayBuffer | null> | null = null
+
+async function getInterBlackFont(): Promise<ArrayBuffer | null> {
+  if (cachedFontData) return cachedFontData
+  // De-duplicate concurrent requests during the first parallel batch
+  if (fontFetchPromise) return fontFetchPromise
+
+  fontFetchPromise = (async () => {
+    const MAX_ATTEMPTS = 3
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const res = await fetch(FONT_URL, {
+          signal: AbortSignal.timeout(15_000),
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AIProDaily/1.0)' },
+        })
+        if (res.ok) {
+          cachedFontData = await res.arrayBuffer()
+          return cachedFontData
+        }
+        console.error(`[trade-image] Font fetch HTTP ${res.status} (attempt ${attempt}/${MAX_ATTEMPTS})`)
+      } catch (err) {
+        console.error(
+          `[trade-image] Font fetch error (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+          err instanceof Error ? err.message : 'Unknown'
+        )
+      }
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 1000 * attempt))
+      }
+    }
+    return null
+  })()
+
+  const result = await fontFetchPromise
+  fontFetchPromise = null // Allow future retries if this run fails
+  return result
+}
+
 /**
  * Generate a trade card image and upload to Supabase storage.
  * Returns the public URL, or null if member photo is unavailable.
@@ -128,21 +173,9 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
   const subtitle = [chamber, state].filter(Boolean).join(' · ')
 
   try {
-    // Load Inter Black (900) for thick, bold letters
-    let fontData: ArrayBuffer | null = null
-    try {
-      const fontRes = await fetch(
-        'https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYMZg.ttf',
-        { signal: AbortSignal.timeout(5_000) }
-      )
-      if (fontRes.ok) {
-        fontData = await fontRes.arrayBuffer()
-      } else {
-        console.error(`[trade-image] Font fetch failed: HTTP ${fontRes.status}`)
-      }
-    } catch (fontErr) {
-      console.error('[trade-image] Font fetch error:', fontErr)
-    }
+    // Load Inter Black (900) — cached at module level so we only hit Google
+    // Fonts once per process, not once per image generation.
+    const fontData = await getInterBlackFont()
 
     const response = new ImageResponse(
       (
