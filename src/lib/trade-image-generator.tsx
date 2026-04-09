@@ -7,6 +7,8 @@
  * Dimensions: 1200x630.
  */
 import { ImageResponse } from '@vercel/og'
+import { readFile } from 'fs/promises'
+import path from 'path'
 import { resolveBioguideId, fetchMemberPhoto, formatDisplayName } from './congress-photos'
 import { SupabaseImageStorage } from './supabase-image-storage'
 import { supabaseAdmin } from './supabase'
@@ -23,48 +25,36 @@ interface TradeInput {
 
 const imageStorage = new SupabaseImageStorage()
 
-// Module-level font cache — the Inter Black font is fetched from Google Fonts
-// once per process and reused across all image generations. Without this cache,
-// each image generation makes its own HTTP request which hammered Google Fonts
-// and caused timeouts when generating 80+ images in a row.
-const FONT_URL =
-  'https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYMZg.ttf'
+// Module-level font cache — the Inter Black font ships with the repo under
+// public/fonts/Inter-Black.ttf and is loaded once per process. This eliminates
+// the Google Fonts dependency entirely.
 let cachedFontData: ArrayBuffer | null = null
-let fontFetchPromise: Promise<ArrayBuffer | null> | null = null
+let fontLoadPromise: Promise<ArrayBuffer | null> | null = null
 
 async function getInterBlackFont(): Promise<ArrayBuffer | null> {
   if (cachedFontData) return cachedFontData
-  // De-duplicate concurrent requests during the first parallel batch
-  if (fontFetchPromise) return fontFetchPromise
+  if (fontLoadPromise) return fontLoadPromise
 
-  fontFetchPromise = (async () => {
-    const MAX_ATTEMPTS = 3
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        const res = await fetch(FONT_URL, {
-          signal: AbortSignal.timeout(15_000),
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AIProDaily/1.0)' },
-        })
-        if (res.ok) {
-          cachedFontData = await res.arrayBuffer()
-          return cachedFontData
-        }
-        console.error(`[trade-image] Font fetch HTTP ${res.status} (attempt ${attempt}/${MAX_ATTEMPTS})`)
-      } catch (err) {
-        console.error(
-          `[trade-image] Font fetch error (attempt ${attempt}/${MAX_ATTEMPTS}):`,
-          err instanceof Error ? err.message : 'Unknown'
-        )
-      }
-      if (attempt < MAX_ATTEMPTS) {
-        await new Promise((r) => setTimeout(r, 1000 * attempt))
-      }
+  fontLoadPromise = (async () => {
+    try {
+      const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Inter-Black.ttf')
+      const buffer = await readFile(fontPath)
+      cachedFontData = buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength
+      ) as ArrayBuffer
+      return cachedFontData
+    } catch (err) {
+      console.error(
+        '[trade-image] Failed to load bundled font:',
+        err instanceof Error ? err.message : 'Unknown'
+      )
+      return null
     }
-    return null
   })()
 
-  const result = await fontFetchPromise
-  fontFetchPromise = null // Allow future retries if this run fails
+  const result = await fontLoadPromise
+  fontLoadPromise = null
   return result
 }
 
