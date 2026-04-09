@@ -565,6 +565,47 @@ export function useRSSCombinerData() {
     }
   }
 
+  // Triggers the durable workflow which handles ingestion across multiple steps,
+  // each with its own 800s timeout. Returns immediately; workflow runs in background.
+  const handleRunIngestionWorkflow = async () => {
+    setIngesting(true)
+    setIngestionResult(null)
+    try {
+      const res = await fetch('/api/workflows/rss-combiner-ingestion', { method: 'POST' })
+      if (res.ok) {
+        // Workflow is async — we don't get stats back immediately.
+        // Caller should poll or just wait for next refresh.
+        setIngestionResult({
+          feedsFetched: 0,
+          feedsFailed: 0,
+          articlesStored: 0,
+          articlesFiltered: 0,
+          articlesSkippedDuplicate: 0,
+        })
+      } else {
+        const data = await res.json()
+        console.error('Workflow start failed:', data.error)
+        setIngestionResult({
+          feedsFetched: 0,
+          feedsFailed: 0,
+          articlesStored: 0,
+          articlesFiltered: 0,
+          articlesSkippedDuplicate: 0,
+        })
+      }
+    } catch {
+      setIngestionResult({
+        feedsFetched: 0,
+        feedsFailed: 0,
+        articlesStored: 0,
+        articlesFiltered: 0,
+        articlesSkippedDuplicate: 0,
+      })
+    } finally {
+      setIngesting(false)
+    }
+  }
+
   const handleDiscardStaged = async () => {
     if (!confirm('Discard all staged data?')) return
     const res = await fetch('/api/admin/rss-combiner/staging', { method: 'DELETE' })
@@ -703,6 +744,7 @@ export function useRSSCombinerData() {
     ingesting,
     ingestionResult,
     handleRunIngestion,
+    handleRunIngestionWorkflow,
 
     // Staging
     stagingStatus,
