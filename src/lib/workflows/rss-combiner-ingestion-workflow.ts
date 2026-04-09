@@ -174,6 +174,11 @@ async function loadIngestionContext(): Promise<{
 async function generatePrimaryImages(trades: any[]): Promise<number> {
   "use step"
 
+  // Note: in-memory mutations to trade.image_url within this step are not
+  // persisted back to the workflow context (each step runs as a separate
+  // invocation). That's intentional — generateAndUploadTradeImage() already
+  // writes image_url to congress_trades as the source of truth, and no
+  // downstream step reads trade.image_url from the in-memory object.
   const { generateAndUploadTradeImage } = await import('@/lib/trade-image-generator')
 
   const BATCH_SIZE = 10
@@ -241,16 +246,22 @@ async function secondaryFetchPass(params: {
   const { supabaseAdmin } = await import('@/lib/supabase')
   const { fetchFeedsAndUpsert } = await import('@/lib/rss-combiner')
 
-  // Count existing articles per ticker to find trades below threshold
+  // Count existing articles per ticker with a single query, then tally in memory.
+  // Much faster than N sequential count queries when there are 70+ tickers.
   const tradeTickers = Array.from(new Set(params.trades.map((t) => t.ticker)))
   const articlesPerTrade = new Map<string, number>()
+  for (const ticker of tradeTickers) articlesPerTrade.set(ticker, 0)
 
-  for (const ticker of tradeTickers) {
-    const { count } = await supabaseAdmin
-      .from('congress_feed_articles')
-      .select('id', { count: 'exact', head: true })
-      .eq('ticker', ticker)
-    articlesPerTrade.set(ticker, count ?? 0)
+  const { data: existingRows } = await supabaseAdmin
+    .from('congress_feed_articles')
+    .select('ticker')
+    .in('ticker', tradeTickers)
+
+  for (const row of existingRows || []) {
+    const ticker = row.ticker
+    if (ticker) {
+      articlesPerTrade.set(ticker, (articlesPerTrade.get(ticker) ?? 0) + 1)
+    }
   }
 
   const tradesToRetry = params.trades.filter((t) => {

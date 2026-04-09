@@ -3,7 +3,7 @@ import { withApiHandler } from '@/lib/api-handler'
 import { runIngestion, checkAndActivateSchedule } from '@/lib/rss-combiner'
 
 /**
- * Congress Feed Ingestion Cron (runs every 3 hours)
+ * Congress Feed Ingestion Cron (runs every 15 minutes)
  * 1. Checks if scheduled activation is due (staged trades → live)
  * 2. Fetches Google News articles for top congressional trades, filters by approved sources.
  *
@@ -48,4 +48,4 @@ const handler = withApiHandler(
 export const POST = handler
 export const GET = handler
 
-export const maxDuration = 300 // 5 minutes
+export const maxDuration = 600 // 10 minutes — matches admin route and vercel.json

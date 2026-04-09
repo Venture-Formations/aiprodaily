@@ -899,17 +899,21 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 7. Secondary fetch pass — for trades below min_posts_per_trade threshold
   const hasSecondaryTemplates = secondarySaleTemplate || secondaryPurchaseTemplate
   if (hasSecondaryTemplates && secondaryTemplatesEnabled && tradesWithNames.length > 0) {
-    // Count existing approved articles per ticker
+    // Count existing articles per ticker with a single query, then tally in memory.
+    // Faster than N sequential count queries when there are many tickers.
     const tradeTickers = Array.from(new Set(tradesWithNames.map(t => t.ticker)))
     const articlesPerTrade = new Map<string, number>()
+    for (const ticker of tradeTickers) articlesPerTrade.set(ticker, 0)
 
-    for (const ticker of tradeTickers) {
-      const { count } = await supabaseAdmin
-        .from('congress_feed_articles')
-        .select('id', { count: 'exact', head: true })
-        .eq('ticker', ticker)
+    const { data: existingRows } = await supabaseAdmin
+      .from('congress_feed_articles')
+      .select('ticker')
+      .in('ticker', tradeTickers)
 
-      articlesPerTrade.set(ticker, count ?? 0)
+    for (const row of existingRows || []) {
+      if (row.ticker) {
+        articlesPerTrade.set(row.ticker, (articlesPerTrade.get(row.ticker) ?? 0) + 1)
+      }
     }
 
     // Find trades below threshold

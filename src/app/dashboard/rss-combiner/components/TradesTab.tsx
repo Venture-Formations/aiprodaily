@@ -18,6 +18,8 @@ interface TradesTabProps {
   ingestionResult: IngestionStats | null
   handleRunIngestion: () => void
   handleRunIngestionWorkflow: () => void
+  workflowStatus: 'idle' | 'starting' | 'started' | 'failed'
+  workflowStartedAt: string | null
   stagingStatus: StagingStatus | null
   activating: boolean
   activationResult: any
@@ -41,6 +43,8 @@ export function TradesTab({
   ingestionResult,
   handleRunIngestion,
   handleRunIngestionWorkflow,
+  workflowStatus,
+  workflowStartedAt,
   stagingStatus,
   activating,
   activationResult,
@@ -80,7 +84,17 @@ export function TradesTab({
             </button>
           </div>
         </div>
-        {ingestionResult && (
+        {workflowStatus === 'started' && (
+          <div className="mt-3 p-3 rounded bg-blue-50 border border-blue-200 text-sm text-blue-800">
+            Workflow started{workflowStartedAt ? ` at ${new Date(workflowStartedAt).toLocaleTimeString()}` : ''}. Running in background — check back in a few minutes. The &quot;Last run&quot; timestamp above will update when it completes.
+          </div>
+        )}
+        {workflowStatus === 'failed' && (
+          <div className="mt-3 p-3 rounded bg-red-50 border border-red-200 text-sm text-red-800">
+            Failed to start workflow. Check console for details.
+          </div>
+        )}
+        {ingestionResult && workflowStatus === 'idle' && (
           <div className="mt-3 p-3 rounded bg-gray-50 text-sm grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div>
               <div className="text-xs text-gray-500">Feeds Fetched</div>

@@ -59,6 +59,8 @@ export function useRSSCombinerData() {
   // Ingestion state
   const [ingesting, setIngesting] = useState(false)
   const [ingestionResult, setIngestionResult] = useState<IngestionStats | null>(null)
+  const [workflowStatus, setWorkflowStatus] = useState<'idle' | 'starting' | 'started' | 'failed'>('idle')
+  const [workflowStartedAt, setWorkflowStartedAt] = useState<string | null>(null)
 
   // Excluded keywords state
   const [excludedKeywords, setExcludedKeywords] = useState<ExcludedKeyword[]>([])
@@ -567,40 +569,27 @@ export function useRSSCombinerData() {
 
   // Triggers the durable workflow which handles ingestion across multiple steps,
   // each with its own 800s timeout. Returns immediately; workflow runs in background.
+  // Sets workflowStatus so the UI can distinguish "started" from "failed" — the
+  // fire-and-forget nature means we don't know the actual stats until the workflow
+  // finishes and last_ingestion_at updates.
   const handleRunIngestionWorkflow = async () => {
     setIngesting(true)
     setIngestionResult(null)
+    setWorkflowStatus('starting')
+    setWorkflowStartedAt(null)
     try {
       const res = await fetch('/api/workflows/rss-combiner-ingestion', { method: 'POST' })
       if (res.ok) {
-        // Workflow is async — we don't get stats back immediately.
-        // Caller should poll or just wait for next refresh.
-        setIngestionResult({
-          feedsFetched: 0,
-          feedsFailed: 0,
-          articlesStored: 0,
-          articlesFiltered: 0,
-          articlesSkippedDuplicate: 0,
-        })
+        setWorkflowStatus('started')
+        setWorkflowStartedAt(new Date().toISOString())
       } else {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         console.error('Workflow start failed:', data.error)
-        setIngestionResult({
-          feedsFetched: 0,
-          feedsFailed: 0,
-          articlesStored: 0,
-          articlesFiltered: 0,
-          articlesSkippedDuplicate: 0,
-        })
+        setWorkflowStatus('failed')
       }
-    } catch {
-      setIngestionResult({
-        feedsFetched: 0,
-        feedsFailed: 0,
-        articlesStored: 0,
-        articlesFiltered: 0,
-        articlesSkippedDuplicate: 0,
-      })
+    } catch (error) {
+      console.error('Workflow start error:', error)
+      setWorkflowStatus('failed')
     } finally {
       setIngesting(false)
     }
@@ -745,6 +734,8 @@ export function useRSSCombinerData() {
     ingestionResult,
     handleRunIngestion,
     handleRunIngestionWorkflow,
+    workflowStatus,
+    workflowStartedAt,
 
     // Staging
     stagingStatus,

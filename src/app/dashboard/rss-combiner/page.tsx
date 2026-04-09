@@ -76,6 +76,8 @@ export default function RSSCombinerPage() {
             ingestionResult={data.ingestionResult}
             handleRunIngestion={data.handleRunIngestion}
             handleRunIngestionWorkflow={data.handleRunIngestionWorkflow}
+            workflowStatus={data.workflowStatus}
+            workflowStartedAt={data.workflowStartedAt}
             stagingStatus={data.stagingStatus}
             activating={data.activating}
             activationResult={data.activationResult}
