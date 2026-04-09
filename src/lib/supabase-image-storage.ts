@@ -180,7 +180,11 @@ export class SupabaseImageStorage {
     return (data?.length ?? 0) > 0
   }
 
-  /** Upload buffer to Supabase Storage and return the public URL */
+  /**
+   * Upload buffer to Supabase Storage and return the public URL.
+   * Retries with exponential backoff when the storage API returns transient
+   * errors (gateway timeouts, HTML error pages from CDN, JSON parse failures).
+   */
   private async uploadToStorage(
     objectPath: string,
     buffer: Buffer,
@@ -194,23 +198,72 @@ export class SupabaseImageStorage {
       }
     }
 
-    const { error } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(objectPath, buffer, {
-        contentType,
-        cacheControl: '31536000',
-        upsert,
-      })
+    const MAX_ATTEMPTS = 3
+    let lastError: string | undefined
 
-    if (error) {
-      if (error.message?.includes('already exists') || error.message?.includes('Duplicate')) {
-        return `${STORAGE_PUBLIC_URL}/${BUCKET}/${objectPath}`
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      if (attempt > 1) {
+        // Exponential backoff: 1s, 2s
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt - 1)))
       }
-      console.error(`[SupabaseImageStorage] Upload failed for ${objectPath}:`, error.message)
-      return null
+
+      try {
+        const { error } = await supabaseAdmin.storage
+          .from(BUCKET)
+          .upload(objectPath, buffer, {
+            contentType,
+            cacheControl: '31536000',
+            upsert,
+          })
+
+        if (!error) {
+          return `${STORAGE_PUBLIC_URL}/${BUCKET}/${objectPath}`
+        }
+
+        // Already-exists is success
+        if (error.message?.includes('already exists') || error.message?.includes('Duplicate')) {
+          return `${STORAGE_PUBLIC_URL}/${BUCKET}/${objectPath}`
+        }
+
+        lastError = error.message
+        const isTransient =
+          error.message?.includes('Unexpected token') ||       // HTML error page parsed as JSON
+          error.message?.includes('fetch failed') ||
+          error.message?.includes('ECONNRESET') ||
+          error.message?.includes('ETIMEDOUT') ||
+          error.message?.includes('502') ||
+          error.message?.includes('503') ||
+          error.message?.includes('504')
+
+        if (!isTransient || attempt === MAX_ATTEMPTS) {
+          console.error(
+            `[SupabaseImageStorage] Upload failed for ${objectPath} (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+            error.message
+          )
+          return null
+        }
+
+        console.warn(
+          `[SupabaseImageStorage] Transient upload error for ${objectPath} (attempt ${attempt}/${MAX_ATTEMPTS}), retrying:`,
+          error.message
+        )
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : 'Unknown error'
+        if (attempt === MAX_ATTEMPTS) {
+          console.error(
+            `[SupabaseImageStorage] Upload threw for ${objectPath} (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+            lastError
+          )
+          return null
+        }
+        console.warn(
+          `[SupabaseImageStorage] Upload threw for ${objectPath} (attempt ${attempt}/${MAX_ATTEMPTS}), retrying:`,
+          lastError
+        )
+      }
     }
 
-    return `${STORAGE_PUBLIC_URL}/${BUCKET}/${objectPath}`
+    return null
   }
 }
 
