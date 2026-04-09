@@ -709,38 +709,37 @@ export async function runIngestion(): Promise<IngestionResult> {
             continue
           }
 
-          // Upsert into congress_feed_articles
+          // Insert into congress_feed_articles (unique constraint on article_url)
+          // Using .insert() instead of .upsert() so duplicate URLs return 23505,
+          // letting us accurately distinguish new articles from duplicates.
           const { error } = await supabaseAdmin
             .from('congress_feed_articles')
-            .upsert(
-              {
-                ticker: trade.ticker,
-                company_name: trade.company_name,
-                transaction_type: trade.transaction,
-                article_title: title,
-                article_url: link,
-                article_description: item.description || null,
-                source_name: sourceName || null,
-                source_domain: sourceDomain || null,
-                published_at: pubDate.toISOString(),
-                trade_meta: {
-                  member: trade.name,
-                  party: trade.party,
-                  chamber: trade.chamber,
-                  state: trade.state,
-                  district: trade.district,
-                  traded: trade.traded,
-                },
-                ingested_at: new Date().toISOString(),
+            .insert({
+              ticker: trade.ticker,
+              company_name: trade.company_name,
+              transaction_type: trade.transaction,
+              article_title: title,
+              article_url: link,
+              article_description: item.description || null,
+              source_name: sourceName || null,
+              source_domain: sourceDomain || null,
+              published_at: pubDate.toISOString(),
+              trade_meta: {
+                member: trade.name,
+                party: trade.party,
+                chamber: trade.chamber,
+                state: trade.state,
+                district: trade.district,
+                traded: trade.traded,
               },
-              { onConflict: 'article_url' }
-            )
+              ingested_at: new Date().toISOString(),
+            })
 
           if (error) {
             if (error.code === '23505') {
               articlesSkippedDuplicate++
             } else {
-              console.error(`[RSS-Combiner] Upsert failed for ${link}:`, error.message)
+              console.error(`[RSS-Combiner] Insert failed for ${link}:`, error.message)
             }
           } else {
             storedForTrade++
@@ -834,35 +833,32 @@ export async function runIngestion(): Promise<IngestionResult> {
 
               const { error } = await supabaseAdmin
                 .from('congress_feed_articles')
-                .upsert(
-                  {
-                    ticker: trade.ticker,
-                    company_name: trade.company_name,
-                    transaction_type: trade.transaction,
-                    article_title: title,
-                    article_url: link,
-                    article_description: item.description || null,
-                    source_name: sourceName || null,
-                    source_domain: sourceDomain || null,
-                    published_at: pubDate.toISOString(),
-                    trade_meta: {
-                      member: trade.name,
-                      party: trade.party,
-                      chamber: trade.chamber,
-                      state: trade.state,
-                      district: trade.district,
-                      traded: trade.traded,
-                    },
-                    ingested_at: new Date().toISOString(),
+                .insert({
+                  ticker: trade.ticker,
+                  company_name: trade.company_name,
+                  transaction_type: trade.transaction,
+                  article_title: title,
+                  article_url: link,
+                  article_description: item.description || null,
+                  source_name: sourceName || null,
+                  source_domain: sourceDomain || null,
+                  published_at: pubDate.toISOString(),
+                  trade_meta: {
+                    member: trade.name,
+                    party: trade.party,
+                    chamber: trade.chamber,
+                    state: trade.state,
+                    district: trade.district,
+                    traded: trade.traded,
                   },
-                  { onConflict: 'article_url' }
-                )
+                  ingested_at: new Date().toISOString(),
+                })
 
               if (error) {
                 if (error.code === '23505') {
                   articlesSkippedDuplicate++
                 } else {
-                  console.error(`[RSS-Combiner] Secondary upsert failed for ${link}:`, error.message)
+                  console.error(`[RSS-Combiner] Secondary insert failed for ${link}:`, error.message)
                 }
               } else {
                 storedForTrade++
@@ -892,7 +888,105 @@ export async function runIngestion(): Promise<IngestionResult> {
     }
   }
 
-  // 8. Update last_ingestion_at
+  // 8. Generate missing trade images for all tickers in congress_feed_articles
+  // within the feed window. Covers tickers whose trades are outside the current
+  // freshness window but whose articles are still served in the combined feed.
+  try {
+    // Use the feed window to find which tickers will appear in output
+    const { data: feedSettings } = await supabaseAdmin
+      .from('combined_feed_settings')
+      .select('feed_article_age_days')
+      .limit(1)
+      .single()
+
+    const feedWindowDays = feedSettings?.feed_article_age_days ?? 14
+    const feedCutoff = new Date()
+    feedCutoff.setDate(feedCutoff.getDate() - feedWindowDays)
+
+    // Get distinct tickers in congress_feed_articles within the window
+    const { data: feedArticles } = await supabaseAdmin
+      .from('congress_feed_articles')
+      .select('ticker')
+      .gte('published_at', feedCutoff.toISOString())
+
+    const feedTickers = Array.from(new Set((feedArticles || []).map(a => a.ticker).filter(Boolean)))
+
+    if (feedTickers.length > 0) {
+      // Find tickers that already have at least one trade with image_url
+      const { data: tradesWithImages } = await supabaseAdmin
+        .from('congress_trades')
+        .select('ticker')
+        .in('ticker', feedTickers)
+        .not('image_url', 'is', null)
+
+      const tickersWithImages = new Set((tradesWithImages || []).map(t => t.ticker))
+      const tickersMissingImages = feedTickers.filter(t => !tickersWithImages.has(t))
+
+      if (tickersMissingImages.length > 0) {
+        console.log(`[RSS-Combiner] Generating missing trade images for ${tickersMissingImages.length} tickers in feed window`)
+
+        // For each missing ticker, find the largest trade row and generate an image
+        let feedImagesGenerated = 0
+        for (const ticker of tickersMissingImages) {
+          // Find the largest trade row for this ticker (any age)
+          const { data: tradeRow } = await supabaseAdmin
+            .from('congress_trades')
+            .select('id, ticker, name, chamber, state, transaction, company, trade_size_parsed')
+            .eq('ticker', ticker)
+            .order('trade_size_parsed', { ascending: false, nullsFirst: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (!tradeRow) {
+            console.log(`[RSS-Combiner] No congress_trades row for ticker ${ticker}, skipping image`)
+            continue
+          }
+
+          // Resolve clean company name
+          const { data: nameMapping } = await supabaseAdmin
+            .from('ticker_company_names')
+            .select('company_name')
+            .eq('ticker', ticker.toUpperCase())
+            .maybeSingle()
+
+          const companyName = nameMapping?.company_name || tradeRow.company || ticker
+
+          if (feedImagesGenerated > 0) {
+            await new Promise(r => setTimeout(r, 300))
+          }
+
+          try {
+            const imageUrl = await generateAndUploadTradeImage({
+              id: tradeRow.id,
+              name: tradeRow.name,
+              chamber: tradeRow.chamber,
+              state: tradeRow.state,
+              transaction: tradeRow.transaction,
+              company: companyName,
+              ticker: tradeRow.ticker,
+            })
+            if (imageUrl) {
+              feedImagesGenerated++
+              console.log(`[RSS-Combiner] Generated feed image for ${ticker}`)
+            }
+          } catch (error) {
+            console.error(`[RSS-Combiner] Failed to generate feed image for ${ticker}:`, error)
+          }
+        }
+
+        if (feedImagesGenerated > 0) {
+          console.log(`[RSS-Combiner] Generated ${feedImagesGenerated} feed trade images`)
+          // Invalidate feed cache since images changed
+          invalidateCache()
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[RSS-Combiner] Feed image generation pass failed:', error)
+    // Don't fail the whole ingestion
+  }
+
+  // 9. Update last_ingestion_at
   await supabaseAdmin
     .from('combined_feed_settings')
     .update({ last_ingestion_at: new Date().toISOString() })

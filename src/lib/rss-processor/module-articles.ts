@@ -325,7 +325,9 @@ export class ModuleArticles {
               word_count: 0,
               ticker: (post as any).ticker || null,
               member_name: (post as any).member_name || null,
-              transaction_type: (post as any).transaction_type || null
+              transaction_type: (post as any).transaction_type || null,
+              trade_image_url: (post as any).image_url || null,
+              trade_image_alt: (post as any).image_alt || (post as any).ticker || null
             }])
 
           if (insertError && insertError.code !== '23505') {
