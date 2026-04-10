@@ -383,10 +383,18 @@ export const GET = withApiHandler(
     const total = filteredPosts.length;
     const totalPages = Math.ceil(total / pageSize);
 
+    // Compute unique companies with scored posts (for threshold stat)
+    const companyScoredCounts: Record<string, number> = {};
+    for (const post of filteredPosts) {
+      if (post.companyName && post.totalScore !== null) {
+        companyScoredCounts[post.companyName] = (companyScoredCounts[post.companyName] || 0) + 1;
+      }
+    }
+
     // For CSV export, return all filtered results without pagination
     if (exportAll) {
       console.log(`[API] Export all: ${total} filtered posts`);
-      return NextResponse.json({ data: filteredPosts, total, page: 1, pageSize: total, totalPages: 1, allFeedTypes, allPositions });
+      return NextResponse.json({ data: filteredPosts, total, page: 1, pageSize: total, totalPages: 1, allFeedTypes, allPositions, companyScoredCounts });
     }
 
     const startIndex = (page - 1) * pageSize;
@@ -413,6 +421,6 @@ export const GET = withApiHandler(
       });
     }
 
-    return NextResponse.json({ data: paginatedPosts, total, page, pageSize, totalPages, allFeedTypes, allPositions });
+    return NextResponse.json({ data: paginatedPosts, total, page, pageSize, totalPages, allFeedTypes, allPositions, companyScoredCounts });
   }
 );

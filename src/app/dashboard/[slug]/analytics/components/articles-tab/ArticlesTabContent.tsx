@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import type { ArticlesTabProps } from './types'
 import { useArticlesTab } from './useArticlesTab'
 import FilterBar from './FilterBar'
@@ -32,6 +33,7 @@ export default function ArticlesTabContent({ slug }: ArticlesTabProps) {
     posts,
     uniquePositions,
     uniqueFeedTypes,
+    companyScoredCounts,
     csvExporting,
 
     setShowColumnSelector,
@@ -63,6 +65,15 @@ export default function ArticlesTabContent({ slug }: ArticlesTabProps) {
     )
   }
 
+  const [companyThreshold, setCompanyThreshold] = useState(1)
+
+  const uniqueCompaniesAboveThreshold = useMemo(() => {
+    const counts = Object.values(companyScoredCounts)
+    return counts.filter(c => c >= companyThreshold).length
+  }, [companyScoredCounts, companyThreshold])
+
+  const totalUniqueCompanies = Object.keys(companyScoredCounts).length
+
   if (error) {
     return (
       <div className="text-center py-12">
@@ -87,6 +98,22 @@ export default function ArticlesTabContent({ slug }: ArticlesTabProps) {
           View all ingested and scored RSS posts with criteria scores and details.
         </p>
       </div>
+
+      {totalUniqueCompanies > 0 && (
+        <div className="mb-4 flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+          <span className="text-gray-700">Unique companies with</span>
+          <input
+            type="number"
+            min={1}
+            value={companyThreshold}
+            onChange={e => setCompanyThreshold(Math.max(1, parseInt(e.target.value) || 1))}
+            className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm font-medium"
+          />
+          <span className="text-gray-700">scored {companyThreshold === 1 ? 'post' : 'posts'}:</span>
+          <span className="font-bold text-gray-900">{uniqueCompaniesAboveThreshold}</span>
+          <span className="text-gray-400 ml-1">/ {totalUniqueCompanies} total</span>
+        </div>
+      )}
 
       <FilterBar
         datePreset={datePreset}
