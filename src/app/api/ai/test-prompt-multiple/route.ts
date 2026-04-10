@@ -193,7 +193,7 @@ export const POST = withApiHandler(
       //  a massive NOT IN clause that can exceed PostgREST URL limits)
       const { data: poolPosts, error: poolError } = await supabaseAdmin
         .from('rss_posts')
-        .select('id, title, description, full_article_text, source_url, publication_date, feed_id')
+        .select('id, title, description, full_article_text, source_url, publication_date, feed_id, ticker')
         .in('feed_id', pubFeedIds)
         .not('full_article_text', 'is', null)
         .gte('publication_date', cutoffDateStr)
@@ -277,7 +277,8 @@ export const POST = withApiHandler(
             full_article_text,
             source_url,
             publication_date,
-            feed_id
+            feed_id,
+            ticker
           )
         `)
         .in('issue_id', sentIssueIds)

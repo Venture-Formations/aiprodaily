@@ -270,13 +270,20 @@ export class FeedIngestion {
       // from prior runs that timed out before finishing. Caps at 20 per run
       // so we chip away at the backlog without blowing the timeout.
       const CATCHUP_LIMIT = 20
-      const { data: pendingPosts } = await supabaseAdmin
+      let pendingQuery = supabaseAdmin
         .from('rss_posts')
         .select('id, source_url')
         .eq('feed_id', feed.id)
         .eq('extraction_status', 'pending')
-        .not('id', 'in', `(${newPosts.map(p => p.id).join(',')})`)
-        .order('processed_at', { ascending: false })
+
+      // Exclude posts from this run (avoid double-processing)
+      if (newPosts.length > 0) {
+        pendingQuery = pendingQuery.not('id', 'in', `(${newPosts.map(p => p.id).join(',')})`)
+      }
+
+      // Process oldest first so the backlog clears from the bottom up
+      const { data: pendingPosts } = await pendingQuery
+        .order('processed_at', { ascending: true })
         .limit(CATCHUP_LIMIT)
 
       if (pendingPosts && pendingPosts.length > 0) {

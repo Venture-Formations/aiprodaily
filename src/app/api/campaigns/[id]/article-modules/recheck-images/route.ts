@@ -55,33 +55,61 @@ export async function POST(
   // Build a map of ticker → valid trade card image URL from congress_trades.
   // Only include tickers whose underlying file actually exists in Supabase Storage
   // (previously this endpoint could copy stale URLs pointing to deleted files).
-  const tickers = Array.from(new Set(articles.map(a => a.ticker).filter(Boolean))) as string[]
+  // Collect tickers from both module_articles and their linked rss_posts
+  const tickers = Array.from(new Set(
+    articles.flatMap(a => {
+      const rssPost = Array.isArray((a as any).rss_post) ? (a as any).rss_post[0] : (a as any).rss_post
+      return [a.ticker, rssPost?.ticker].filter(Boolean)
+    })
+  )) as string[]
   const validImageByTicker = new Map<string, string>()
 
   if (tickers.length > 0) {
     // Fetch all congress_trades rows for these tickers with non-null image_url.
     // Order by most recent so the first per ticker wins.
-    const { data: tradeRows } = await supabaseAdmin
+    const { data: tradeRows, error: tradeError } = await supabaseAdmin
       .from('congress_trades')
       .select('id, ticker, image_url, quiver_upload_time')
       .in('ticker', tickers)
       .not('image_url', 'is', null)
       .order('quiver_upload_time', { ascending: false, nullsFirst: false })
 
+    if (tradeError) {
+      console.error('[recheck-images] Failed to query congress_trades:', tradeError.message)
+      return NextResponse.json({ error: 'Failed to query trade images' }, { status: 500 })
+    }
+
     // Verify file existence via the Supabase Storage API.
     // Fetch all files under the st/t/ prefix once and build a lookup set.
     const existingFiles = new Set<string>()
     let offset = 0
     const pageSize = 1000
+    let storageListFailed = false
     while (true) {
       const { data: files, error: listError } = await supabaseAdmin.storage
         .from('img')
         .list('st/t', { limit: pageSize, offset })
 
-      if (listError || !files || files.length === 0) break
+      if (listError) {
+        console.error('[recheck-images] Storage list error:', listError.message)
+        storageListFailed = true
+        break
+      }
+      if (!files || files.length === 0) break
       for (const f of files) existingFiles.add(f.name)
       if (files.length < pageSize) break
       offset += pageSize
+    }
+
+    // If storage listing failed and we got no files, don't overwrite existing
+    // trade_image_url values — it's safer to keep them than wipe them.
+    if (storageListFailed && existingFiles.size === 0 && (tradeRows || []).length > 0) {
+      console.warn('[recheck-images] Storage listing failed, skipping image updates to preserve existing URLs')
+      return NextResponse.json({
+        success: false,
+        error: 'Storage listing failed — image URLs not updated to avoid data loss. Try again.',
+        results: [],
+      })
     }
 
     // Walk rows in order — first matching ticker with a verified file wins
@@ -109,9 +137,11 @@ export async function POST(
       ? (article as any).rss_post[0]
       : (article as any).rss_post
 
-    // Prefer a verified congress_trades image, then fall back to rss_posts.image_url
+    // Prefer a verified congress_trades image (try article ticker, then rss_post ticker),
+    // then fall back to rss_posts.image_url
+    const articleTicker = article.ticker || rssPost?.ticker || null
     const resolvedImage =
-      (article.ticker && validImageByTicker.get(article.ticker)) ||
+      (articleTicker && validImageByTicker.get(articleTicker)) ||
       rssPost?.image_url ||
       null
 

@@ -24,7 +24,10 @@ export default async function WebsiteLayout({
   const businessName = settings.business_name || 'Newsletter'
   const logoUrl = settings.logo_url || '/logo.png'
 
-  const pixelId = settings.meta_pixel_id || ''
+  // Validate pixel ID: must be digits only to prevent stored XSS
+  // (interpolated into dangerouslySetInnerHTML for the FB pixel script)
+  const rawPixelId = settings.meta_pixel_id || ''
+  const pixelId = /^\d+$/.test(rawPixelId) ? rawPixelId : ''
 
   // JSON-LD structured data for Organization
   const organizationSchema = {
