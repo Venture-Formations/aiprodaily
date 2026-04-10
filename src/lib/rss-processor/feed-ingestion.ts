@@ -232,16 +232,21 @@ export class FeedIngestion {
         }
       }
 
-      // Score new posts (batch of 5)
+      // Score new posts — ONLY those with successfully extracted text.
+      // Posts where extraction failed or is still pending are skipped (no point
+      // scoring without article content — the AI has nothing to evaluate).
       let scoredCount = 0
 
       if (newPosts.length > 0) {
         const { data: fullPosts } = await supabaseAdmin
           .from('rss_posts')
-          .select('id, title, description, content, source_url, full_article_text, article_module_id')
+          .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id')
           .in('id', newPosts.map(p => p.id))
+          .eq('extraction_status', 'success')
+          .not('full_article_text', 'is', null)
 
         if (fullPosts && fullPosts.length > 0) {
+          console.log(`[Ingest] Scoring ${fullPosts.length}/${newPosts.length} posts (${newPosts.length - fullPosts.length} skipped — extraction not successful)`)
           const BATCH_SIZE = 5
           const BATCH_DELAY = 2000
 
@@ -258,6 +263,85 @@ export class FeedIngestion {
               await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
             }
           }
+        }
+      }
+
+      // Catch-up: extract + score any older posts still stuck at "pending"
+      // from prior runs that timed out before finishing. Caps at 20 per run
+      // so we chip away at the backlog without blowing the timeout.
+      const CATCHUP_LIMIT = 20
+      const { data: pendingPosts } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id, source_url')
+        .eq('feed_id', feed.id)
+        .eq('extraction_status', 'pending')
+        .not('id', 'in', `(${newPosts.map(p => p.id).join(',')})`)
+        .order('processed_at', { ascending: false })
+        .limit(CATCHUP_LIMIT)
+
+      if (pendingPosts && pendingPosts.length > 0) {
+        console.log(`[Ingest] Catch-up: extracting ${pendingPosts.length} pending posts from prior runs`)
+
+        const pendingUrls = pendingPosts.filter(p => p.source_url).map(p => p.source_url)
+        try {
+          const catchupResults = await this.ctx.articleExtractor.extractBatch(pendingUrls, 3)
+
+          for (const post of pendingPosts) {
+            if (!post.source_url) continue
+            const result = catchupResults.get(post.source_url)
+            if (result?.success && result.fullText) {
+              await supabaseAdmin
+                .from('rss_posts')
+                .update({
+                  full_article_text: result.fullText,
+                  extraction_status: 'success',
+                  extraction_error: null
+                })
+                .eq('id', post.id)
+            } else if (result) {
+              await supabaseAdmin
+                .from('rss_posts')
+                .update({
+                  extraction_status: result.status || 'failed',
+                  extraction_error: result.error?.substring(0, 500) || null
+                })
+                .eq('id', post.id)
+            }
+          }
+
+          // Score successfully extracted catch-up posts
+          const { data: catchupExtracted } = await supabaseAdmin
+            .from('rss_posts')
+            .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id')
+            .in('id', pendingPosts.map(p => p.id))
+            .eq('extraction_status', 'success')
+            .not('full_article_text', 'is', null)
+
+          if (catchupExtracted && catchupExtracted.length > 0) {
+            // Filter to only posts without existing ratings
+            const postIds = catchupExtracted.map(p => p.id)
+            const { data: existingRatings } = await supabaseAdmin
+              .from('post_ratings')
+              .select('post_id')
+              .in('post_id', postIds)
+
+            const ratedIds = new Set((existingRatings || []).map(r => r.post_id))
+            const unratedPosts = catchupExtracted.filter(p => !ratedIds.has(p.id))
+
+            if (unratedPosts.length > 0) {
+              console.log(`[Ingest] Catch-up: scoring ${unratedPosts.length} newly extracted posts`)
+              for (const post of unratedPosts) {
+                try {
+                  await this.scoreAndStorePost(post, newsletterId)
+                  scoredCount++
+                } catch (error) {
+                  // Skip individual scoring failures
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[Ingest] Catch-up extraction failed:', error instanceof Error ? error.message : 'Unknown')
         }
       }
 
