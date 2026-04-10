@@ -7,6 +7,8 @@ const WEBSITE_SETTINGS_KEYS = [
   'website_heading',
   'website_subheading',
   'tools_directory_enabled',
+  // Tracking
+  'meta_pixel_id',
   // Subscribe page
   'subscribe_heading',
   'subscribe_subheading',

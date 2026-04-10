@@ -23,6 +23,7 @@ export interface WebsiteSettingsState {
   website_heading: string
   website_subheading: string
   tools_directory_enabled: boolean
+  meta_pixel_id: string
   subscribe_heading: string
   subscribe_subheading: string
   subscribe_tagline: string
@@ -41,6 +42,7 @@ export function useWebsiteSettings(publicationId: string) {
     website_heading: '',
     website_subheading: '',
     tools_directory_enabled: true,
+    meta_pixel_id: '',
     subscribe_heading: '',
     subscribe_subheading: '',
     subscribe_tagline: '',

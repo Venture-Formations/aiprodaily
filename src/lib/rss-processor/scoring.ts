@@ -149,9 +149,20 @@ export class Scoring {
 
     console.log(`[Score] Using ${criteria.length} criteria from mod ${moduleId}`)
 
-    // Look up feed name for company_name placeholder
+    // Look up company name for {{company_name}} placeholder in AI prompts.
+    // Prefer the ticker's resolved company name from ticker_company_names,
+    // then fall back to the feed name.
     let companyName = ''
-    if (post.feed_id) {
+    const postTicker = (post as any).ticker
+    if (postTicker) {
+      const { data: tickerMapping } = await supabaseAdmin
+        .from('ticker_company_names')
+        .select('company_name')
+        .eq('ticker', postTicker.toUpperCase())
+        .maybeSingle()
+      companyName = tickerMapping?.company_name || ''
+    }
+    if (!companyName && post.feed_id) {
       const { data: feed } = await supabaseAdmin
         .from('rss_feeds')
         .select('name')

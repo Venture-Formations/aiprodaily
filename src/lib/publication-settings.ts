@@ -231,6 +231,7 @@ export async function resolvePublicationFromRequest(): Promise<{
     'newsletter_name',
     'business_name',
     'tools_directory_enabled',
+    'meta_pixel_id',
   ])
 
   return { publicationId, host, settings }

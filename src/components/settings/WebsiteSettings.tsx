@@ -33,6 +33,12 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
         <SettingsTextarea label="Subheading" value={settings.website_subheading} onChange={(v) => setSettings(prev => ({ ...prev, website_subheading: v }))} placeholder="Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes." rows={3} hint="The description text below the heading." />
       </div>
 
+      {/* Tracking */}
+      <div className="border rounded-lg p-4 space-y-4">
+        <h3 className="font-medium text-gray-900">Tracking</h3>
+        <SettingsInput label="Meta Pixel ID" value={settings.meta_pixel_id} onChange={(v) => setSettings(prev => ({ ...prev, meta_pixel_id: v }))} placeholder="1651450039330329" hint="Your Facebook/Meta Pixel ID. Leave blank to disable. Each publication can have a different pixel." />
+      </div>
+
       {/* Navigation Features */}
       <div className="border rounded-lg p-4 space-y-4">
         <h3 className="font-medium text-gray-900">Navigation</h3>
