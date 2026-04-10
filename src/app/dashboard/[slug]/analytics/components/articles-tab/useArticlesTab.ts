@@ -47,6 +47,7 @@ export function useArticlesTab(slug: string) {
   // Server-provided filter options (from all data, not just current page)
   const [uniqueFeedTypes, setUniqueFeedTypes] = useState<string[]>([])
   const [uniquePositions, setUniquePositions] = useState<number[]>([])
+  const [companyScoredCounts, setCompanyScoredCounts] = useState<Record<string, number>>({})
 
   const enabledColumns = columns.filter(col => col.enabled)
 
@@ -111,6 +112,7 @@ export function useArticlesTab(slug: string) {
       setTotalPages(result.totalPages || 0)
       if (result.allFeedTypes) setUniqueFeedTypes(result.allFeedTypes)
       if (result.allPositions) setUniquePositions(result.allPositions)
+      if (result.companyScoredCounts) setCompanyScoredCounts(result.companyScoredCounts)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -238,6 +240,7 @@ export function useArticlesTab(slug: string) {
     enabledColumns,
     uniquePositions,
     uniqueFeedTypes,
+    companyScoredCounts,
     csvExporting,
 
     // Setters
