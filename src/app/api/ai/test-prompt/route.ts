@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
+import { supabaseAdmin } from '@/lib/supabase'
 import { TextBoxGenerator } from '@/lib/text-box-modules/text-box-generator'
 import type { TextBoxPlaceholderData } from '@/types/database'
 
@@ -78,6 +79,16 @@ export const POST = withApiHandler(
   async ({ request }) => {
     const body = await request.json()
     const { provider, promptJson, post, publication_id, isCustomFreeform } = body
+
+    // Resolve company_name from ticker_company_names if the post has a ticker
+    if (post?.ticker && !post.company_name) {
+      const { data: tickerMapping } = await supabaseAdmin
+        .from('ticker_company_names')
+        .select('company_name')
+        .eq('ticker', post.ticker.toUpperCase())
+        .maybeSingle()
+      post.company_name = tickerMapping?.company_name || ''
+    }
 
     // Validate provider matches model
     const modelName = (promptJson?.model || '').toLowerCase()
