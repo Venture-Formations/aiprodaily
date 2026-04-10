@@ -7,9 +7,13 @@ interface ArticleModuleSectionProps {
       headline: string
       content: string
       ai_image_url?: string
+      image_alt?: string
+      trade_image_url?: string
+      trade_image_alt?: string
       rss_post?: {
         source_url?: string
         image_url?: string
+        image_alt?: string
       }
     }>
   }
@@ -35,12 +39,22 @@ export default function ArticleModuleSection({ articleModule }: ArticleModuleSec
                 <div className="flex-1">
                   {blockOrder.map((blockType: string) => {
                     switch (blockType) {
+                      case 'trade_image':
+                        return article.trade_image_url ? (
+                          <div key="trade_image" className="mb-4">
+                            <img
+                              src={article.trade_image_url}
+                              alt={article.trade_image_alt || article.headline}
+                              className="w-full max-w-md rounded-lg"
+                            />
+                          </div>
+                        ) : null
                       case 'source_image':
                         return article.rss_post?.image_url ? (
                           <div key="source_image" className="mb-4">
                             <img
                               src={article.rss_post.image_url}
-                              alt={article.headline}
+                              alt={article.image_alt || article.rss_post?.image_alt || article.headline}
                               className="w-full max-w-md rounded-lg"
                             />
                           </div>
@@ -50,7 +64,7 @@ export default function ArticleModuleSection({ articleModule }: ArticleModuleSec
                           <div key="ai_image" className="mb-4">
                             <img
                               src={article.ai_image_url}
-                              alt={article.headline}
+                              alt={article.image_alt || article.headline}
                               className="w-full max-w-md rounded-lg"
                             />
                           </div>

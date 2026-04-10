@@ -366,10 +366,14 @@ export class NewsletterArchiver {
               word_count,
               rank,
               ai_image_url,
+              image_alt,
+              trade_image_url,
+              trade_image_alt,
               rss_post:rss_posts(
                 title,
                 source_url,
                 image_url,
+                image_alt,
                 publication_date
               )
             `)
@@ -391,6 +395,9 @@ export class NewsletterArchiver {
                 word_count: article.word_count,
                 rank: article.rank,
                 ai_image_url: article.ai_image_url,
+                image_alt: article.image_alt,
+                trade_image_url: article.trade_image_url,
+                trade_image_alt: article.trade_image_alt,
                 rss_post: Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
               }))
             })
