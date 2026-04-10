@@ -240,7 +240,7 @@ export class FeedIngestion {
       if (newPosts.length > 0) {
         const { data: fullPosts } = await supabaseAdmin
           .from('rss_posts')
-          .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id')
+          .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id, ticker')
           .in('id', newPosts.map(p => p.id))
           .eq('extraction_status', 'success')
           .not('full_article_text', 'is', null)
@@ -312,7 +312,7 @@ export class FeedIngestion {
           // Score successfully extracted catch-up posts
           const { data: catchupExtracted } = await supabaseAdmin
             .from('rss_posts')
-            .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id')
+            .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id, ticker')
             .in('id', pendingPosts.map(p => p.id))
             .eq('extraction_status', 'success')
             .not('full_article_text', 'is', null)
