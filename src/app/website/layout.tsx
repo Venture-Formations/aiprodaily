@@ -24,7 +24,7 @@ export default async function WebsiteLayout({
   const businessName = settings.business_name || 'Newsletter'
   const logoUrl = settings.logo_url || '/logo.png'
 
-  const pixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID || ''
+  const pixelId = settings.meta_pixel_id || ''
 
   // JSON-LD structured data for Organization
   const organizationSchema = {
