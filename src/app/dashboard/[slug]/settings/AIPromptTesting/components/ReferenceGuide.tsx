@@ -42,7 +42,7 @@ export default function ReferenceGuide({ promptType }: ReferenceGuideProps) {
           </div>
           <div className="font-mono">
             <span className="text-blue-600">{'{{company_name}}'}</span>
-            <span className="text-gray-600 ml-2">- RSS feed name (source company)</span>
+            <span className="text-gray-600 ml-2">- Company name from ticker database (falls back to feed name)</span>
           </div>
         </div>
 

@@ -340,7 +340,20 @@ export const POST = withApiHandler(
 
     console.log(`[AI Test Multiple] Testing ${posts.length} posts`)
 
-    // Resolve feed names for {{company_name}} placeholder
+    // Resolve company names for {{company_name}} placeholder.
+    // Prefer ticker_company_names (the actual company), fall back to feed name.
+    const postTickers = Array.from(new Set(posts.map((p: any) => p.ticker).filter(Boolean)))
+    const tickerNameMap = new Map<string, string>()
+    if (postTickers.length > 0) {
+      const { data: tickerMappings } = await supabaseAdmin
+        .from('ticker_company_names')
+        .select('ticker, company_name')
+        .in('ticker', postTickers.map((t: string) => t.toUpperCase()))
+      for (const m of tickerMappings || []) {
+        tickerNameMap.set(m.ticker.toUpperCase(), m.company_name)
+      }
+    }
+
     const feedIds = Array.from(new Set(posts.map((p: any) => p.feed_id).filter(Boolean)))
     const feedNameMap = new Map<string, string>()
     if (feedIds.length > 0) {
@@ -353,9 +366,13 @@ export const POST = withApiHandler(
       }
     }
 
-    // Attach company_name to each post
+    // Attach company_name: prefer ticker lookup, fall back to feed name
     for (const post of posts) {
-      ;(post as any).company_name = feedNameMap.get((post as any).feed_id) || ''
+      const ticker = ((post as any).ticker || '').toUpperCase()
+      ;(post as any).company_name =
+        tickerNameMap.get(ticker) ||
+        feedNameMap.get((post as any).feed_id) ||
+        ''
     }
 
     // Process each post
