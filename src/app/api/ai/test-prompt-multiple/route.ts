@@ -310,6 +310,7 @@ export const POST = withApiHandler(
         source_url: string | null
         publication_date: string | null
         feed_id: string | null
+        ticker: string | null
       }>()
 
       for (const article of result.data || []) {
@@ -321,6 +322,7 @@ export const POST = withApiHandler(
           source_url: string | null
           publication_date: string | null
           feed_id: string | null
+          ticker: string | null
         } | null
 
         if (rssPost && !postsMap.has(rssPost.id)) {
@@ -341,8 +343,7 @@ export const POST = withApiHandler(
 
     console.log(`[AI Test Multiple] Testing ${posts.length} posts`)
 
-    // Resolve company names for {{company_name}} placeholder.
-    // Prefer ticker_company_names (the actual company), fall back to feed name.
+    // Resolve company names for {{company_name}} placeholder from ticker_company_names.
     const postTickers = Array.from(new Set(posts.map((p: any) => p.ticker).filter(Boolean)))
     const tickerNameMap = new Map<string, string>()
     if (postTickers.length > 0) {
@@ -355,25 +356,10 @@ export const POST = withApiHandler(
       }
     }
 
-    const feedIds = Array.from(new Set(posts.map((p: any) => p.feed_id).filter(Boolean)))
-    const feedNameMap = new Map<string, string>()
-    if (feedIds.length > 0) {
-      const { data: feeds } = await supabaseAdmin
-        .from('rss_feeds')
-        .select('id, name')
-        .in('id', feedIds)
-      for (const feed of feeds || []) {
-        feedNameMap.set(feed.id, feed.name)
-      }
-    }
-
-    // Attach company_name: prefer ticker lookup, fall back to feed name
+    // Attach company_name from ticker lookup (blank if no ticker on the post)
     for (const post of posts) {
       const ticker = ((post as any).ticker || '').toUpperCase()
-      ;(post as any).company_name =
-        tickerNameMap.get(ticker) ||
-        feedNameMap.get((post as any).feed_id) ||
-        ''
+      ;(post as any).company_name = tickerNameMap.get(ticker) || ''
     }
 
     // Process each post

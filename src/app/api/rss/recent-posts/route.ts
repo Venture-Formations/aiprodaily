@@ -93,7 +93,8 @@ export const GET = withApiHandler(
             description,
             full_article_text,
             source_url,
-            publication_date
+            publication_date,
+            ticker
           )
         `)
         .in('issue_id', sentIssueIds)
@@ -137,6 +138,7 @@ export const GET = withApiHandler(
         full_article_text: string | null
         source_url: string | null
         publication_date: string | null
+        ticker: string | null
         used_in_issue_date?: string
         generated_headline?: string
       }>()
@@ -149,6 +151,7 @@ export const GET = withApiHandler(
           full_article_text: string | null
           source_url: string | null
           publication_date: string | null
+          ticker: string | null
         } | null
 
         if (!rssPost) continue
@@ -213,7 +216,7 @@ export const GET = withApiHandler(
       // (Avoids stuffing thousands of IDs into a PostgREST filter which can exceed URL limits)
       const { data: rawPoolPosts, error: poolError } = await supabaseAdmin
         .from('rss_posts')
-        .select('id, title, description, full_article_text, source_url, publication_date')
+        .select('id, title, description, full_article_text, source_url, publication_date, ticker')
         .in('feed_id', pubFeedIds)
         .not('full_article_text', 'is', null)
         .gte('publication_date', cutoffDateStr)
@@ -298,7 +301,7 @@ export const GET = withApiHandler(
       // Fetch posts with their ratings via join
       const { data: rawScoredPosts, error: scoredError } = await supabaseAdmin
         .from('rss_posts')
-        .select('id, title, description, full_article_text, source_url, publication_date, post_ratings(total_score)')
+        .select('id, title, description, full_article_text, source_url, publication_date, ticker, post_ratings(total_score)')
         .in('feed_id', pubFeedIds)
         .not('full_article_text', 'is', null)
         .gte('publication_date', cutoffDateStr)
@@ -323,6 +326,7 @@ export const GET = withApiHandler(
           full_article_text: p.full_article_text,
           source_url: p.source_url,
           publication_date: p.publication_date,
+          ticker: (p as any).ticker || null,
           total_score: p.post_ratings[0]?.total_score ?? 0,
         }))
         .sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0))
