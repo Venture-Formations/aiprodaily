@@ -15,6 +15,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       const all = url.searchParams.get('all') === 'true'
       const onlyMissing = url.searchParams.get('onlyMissing') === 'true'
       const limitParam = url.searchParams.get('limit')
+      const offsetParam = url.searchParams.get('offset')
 
       if (!id && !ticker && !all) {
         return NextResponse.json(
@@ -25,17 +26,20 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
       // Default/cap differs by mode:
       //   single lookups (id/ticker): cap at 25
-      //   bulk (all=true): default 250, cap 300
-      // 300 × ~3s/trade ÷ 5 parallel = ~180s worst case,
-      // comfortably under the 600s maxDuration.
-      const defaultLimit = all ? 250 : 1
-      const maxLimit = all ? 300 : 25
+      //   bulk (all=true): default 100, cap 120
+      // Empirically measured: parallel Satori renders + Tinify + upload
+      // takes ~14s per batch of 5, not the ~3s I originally guessed.
+      // 100 ÷ 5 × 14s = ~280s, comfortably under the 600s maxDuration.
+      // Use ?offset=N (e.g. 0, 100, 200) to paginate past 100.
+      const defaultLimit = all ? 100 : 1
+      const maxLimit = all ? 120 : 25
       const limit = Math.min(parseInt(limitParam || String(defaultLimit), 10) || defaultLimit, maxLimit)
+      const offset = all ? Math.max(parseInt(offsetParam || '0', 10) || 0, 0) : 0
 
       let query = supabaseAdmin
         .from('congress_trades')
         .select('id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time, image_url')
-        .limit(limit)
+        .range(offset, offset + limit - 1)
 
       if (id) {
         query = query.eq('id', id)
@@ -45,8 +49,8 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
         // all=true: newest first so the most visible cards refresh first.
         // CRITICAL: default to regenerating LIVE cards (image_url IS NOT NULL).
         // congress_trades carries 100k+ historical rows with null image_url;
-        // pulling 250 of those into the regen pipeline would thrash member
-        // photo resolution and easily blow past the 600s function timeout.
+        // pulling those into the regen pipeline would thrash member photo
+        // resolution and easily blow past the 600s function timeout.
         query = query.order('traded', { ascending: false })
         if (onlyMissing) {
           query = query.is('image_url', null)

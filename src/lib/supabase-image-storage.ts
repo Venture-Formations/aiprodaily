@@ -124,10 +124,19 @@ export class SupabaseImageStorage {
 
   /**
    * Upload a static asset (background images, cover photos, etc.).
+   *
+   * Pass `{ skipOptimize: true }` to bypass Tinify entirely — use for
+   * assets that are already small (e.g. @vercel/og output) where the
+   * round-trip + quota spend isn't worth the marginal size savings.
    */
-  async uploadStaticAsset(buffer: Buffer, fileName: string, contentType: string): Promise<string | null> {
+  async uploadStaticAsset(
+    buffer: Buffer,
+    fileName: string,
+    contentType: string,
+    options: { skipOptimize?: boolean } = {}
+  ): Promise<string | null> {
     try {
-      const optimized = await optimizeBuffer(buffer)
+      const optimized = options.skipOptimize ? buffer : await optimizeBuffer(buffer)
       const objectPath = `${PREFIX.static}/${fileName}`
 
       return this.uploadToStorage(objectPath, optimized, contentType, true)

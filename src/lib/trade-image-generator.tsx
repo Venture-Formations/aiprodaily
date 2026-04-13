@@ -112,11 +112,13 @@ export async function generateAndUploadTradeImage(
 
   if (!imageBuffer) return null
 
-  // Upload with Tinify compression
+  // Trade cards are already small (1200×320 Satori PNG ~30-80KB).
+  // Skip Tinify — the round-trip + quota spend isn't worth it.
   const imageUrl = await imageStorage.uploadStaticAsset(
     imageBuffer,
     `t/${trade.id}.png`,
-    'image/png'
+    'image/png',
+    { skipOptimize: true }
   )
 
   if (imageUrl) {
