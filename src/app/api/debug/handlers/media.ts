@@ -23,10 +23,13 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
         )
       }
 
-      // Default/cap differs by mode: single lookups cap at 25, bulk at 500.
-      // 500 × ~3s/trade = ~25 min worst case — fits in 600s maxDuration with room.
-      const defaultLimit = all ? 500 : 1
-      const maxLimit = all ? 500 : 25
+      // Default/cap differs by mode:
+      //   single lookups (id/ticker): cap at 25
+      //   bulk (all=true): default 250, cap 300
+      // 300 × ~3s/trade ÷ 5 parallel = ~180s worst case,
+      // comfortably under the 600s maxDuration.
+      const defaultLimit = all ? 250 : 1
+      const maxLimit = all ? 300 : 25
       const limit = Math.min(parseInt(limitParam || String(defaultLimit), 10) || defaultLimit, maxLimit)
 
       let query = supabaseAdmin
@@ -39,9 +42,17 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       } else if (ticker) {
         query = query.eq('ticker', ticker).order('traded', { ascending: false })
       } else {
-        // all=true: newest first so the most visible cards refresh first
+        // all=true: newest first so the most visible cards refresh first.
+        // CRITICAL: default to regenerating LIVE cards (image_url IS NOT NULL).
+        // congress_trades carries 100k+ historical rows with null image_url;
+        // pulling 250 of those into the regen pipeline would thrash member
+        // photo resolution and easily blow past the 600s function timeout.
         query = query.order('traded', { ascending: false })
-        if (onlyMissing) query = query.is('image_url', null)
+        if (onlyMissing) {
+          query = query.is('image_url', null)
+        } else {
+          query = query.not('image_url', 'is', null)
+        }
       }
 
       const { data: trades, error } = await query
