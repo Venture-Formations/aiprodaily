@@ -1,6 +1,7 @@
 import Parser from 'rss-parser'
 import { supabaseAdmin } from '../supabase'
 import { getExcludedRssSources, getBlockedDomains } from '../publication-settings'
+import { alertOnFirecrawl402 } from '../monitoring/firecrawl-monitor'
 import type { RSSProcessorContext } from './shared-context'
 import { isFbcdnUrl } from './shared-context'
 import { Scoring } from './scoring'
@@ -203,6 +204,7 @@ export class FeedIngestion {
 
         try {
           const extractionResults = await this.ctx.articleExtractor.extractBatch(urls, 10)
+          await alertOnFirecrawl402(extractionResults, { feedName: feed.name })
 
           for (const post of newPosts) {
             if (!post.source_url) continue
@@ -292,6 +294,7 @@ export class FeedIngestion {
         const pendingUrls = pendingPosts.filter(p => p.source_url).map(p => p.source_url)
         try {
           const catchupResults = await this.ctx.articleExtractor.extractBatch(pendingUrls, 3)
+          await alertOnFirecrawl402(catchupResults, { feedName: feed.name })
 
           for (const post of pendingPosts) {
             if (!post.source_url) continue
