@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'crypto'
 import { Feed } from 'feed'
 import { htmlToText } from 'html-to-text'
 import { supabaseAdmin } from '../supabase'
+import { normalizeTransactionType } from '../transaction-type'
 import { wrapTrackingUrl } from '../url-tracking'
 
 // Module-level cache keyed by moduleId:publicationId
@@ -157,8 +158,9 @@ export class ModuleFeedGenerator {
       if (article.member_name) {
         categories.push({ name: article.member_name })
       }
-      if (article.transaction_type) {
-        categories.push({ name: article.transaction_type })
+      const normalizedTransactionType = normalizeTransactionType(article.transaction_type)
+      if (normalizedTransactionType) {
+        categories.push({ name: normalizedTransactionType })
       }
       if (categories.length > 0) {
         itemData.category = categories

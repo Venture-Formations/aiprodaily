@@ -2,10 +2,162 @@ import { NextResponse } from 'next/server'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
+import { generateAndUploadTradeImage } from '@/lib/trade-image-generator'
 
 type DebugHandler = (context: ApiHandlerContext) => Promise<NextResponse>
 
 export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler }> = {
+  'regen-trade-image': {
+    GET: async ({ request }) => {
+      const url = new URL(request.url)
+      const id = url.searchParams.get('id')
+      const ticker = url.searchParams.get('ticker')?.toUpperCase()
+      const all = url.searchParams.get('all') === 'true'
+      const onlyMissing = url.searchParams.get('onlyMissing') === 'true'
+      const limitParam = url.searchParams.get('limit')
+      const offsetParam = url.searchParams.get('offset')
+
+      if (!id && !ticker && !all) {
+        return NextResponse.json(
+          { error: 'Provide ?id=<uuid>, ?ticker=<TICKER>, or ?all=true' },
+          { status: 400 }
+        )
+      }
+
+      // Default/cap differs by mode:
+      //   single lookups (id/ticker): cap at 25
+      //   bulk (all=true): default 100, cap 120
+      // Empirically measured: parallel Satori renders + Tinify + upload
+      // takes ~14s per batch of 5, not the ~3s I originally guessed.
+      // 100 ÷ 5 × 14s = ~280s, comfortably under the 600s maxDuration.
+      // Use ?offset=N (e.g. 0, 100, 200) to paginate past 100.
+      const defaultLimit = all ? 100 : 1
+      const maxLimit = all ? 120 : 25
+      const limit = Math.min(parseInt(limitParam || String(defaultLimit), 10) || defaultLimit, maxLimit)
+      const offset = all ? Math.max(parseInt(offsetParam || '0', 10) || 0, 0) : 0
+
+      let query = supabaseAdmin
+        .from('congress_trades')
+        .select('id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time, image_url')
+        .range(offset, offset + limit - 1)
+
+      if (id) {
+        query = query.eq('id', id)
+      } else if (ticker) {
+        query = query.eq('ticker', ticker).order('traded', { ascending: false })
+      } else {
+        // all=true: newest first so the most visible cards refresh first.
+        // CRITICAL: default to regenerating LIVE cards (image_url IS NOT NULL).
+        // congress_trades carries 100k+ historical rows with null image_url;
+        // pulling those into the regen pipeline would thrash member photo
+        // resolution and easily blow past the 600s function timeout.
+        query = query.order('traded', { ascending: false })
+        if (onlyMissing) {
+          query = query.is('image_url', null)
+        } else {
+          query = query.not('image_url', 'is', null)
+        }
+      }
+
+      const { data: trades, error } = await query
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      if (!trades || trades.length === 0) {
+        return NextResponse.json({ error: 'No matching trades found' }, { status: 404 })
+      }
+
+      // Resolve company name for each trade (mirrors runIngestion pathway)
+      const tickers = Array.from(new Set(trades.map((t) => t.ticker).filter(Boolean)))
+      const companyNameMap = new Map<string, string>()
+      if (tickers.length > 0) {
+        const { data: nameRows } = await supabaseAdmin
+          .from('ticker_company_names')
+          .select('ticker, company_name')
+          .in('ticker', tickers)
+        for (const row of nameRows || []) {
+          if (row.ticker && row.company_name) {
+            companyNameMap.set(row.ticker, row.company_name)
+          }
+        }
+      }
+
+      type RegenResult = {
+        id: string
+        ticker: string
+        member: string | null
+        imageUrl: string | null
+        cacheBustedUrl: string | null
+        error?: string
+      }
+      const results: RegenResult[] = []
+
+      // Batch regenerate to avoid overwhelming Tinify / Supabase Storage —
+      // same cadence runIngestion uses for image generation.
+      const BATCH_SIZE = 5
+      const BATCH_DELAY_MS = 500
+
+      for (let i = 0; i < trades.length; i += BATCH_SIZE) {
+        if (i > 0) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+        const batch = trades.slice(i, i + BATCH_SIZE)
+        const settled = await Promise.allSettled(
+          batch.map((trade) => {
+            const companyName = companyNameMap.get(trade.ticker) || trade.company || trade.ticker
+            return generateAndUploadTradeImage(
+              {
+                id: trade.id,
+                name: trade.name,
+                chamber: trade.chamber,
+                state: trade.state,
+                transaction: trade.transaction,
+                company: companyName,
+                ticker: trade.ticker,
+              },
+              { force: true }
+            )
+          })
+        )
+
+        for (let j = 0; j < settled.length; j++) {
+          const trade = batch[j]
+          const outcome = settled[j]
+          if (outcome.status === 'fulfilled') {
+            const imageUrl = outcome.value
+            results.push({
+              id: trade.id,
+              ticker: trade.ticker,
+              member: trade.name,
+              imageUrl,
+              cacheBustedUrl: imageUrl ? `${imageUrl}?t=${Date.now()}` : null,
+            })
+          } else {
+            results.push({
+              id: trade.id,
+              ticker: trade.ticker,
+              member: trade.name,
+              imageUrl: null,
+              cacheBustedUrl: null,
+              error: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
+            })
+          }
+        }
+      }
+
+      const succeeded = results.filter((r) => r.imageUrl).length
+      const failed = results.length - succeeded
+
+      return NextResponse.json({
+        mode: all ? 'bulk' : id ? 'by-id' : 'by-ticker',
+        attempted: results.length,
+        succeeded,
+        failed,
+        results,
+        timestamp: new Date().toISOString(),
+      })
+    },
+  },
+
+
   'image-upload': {
     GET: async ({ logger }) => {
       try {

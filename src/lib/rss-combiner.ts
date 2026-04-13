@@ -2,6 +2,7 @@ import { Feed } from 'feed'
 import { supabaseAdmin } from '@/lib/supabase'
 import { XMLParser } from 'fast-xml-parser'
 import { generateAndUploadTradeImage } from './trade-image-generator'
+import { normalizeTransactionType } from './transaction-type'
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -659,7 +660,8 @@ export function generateCombinedFeedXml(
     if (item.sourceName) categories.push({ name: `source:${item.sourceName}` })
     if (item.tradeMeta?.ticker) categories.push({ name: `ticker:${item.tradeMeta.ticker}` })
     if (item.tradeMeta?.name) categories.push({ name: `member:${item.tradeMeta.name}` })
-    if (item.tradeMeta?.transaction) categories.push({ name: `transaction:${item.tradeMeta.transaction}` })
+    const normalizedTxn = normalizeTransactionType(item.tradeMeta?.transaction)
+    if (normalizedTxn) categories.push({ name: `transaction:${normalizedTxn}` })
 
     // Build custom XML extensions for trade metadata
     const extensions: { name: string; objects: Record<string, unknown> }[] = []
@@ -668,7 +670,7 @@ export function generateCombinedFeedXml(
       extensions.push({ name: 'ticker', objects: { _text: m.ticker } })
       extensions.push({ name: 'company', objects: { _text: m.company_name } })
       if (m.traded) extensions.push({ name: 'traded', objects: { _text: m.traded } })
-      if (m.transaction) extensions.push({ name: 'transaction', objects: { _text: m.transaction } })
+      if (normalizedTxn) extensions.push({ name: 'transaction', objects: { _text: normalizedTxn } })
       if (m.name) extensions.push({ name: 'member', objects: { _text: m.name } })
       if (m.party) extensions.push({ name: 'party', objects: { _text: m.party } })
       if (m.district) extensions.push({ name: 'district', objects: { _text: m.district } })
