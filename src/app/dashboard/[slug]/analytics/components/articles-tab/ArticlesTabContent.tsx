@@ -57,14 +57,6 @@ export default function ArticlesTabContent({ slug }: ArticlesTabProps) {
     fetchPosts,
   } = useArticlesTab(slug)
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
-      </div>
-    )
-  }
-
   const [companyThreshold, setCompanyThreshold] = useState(1)
 
   const uniqueCompaniesAboveThreshold = useMemo(() => {
@@ -73,6 +65,14 @@ export default function ArticlesTabContent({ slug }: ArticlesTabProps) {
   }, [companyScoredCounts, companyThreshold])
 
   const totalUniqueCompanies = Object.keys(companyScoredCounts).length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+      </div>
+    )
+  }
 
   if (error) {
     return (
