@@ -357,47 +357,70 @@ export async function resolveBioguideId(
 /**
  * Fetch member photo as a buffer. Tries multiple public sources in order.
  * Uses GET directly (not HEAD) because bioguide.congress.gov rejects HEAD requests.
- * Caches results per-process (including null) so repeated calls for the same
- * bioguide within one ingestion run don't re-hit the network.
+ *
+ * Caching is SUCCESS-ONLY. We deliberately do NOT cache null/failure,
+ * because Vercel functions warm-start across requests and a single
+ * transient timeout during a parallel bulk regen would otherwise poison
+ * every subsequent lookup for that bioguide until the instance recycles.
+ *
+ * In-flight dedupe collapses concurrent callers onto a single network
+ * fetch — critical when runIngestion fires 5 parallel card renders for
+ * the same member.
  */
+const memberPhotoInFlight = new Map<string, Promise<Buffer | null>>()
+
 export async function fetchMemberPhoto(bioguideId: string): Promise<Buffer | null> {
-  // Per-run memoization (also caches null for known-missing photos)
-  if (memberPhotoCache.has(bioguideId)) {
-    return memberPhotoCache.get(bioguideId) ?? null
-  }
+  // Success cache hit — return immediately
+  const cached = memberPhotoCache.get(bioguideId)
+  if (cached) return cached
 
-  const upper = bioguideId.toUpperCase()
-  const lower = bioguideId.toLowerCase()
-  const urls = [
-    `https://bioguide.congress.gov/bioguide/photo/${upper[0]}/${upper}.jpg`,
-    `https://www.congress.gov/img/member/${lower}_200.jpg`,
-    `https://raw.githubusercontent.com/unitedstates/images/gh-pages/congress/225x275/${upper}.jpg`,
-  ]
+  // Deduplicate concurrent fetches for the same bioguide
+  const inFlight = memberPhotoInFlight.get(bioguideId)
+  if (inFlight) return inFlight
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(10_000),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; AIProDaily/1.0)',
-          'Accept': 'image/jpeg,image/*,*/*;q=0.8',
-        },
-      })
-      if (!res.ok) continue
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.startsWith('image/')) continue
-      const arrayBuffer = await res.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-      if (buffer.length < 1000) continue // Too small to be a real photo
-      memberPhotoCache.set(bioguideId, buffer)
-      return buffer
-    } catch {
-      // Try next URL
+  const fetchPromise = (async (): Promise<Buffer | null> => {
+    const upper = bioguideId.toUpperCase()
+    const lower = bioguideId.toLowerCase()
+    const urls = [
+      `https://bioguide.congress.gov/bioguide/photo/${upper[0]}/${upper}.jpg`,
+      `https://www.congress.gov/img/member/${lower}_200.jpg`,
+      `https://raw.githubusercontent.com/unitedstates/images/gh-pages/congress/225x275/${upper}.jpg`,
+    ]
+
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          // 20s: some bioguide portraits are >1MB and can be slow
+          // when multiple parallel card renders compete for bandwidth.
+          signal: AbortSignal.timeout(20_000),
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; AIProDaily/1.0)',
+            Accept: 'image/jpeg,image/*,*/*;q=0.8',
+          },
+        })
+        if (!res.ok) continue
+        const contentType = res.headers.get('content-type') || ''
+        if (!contentType.startsWith('image/')) continue
+        const arrayBuffer = await res.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        if (buffer.length < 1000) continue // Too small to be a real photo
+        memberPhotoCache.set(bioguideId, buffer)
+        return buffer
+      } catch {
+        // Try next URL
+      }
     }
-  }
 
-  memberPhotoCache.set(bioguideId, null)
-  return null
+    // IMPORTANT: do NOT cache null. See comment above.
+    return null
+  })()
+
+  memberPhotoInFlight.set(bioguideId, fetchPromise)
+  try {
+    return await fetchPromise
+  } finally {
+    memberPhotoInFlight.delete(bioguideId)
+  }
 }
 
 /**
