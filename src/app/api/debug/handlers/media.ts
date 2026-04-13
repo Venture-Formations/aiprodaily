@@ -2,10 +2,102 @@ import { NextResponse } from 'next/server'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
+import { generateAndUploadTradeImage } from '@/lib/trade-image-generator'
 
 type DebugHandler = (context: ApiHandlerContext) => Promise<NextResponse>
 
 export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler }> = {
+  'regen-trade-image': {
+    GET: async ({ request }) => {
+      const url = new URL(request.url)
+      const id = url.searchParams.get('id')
+      const ticker = url.searchParams.get('ticker')?.toUpperCase()
+      const limitParam = url.searchParams.get('limit')
+      const limit = Math.min(parseInt(limitParam || '1', 10) || 1, 25)
+
+      if (!id && !ticker) {
+        return NextResponse.json(
+          { error: 'Provide ?id=<uuid> or ?ticker=<TICKER>' },
+          { status: 400 }
+        )
+      }
+
+      let query = supabaseAdmin
+        .from('congress_trades')
+        .select('id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time, image_url')
+        .limit(limit)
+
+      if (id) query = query.eq('id', id)
+      if (ticker) query = query.eq('ticker', ticker).order('traded', { ascending: false })
+
+      const { data: trades, error } = await query
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      if (!trades || trades.length === 0) {
+        return NextResponse.json({ error: 'No matching trade found' }, { status: 404 })
+      }
+
+      // Resolve company name for each trade (mirrors runIngestion pathway)
+      const tickers = Array.from(new Set(trades.map((t) => t.ticker).filter(Boolean)))
+      const companyNameMap = new Map<string, string>()
+      if (tickers.length > 0) {
+        const { data: nameRows } = await supabaseAdmin
+          .from('ticker_company_names')
+          .select('ticker, company_name')
+          .in('ticker', tickers)
+        for (const row of nameRows || []) {
+          if (row.ticker && row.company_name) {
+            companyNameMap.set(row.ticker, row.company_name)
+          }
+        }
+      }
+
+      const results: Array<{ id: string; ticker: string; member: string | null; imageUrl: string | null; cacheBustedUrl: string | null; error?: string }> = []
+
+      for (const trade of trades) {
+        try {
+          const companyName = companyNameMap.get(trade.ticker) || trade.company || trade.ticker
+          const imageUrl = await generateAndUploadTradeImage(
+            {
+              id: trade.id,
+              name: trade.name,
+              chamber: trade.chamber,
+              state: trade.state,
+              transaction: trade.transaction,
+              company: companyName,
+              ticker: trade.ticker,
+            },
+            { force: true }
+          )
+          results.push({
+            id: trade.id,
+            ticker: trade.ticker,
+            member: trade.name,
+            imageUrl,
+            cacheBustedUrl: imageUrl ? `${imageUrl}?t=${Date.now()}` : null,
+          })
+        } catch (err) {
+          results.push({
+            id: trade.id,
+            ticker: trade.ticker,
+            member: trade.name,
+            imageUrl: null,
+            cacheBustedUrl: null,
+            error: err instanceof Error ? err.message : 'Unknown error',
+          })
+        }
+      }
+
+      return NextResponse.json({
+        regenerated: results.length,
+        results,
+        timestamp: new Date().toISOString(),
+      })
+    },
+  },
+
+
   'image-upload': {
     GET: async ({ logger }) => {
       try {

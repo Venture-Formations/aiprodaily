@@ -61,18 +61,26 @@ async function getInterBlackFont(): Promise<ArrayBuffer | null> {
 /**
  * Generate a trade card image and upload to Supabase storage.
  * Returns the public URL, or null if member photo is unavailable.
+ *
+ * Pass `force: true` to bypass the "already exists" short-circuit and
+ * overwrite the stored PNG (upsert). Useful for design iteration.
  */
-export async function generateAndUploadTradeImage(trade: TradeInput): Promise<string | null> {
+export async function generateAndUploadTradeImage(
+  trade: TradeInput,
+  options: { force?: boolean } = {}
+): Promise<string | null> {
   if (!trade.name) {
     console.log(`[trade-image] Skipping trade ${trade.id}: no member name`)
     return null
   }
 
-  // Check if image already exists in storage
+  // Check if image already exists in storage (unless forced)
   const objectPath = `st/t/${trade.id}.png`
-  const exists = await imageStorage.exists(objectPath)
-  if (exists) {
-    return imageStorage.getPublicUrl(objectPath)
+  if (!options.force) {
+    const exists = await imageStorage.exists(objectPath)
+    if (exists) {
+      return imageStorage.getPublicUrl(objectPath)
+    }
   }
 
   // Resolve bioguide ID
@@ -98,7 +106,6 @@ export async function generateAndUploadTradeImage(trade: TradeInput): Promise<st
     chamber: trade.chamber || '',
     state: trade.state || '',
     transaction: trade.transaction || 'Purchase',
-    companyName: trade.company || trade.ticker,
     ticker: trade.ticker,
     photoDataUrl: photoBase64,
   })
@@ -128,31 +135,62 @@ interface CardParams {
   chamber: string
   state: string
   transaction: string
-  companyName: string
   ticker: string
   photoDataUrl: string
 }
 
 /**
- * Pick a font size that will fit the member name on a single line.
- * Available width is ~440px at the default 48px font size.
- * Scales down in steps based on character count.
+ * Split a display name into first / last for two-line rendering.
+ * Skips leading title tokens (e.g. "Dr.") and keeps multi-word last names
+ * together ("Van Duyne", "de la Cruz").
  */
-function getMemberNameFontSize(name: string): number {
+function splitMemberName(fullName: string): { first: string; last: string } {
+  const tokens = fullName.trim().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return { first: '', last: '' }
+  if (tokens.length === 1) return { first: '', last: tokens[0] }
+
+  const titleTokens = new Set(['Dr', 'Mr', 'Ms', 'Mrs', 'Rep', 'Sen', 'Hon'])
+  let startIdx = 0
+  const firstTokenBare = tokens[0].replace(/\./g, '')
+  if (tokens[0].endsWith('.') || titleTokens.has(firstTokenBare)) {
+    startIdx = 1
+  }
+
+  const remaining = tokens.slice(startIdx)
+  if (remaining.length <= 1) return { first: '', last: remaining[0] || tokens[0] }
+
+  return { first: remaining[0], last: remaining.slice(1).join(' ') }
+}
+
+function getFirstNameFontSize(name: string): number {
   const len = name.length
-  if (len <= 14) return 48
-  if (len <= 17) return 42
-  if (len <= 20) return 38
-  if (len <= 23) return 34
-  if (len <= 26) return 30
-  if (len <= 30) return 26
-  return 22
+  if (len <= 10) return 60
+  if (len <= 13) return 52
+  return 44
+}
+
+function getLastNameFontSize(name: string): number {
+  const len = name.length
+  if (len <= 10) return 84
+  if (len <= 13) return 72
+  if (len <= 16) return 60
+  return 50
+}
+
+function getTickerFontSize(ticker: string): number {
+  const len = ticker.length
+  if (len <= 4) return 68
+  if (len === 5) return 58
+  return 48
 }
 
 async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
-  const { memberName, chamber, state, transaction, companyName, ticker, photoDataUrl } = params
+  const { memberName, chamber, state, transaction, ticker, photoDataUrl } = params
 
-  const memberNameFontSize = getMemberNameFontSize(memberName)
+  const { first: firstName, last: lastName } = splitMemberName(memberName)
+  const firstNameFontSize = getFirstNameFontSize(firstName)
+  const lastNameFontSize = getLastNameFontSize(lastName)
+  const tickerFontSize = getTickerFontSize(ticker)
   const isPurchase = transaction.toLowerCase().includes('purchase')
   const tickerColor = isPurchase ? '#00ff88' : '#ff4444'
   const buttonBg = isPurchase
@@ -172,18 +210,18 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
         <div
           style={{
             width: '1200px',
-            height: '630px',
+            height: '320px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: '#0a0a1a',
+            background: 'transparent',
             fontFamily: 'Inter, sans-serif',
           }}
         >
           {/* Pill container */}
           <div
             style={{
-              width: '1080px',
+              width: '1160px',
               height: '280px',
               borderRadius: '140px',
               background: 'linear-gradient(135deg, #1a1a4e 0%, #2d1b69 50%, #1a1a4e 100%)',
@@ -192,7 +230,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
               position: 'relative',
               boxShadow: '0 0 15px rgba(0,212,255,0.4), 0 0 30px rgba(0,212,255,0.2), 0 0 60px rgba(0,212,255,0.1), inset 0 0 30px rgba(0,212,255,0.05)',
               border: '2px solid rgba(0,212,255,0.3)',
-              padding: '0 60px 0 0',
+              padding: '0 50px 0 0',
             }}
           >
             {/* Photo ring — outer glow */}
@@ -244,37 +282,56 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
               </div>
             </div>
 
-            {/* Center content — Name + Subtitle */}
+            {/* Center content — First name, Last name, Subtitle */}
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 marginLeft: '40px',
                 flex: 1,
+                overflow: 'hidden',
               }}
             >
+              {firstName && (
+                <div
+                  style={{
+                    fontSize: `${firstNameFontSize}px`,
+                    fontWeight: 900,
+                    color: 'white',
+                    lineHeight: 1,
+                    letterSpacing: '1px',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {firstName}
+                </div>
+              )}
               <div
                 style={{
-                  fontSize: `${memberNameFontSize}px`,
+                  fontSize: `${lastNameFontSize}px`,
                   fontWeight: 900,
                   color: 'white',
+                  lineHeight: 1,
+                  marginTop: firstName ? '6px' : '0',
                   letterSpacing: '1px',
                   textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                 }}
               >
-                {memberName}
+                {lastName}
               </div>
               {subtitle && (
                 <div
                   style={{
-                    fontSize: '22px',
-                    fontWeight: 600,
+                    fontSize: '32px',
+                    fontWeight: 700,
                     color: '#00d4ff',
-                    marginTop: '4px',
+                    marginTop: '10px',
                     textTransform: 'uppercase',
-                    letterSpacing: '2px',
+                    letterSpacing: '3px',
                     textShadow: '0 0 10px rgba(0,212,255,0.3)',
                   }}
                 >
@@ -291,39 +348,42 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                 alignItems: 'center',
                 flexShrink: 0,
                 marginLeft: '20px',
-                gap: '12px',
+                gap: '14px',
               }}
             >
-              {/* Ticker label */}
+              {/* Stock label + ticker stacked */}
               <div
                 style={{
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '8px',
                 }}
               >
-                <span
+                <div
                   style={{
-                    fontSize: '20px',
+                    fontSize: '26px',
                     fontWeight: 900,
                     color: 'rgba(255,255,255,0.6)',
-                    letterSpacing: '2px',
+                    letterSpacing: '3px',
                     textTransform: 'uppercase',
+                    lineHeight: 1,
                   }}
                 >
-                  STOCK:
-                </span>
-                <span
+                  STOCK
+                </div>
+                <div
                   style={{
-                    fontSize: '28px',
+                    fontSize: `${tickerFontSize}px`,
                     fontWeight: 900,
                     color: tickerColor,
-                    letterSpacing: '1px',
-                    textShadow: `0 0 8px ${tickerColor}40`,
+                    letterSpacing: '2px',
+                    lineHeight: 1,
+                    marginTop: '6px',
+                    textShadow: `0 0 10px ${tickerColor}66`,
                   }}
                 >
                   {ticker}
-                </span>
+                </div>
               </div>
 
               {/* Buy/Sell button — outer glow ring */}
@@ -345,7 +405,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                   style={{
                     background: buttonBg,
                     borderRadius: '11px',
-                    padding: '10px 40px',
+                    padding: '8px 44px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -369,10 +429,11 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                   />
                   <div
                     style={{
-                      fontSize: '38px',
+                      fontSize: '44px',
                       fontWeight: 900,
                       color: 'white',
-                      letterSpacing: '4px',
+                      letterSpacing: '5px',
+                      lineHeight: 1,
                       textShadow: isPurchase
                         ? '0 0 10px rgba(0,255,136,0.4), 0 1px 4px rgba(0,0,0,0.3)'
                         : '0 0 10px rgba(255,68,68,0.4), 0 1px 4px rgba(0,0,0,0.3)',
@@ -388,7 +449,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
       ),
       {
         width: 1200,
-        height: 630,
+        height: 320,
         ...(fontData ? {
           fonts: [
             {
