@@ -83,8 +83,8 @@ export async function generateAndUploadTradeImage(
     }
   }
 
-  // Resolve bioguide ID
-  const bioguideId = await resolveBioguideId(trade.name, trade.chamber)
+  // Resolve bioguide ID (state disambiguates same-name members)
+  const bioguideId = await resolveBioguideId(trade.name, trade.chamber, trade.state)
   if (!bioguideId) {
     console.log(`[trade-image] Skipping trade ${trade.id}: no bioguide ID for "${trade.name}"`)
     return null

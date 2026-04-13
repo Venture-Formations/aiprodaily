@@ -10,11 +10,16 @@
 
 interface Legislator {
   id: { bioguide: string }
-  name: { first: string; last: string; official_full?: string }
+  name: { first: string; last: string; official_full?: string; nickname?: string; middle?: string }
   terms: Array<{ type: string; start: string; end?: string; state: string; party: string }>
 }
 
-let legislatorsCache: Legislator[] | null = null
+interface LegislatorSets {
+  current: Legislator[]
+  historical: Legislator[]
+}
+
+let legislatorsCache: LegislatorSets | null = null
 let cacheTimestamp = 0
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
@@ -28,13 +33,16 @@ const LEGISLATORS_CURRENT_URL =
 const LEGISLATORS_HISTORICAL_URL =
   'https://unitedstates.github.io/congress-legislators/legislators-historical.json'
 
-async function loadLegislators(): Promise<Legislator[]> {
+async function loadLegislators(): Promise<LegislatorSets> {
   if (legislatorsCache && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
     return legislatorsCache
   }
 
   try {
-    // Load current + historical in parallel so former-member trades still resolve
+    // Load current + historical in parallel so former-member trades still resolve.
+    // Keeping them separate is critical: we MUST exhaust every matching strategy
+    // on current members before touching historical, otherwise a 19th-century
+    // "Richard McCormick" can beat current "Rich McCormick" (nickname form).
     const [currentRes, historicalRes] = await Promise.all([
       fetch(LEGISLATORS_CURRENT_URL, { signal: AbortSignal.timeout(10_000) }),
       fetch(LEGISLATORS_HISTORICAL_URL, { signal: AbortSignal.timeout(15_000) }),
@@ -43,12 +51,12 @@ async function loadLegislators(): Promise<Legislator[]> {
     const current = currentRes.ok ? ((await currentRes.json()) as Legislator[]) : []
     const historical = historicalRes.ok ? ((await historicalRes.json()) as Legislator[]) : []
 
-    legislatorsCache = [...current, ...historical]
+    legislatorsCache = { current, historical }
     cacheTimestamp = Date.now()
     return legislatorsCache
   } catch (error) {
     console.error('[congress-photos] Failed to fetch legislators:', error)
-    return legislatorsCache || []
+    return legislatorsCache || { current: [], historical: [] }
   }
 }
 
@@ -131,30 +139,131 @@ function normalizeName(name: string): string {
 }
 
 /**
- * Resolve a Congress member's bioguide ID from their name and chamber.
- * Handles both "Nancy Pelosi" and "Pelosi, Nancy" formats.
- * Strips common titles (Dr, Jr, III, etc.) before matching.
+ * Common formal ↔ informal first-name pairs used in US politics.
+ * Keyed by formal name → list of informals. The reverse map is built at
+ * module load for O(1) bidirectional lookup.
  */
-export async function resolveBioguideId(
-  name: string,
-  chamber: string | null
-): Promise<string | null> {
-  if (!name) return null
+const NICKNAME_ALIASES: Record<string, string[]> = {
+  abraham: ['abe'],
+  albert: ['al', 'bert'],
+  alexander: ['alex', 'alec', 'xander', 'sandy'],
+  andrew: ['andy', 'drew'],
+  anthony: ['tony'],
+  benjamin: ['ben', 'benji'],
+  bernard: ['bernie'],
+  bradley: ['brad'],
+  charles: ['charlie', 'chuck'],
+  christopher: ['chris'],
+  daniel: ['dan', 'danny'],
+  david: ['dave', 'davey'],
+  donald: ['don', 'donnie'],
+  douglas: ['doug'],
+  edward: ['ed', 'eddie', 'ted', 'ned'],
+  edwin: ['ed'],
+  elizabeth: ['liz', 'beth', 'betty', 'betsy', 'eliza'],
+  francis: ['frank', 'frankie'],
+  franklin: ['frank'],
+  frederick: ['fred', 'freddy'],
+  gerald: ['gerry', 'jerry'],
+  gregory: ['greg'],
+  harold: ['hal', 'harry'],
+  henry: ['hank', 'harry'],
+  herbert: ['herb', 'herbie'],
+  james: ['jim', 'jimmy', 'jamie'],
+  jeffrey: ['jeff'],
+  jennifer: ['jen', 'jenny'],
+  john: ['johnny', 'jack'],
+  jonathan: ['jon'],
+  joseph: ['joe', 'joey'],
+  joshua: ['josh'],
+  kathleen: ['kathy', 'kate', 'katie'],
+  katherine: ['kate', 'katie', 'kathy'],
+  kenneth: ['ken', 'kenny'],
+  lawrence: ['larry', 'lars'],
+  leonard: ['leo', 'lenny'],
+  margaret: ['maggie', 'meg', 'peg', 'peggy'],
+  matthew: ['matt', 'matty'],
+  michael: ['mike', 'mikey'],
+  nathaniel: ['nate', 'nat'],
+  nicholas: ['nick', 'nicky'],
+  patricia: ['pat', 'patty', 'trish'],
+  patrick: ['pat', 'paddy'],
+  peter: ['pete'],
+  philip: ['phil'],
+  raymond: ['ray'],
+  rebecca: ['becky', 'becca'],
+  richard: ['rich', 'rick', 'ricky', 'dick', 'dickie'],
+  robert: ['rob', 'bob', 'bobby', 'robby'],
+  ronald: ['ron', 'ronnie'],
+  samuel: ['sam', 'sammy'],
+  stephen: ['steve', 'stevie'],
+  steven: ['steve', 'stevie'],
+  susan: ['sue', 'susie'],
+  theodore: ['ted', 'teddy'],
+  thomas: ['tom', 'tommy'],
+  timothy: ['tim', 'timmy'],
+  virginia: ['ginny', 'ginger'],
+  walter: ['walt', 'wally'],
+  william: ['bill', 'billy', 'will', 'willy'],
+  zachary: ['zach', 'zack'],
+}
 
-  // Per-run memoization
-  const cacheKey = `${name}::${chamber || ''}`
-  if (bioguideResolutionCache.has(cacheKey)) {
-    return bioguideResolutionCache.get(cacheKey) ?? null
+// Flattened reverse lookup: every known variant (formal + all informals)
+// maps to the same Set of siblings, so firstNamesMatch is O(1).
+const NICKNAME_LOOKUP: Map<string, Set<string>> = (() => {
+  const map = new Map<string, Set<string>>()
+  for (const [formal, informals] of Object.entries(NICKNAME_ALIASES)) {
+    const siblings = new Set<string>([formal, ...informals])
+    map.set(formal, siblings)
+    for (const i of informals) map.set(i, siblings)
   }
+  return map
+})()
 
-  const legislators = await loadLegislators()
-  if (!legislators.length) return null
+/**
+ * Decide whether two first names should be treated as equivalent.
+ * Matches on: exact equality, known nickname pair, or a ≥3-char shared prefix
+ * in either direction ("rich" ↔ "richard").
+ */
+function firstNamesMatch(a: string, b: string): boolean {
+  if (!a || !b) return false
+  if (a === b) return true
+  const siblings = NICKNAME_LOOKUP.get(a)
+  if (siblings && siblings.has(b)) return true
+  if (a.length >= 3 && b.startsWith(a)) return true
+  if (b.length >= 3 && a.startsWith(b)) return true
+  return false
+}
 
-  const normalized = normalizeName(name)
-  const chamberType = chamber?.toLowerCase() === 'senate' ? 'sen' : 'rep'
+/**
+ * Pick the best legislator from a set of matches. When the trade carries a
+ * state, prefer the legislator whose most-recent term is in that state —
+ * this disambiguates same-name members (e.g. two "Mike Johnsons").
+ */
+function pickBestByState(candidates: Legislator[], stateCode: string | null): Legislator | null {
+  if (candidates.length === 0) return null
+  if (candidates.length === 1 || !stateCode) return candidates[0]
+  const wanted = stateCode.toUpperCase()
+  return (
+    candidates.find((c) => c.terms[c.terms.length - 1]?.state?.toUpperCase() === wanted) ||
+    candidates[0]
+  )
+}
 
-  // Try exact match first (prefer current members, check by most-recent term)
-  for (const leg of legislators) {
+/**
+ * Run the full matching cascade against a single pool (current OR historical).
+ * Returns null if nothing matches in this pool.
+ */
+function findMatch(
+  pool: Legislator[],
+  normalized: string,
+  parts: string[],
+  chamberType: 'sen' | 'rep' | null,
+  state: string | null
+): string | null {
+  // Phase 1: exact equality with official_full / firstLast / lastFirst
+  const exactCandidates: Legislator[] = []
+  for (const leg of pool) {
     const lastTerm = leg.terms[leg.terms.length - 1]
     if (chamberType && lastTerm?.type !== chamberType) continue
 
@@ -163,24 +272,82 @@ export async function resolveBioguideId(
     const lastFirst = normalizeName(`${leg.name.last} ${leg.name.first}`)
 
     if (normalized === officialFull || normalized === firstLast || normalized === lastFirst) {
-      bioguideResolutionCache.set(cacheKey, leg.id.bioguide)
-      return leg.id.bioguide
+      exactCandidates.push(leg)
     }
   }
+  if (exactCandidates.length > 0) {
+    return pickBestByState(exactCandidates, state)?.id.bioguide ?? null
+  }
 
-  // Try partial match (last name + first name substring)
-  const parts = normalized.split(' ')
-  for (const leg of legislators) {
+  // Phase 2: fuzzy — last name substring + nickname-aware first name match
+  const fuzzyCandidates: Legislator[] = []
+  for (const leg of pool) {
     const lastTerm = leg.terms[leg.terms.length - 1]
     if (chamberType && lastTerm?.type !== chamberType) continue
 
-    const lastName = normalizeName(leg.name.last)
-    const firstName = normalizeName(leg.name.first)
+    const legLast = normalizeName(leg.name.last || '')
+    const legFirst = normalizeName(leg.name.first || '')
+    const legNick = normalizeName(leg.name.nickname || '')
+    if (!legLast) continue
 
-    if (parts.some((p) => p === lastName) && parts.some((p) => firstName.startsWith(p))) {
-      bioguideResolutionCache.set(cacheKey, leg.id.bioguide)
-      return leg.id.bioguide
+    // Last name must appear as a substring of the normalized input.
+    // Substring (not token equality) so multi-word last names like
+    // "Van Duyne" / "de la Cruz" still match.
+    if (!normalized.includes(legLast)) continue
+
+    const firstHit =
+      parts.some((p) => firstNamesMatch(p, legFirst)) ||
+      (legNick && parts.some((p) => firstNamesMatch(p, legNick)))
+
+    if (firstHit) {
+      fuzzyCandidates.push(leg)
     }
+  }
+  if (fuzzyCandidates.length > 0) {
+    return pickBestByState(fuzzyCandidates, state)?.id.bioguide ?? null
+  }
+
+  return null
+}
+
+/**
+ * Resolve a Congress member's bioguide ID from their name, chamber, and state.
+ * Handles "Nancy Pelosi" and "Pelosi, Nancy" formats, nickname ↔ formal name
+ * pairs (Rich ↔ Richard), and middle names / initials.
+ *
+ * Critically: exhausts every matching strategy on the CURRENT legislators list
+ * before considering historical. Otherwise a long-dead "Richard McCormick" can
+ * beat current "Rich McCormick" and deliver a 19th-century archival photo.
+ */
+export async function resolveBioguideId(
+  name: string,
+  chamber: string | null,
+  state: string | null = null
+): Promise<string | null> {
+  if (!name) return null
+
+  const cacheKey = `${name}::${chamber || ''}::${state || ''}`
+  if (bioguideResolutionCache.has(cacheKey)) {
+    return bioguideResolutionCache.get(cacheKey) ?? null
+  }
+
+  const { current, historical } = await loadLegislators()
+  if (current.length === 0 && historical.length === 0) return null
+
+  const normalized = normalizeName(name)
+  const parts = normalized.split(' ').filter(Boolean)
+  const chamberType: 'sen' | 'rep' = chamber?.toLowerCase() === 'senate' ? 'sen' : 'rep'
+
+  const currentHit = findMatch(current, normalized, parts, chamberType, state)
+  if (currentHit) {
+    bioguideResolutionCache.set(cacheKey, currentHit)
+    return currentHit
+  }
+
+  const historicalHit = findMatch(historical, normalized, parts, chamberType, state)
+  if (historicalHit) {
+    bioguideResolutionCache.set(cacheKey, historicalHit)
+    return historicalHit
   }
 
   bioguideResolutionCache.set(cacheKey, null)
