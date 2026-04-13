@@ -141,8 +141,13 @@ interface CardParams {
 
 /**
  * Split a display name into first / last for two-line rendering.
- * Skips leading title tokens (e.g. "Dr.") and keeps multi-word last names
- * together ("Van Duyne", "de la Cruz").
+ *
+ * Rules:
+ *  - Skip leading title tokens (Dr., Rep., Sen., etc.).
+ *  - Middle initials ("A", "A.", "B.") stick with the first name line,
+ *    so "John A. Smith" renders as "John A." / "Smith".
+ *  - Multi-word last names stay together: "John Van Duyne" → "Van Duyne",
+ *    "Maria de la Cruz" → "de la Cruz".
  */
 function splitMemberName(fullName: string): { first: string; last: string } {
   const tokens = fullName.trim().split(/\s+/).filter(Boolean)
@@ -157,9 +162,22 @@ function splitMemberName(fullName: string): { first: string; last: string } {
   }
 
   const remaining = tokens.slice(startIdx)
-  if (remaining.length <= 1) return { first: '', last: remaining[0] || tokens[0] }
+  if (remaining.length === 0) return { first: '', last: tokens[0] }
+  if (remaining.length === 1) return { first: '', last: remaining[0] }
 
-  return { first: remaining[0], last: remaining.slice(1).join(' ') }
+  // Absorb middle initials into the first-name line.
+  const initialPattern = /^[A-Za-z]\.?$/
+  const firstParts: string[] = [remaining[0]]
+  let splitAt = 1
+  while (splitAt < remaining.length - 1 && initialPattern.test(remaining[splitAt])) {
+    firstParts.push(remaining[splitAt])
+    splitAt++
+  }
+
+  return {
+    first: firstParts.join(' '),
+    last: remaining.slice(splitAt).join(' '),
+  }
 }
 
 function getFirstNameFontSize(name: string): number {
@@ -179,9 +197,9 @@ function getLastNameFontSize(name: string): number {
 
 function getTickerFontSize(ticker: string): number {
   const len = ticker.length
-  if (len <= 4) return 68
-  if (len === 5) return 58
-  return 48
+  if (len <= 4) return 56
+  if (len === 5) return 48
+  return 40
 }
 
 async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
@@ -369,7 +387,7 @@ async function renderTradeCard(params: CardParams): Promise<Buffer | null> {
                     lineHeight: 1,
                   }}
                 >
-                  STOCK
+                  STOCK:
                 </div>
                 <div
                   style={{
