@@ -4,6 +4,7 @@ import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { supabaseAdmin } from '@/lib/supabase'
 import { TextBoxGenerator } from '@/lib/text-box-modules/text-box-generator'
+import { normalizeTransactionType } from '@/lib/transaction-type'
 import type { TextBoxPlaceholderData } from '@/types/database'
 
 // Initialize AI clients
@@ -30,6 +31,7 @@ function injectPostData(obj: any, post: any): any {
         .replace(/\{\{headline\}\}/g, post.title || '')
         .replace(/\{\{url\}\}/g, post.source_url || '')
         .replace(/\{\{company_name\}\}/g, post.company_name || '')
+        .replace(/\{\{transaction_type\}\}/g, normalizeTransactionType(post.transaction_type))
     }
     // Replace random integer placeholders: {{random_X-Y}}
     result = result.replace(/\{\{random_(\d+)-(\d+)\}\}/g, (match: string, minStr: string, maxStr: string) => {

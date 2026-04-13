@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../supabase'
 import { AI_CALL, callOpenAI } from '../openai'
+import { normalizeTransactionType } from '../transaction-type'
 import { detectAIRefusal, getNewsletterIdFromIssue } from './shared-context'
 import type { ArticleGenerator } from './article-generator'
 
@@ -275,7 +276,8 @@ export class ModuleArticles {
             title: post.title,
             description: post.description || '',
             content: fullText,
-            source_url: post.source_url || ''
+            source_url: post.source_url || '',
+            transaction_type: normalizeTransactionType((post as any).transaction_type)
           }
 
           let titleResult
@@ -285,6 +287,7 @@ export class ModuleArticles {
               .replace('{{description}}', postData.description)
               .replace('{{content}}', postData.content.substring(0, 3000))
               .replace('{{source_url}}', postData.source_url)
+              .replace(/\{\{transaction_type\}\}/g, postData.transaction_type)
             titleResult = await callOpenAI(
               customPrompt,
               titlePrompt.max_tokens || 200,
@@ -369,7 +372,7 @@ export class ModuleArticles {
       .from('module_articles')
       .select(`
         id, headline, content, post_id,
-        rss_posts(id, title, description, content, full_article_text, source_url)
+        rss_posts(id, title, description, content, full_article_text, source_url, transaction_type)
       `)
       .eq('issue_id', issueId)
       .eq('article_module_id', moduleId)
@@ -402,7 +405,8 @@ export class ModuleArticles {
             title: post.title,
             description: post.description || '',
             content: fullText,
-            source_url: post.source_url || ''
+            source_url: post.source_url || '',
+            transaction_type: normalizeTransactionType(post.transaction_type)
           }
 
           let bodyResult
@@ -413,6 +417,7 @@ export class ModuleArticles {
               .replace('{{description}}', postData.description)
               .replace('{{content}}', postData.content.substring(0, 5000))
               .replace('{{source_url}}', postData.source_url)
+              .replace(/\{\{transaction_type\}\}/g, postData.transaction_type)
             const rawResult = await callOpenAI(
               customPrompt,
               bodyPrompt.max_tokens || 500,

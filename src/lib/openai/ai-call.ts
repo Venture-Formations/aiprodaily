@@ -1,4 +1,5 @@
 import { callAIWithPrompt } from './core'
+import { normalizeTransactionType } from '../transaction-type'
 
 // Complete AI call interface - fetches prompt+provider, replaces placeholders, calls AI
 export const AI_CALL = {
@@ -16,45 +17,49 @@ export const AI_CALL = {
     })
   },
 
-  primaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
+  primaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string; transaction_type?: string | null }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
     return callAIWithPrompt('ai_prompt_primary_article_title', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
-      url: post.source_url || ''
+      url: post.source_url || '',
+      transaction_type: normalizeTransactionType(post.transaction_type)
     })
   },
 
-  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
+  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string; transaction_type?: string | null }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
     return callAIWithPrompt('ai_prompt_primary_article_body', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
       url: post.source_url || '',
-      headline: headline
+      headline: headline,
+      transaction_type: normalizeTransactionType(post.transaction_type)
     })
   },
 
-  secondaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
+  secondaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string; transaction_type?: string | null }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
     return callAIWithPrompt('ai_prompt_secondary_article_title', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
-      url: post.source_url || ''
+      url: post.source_url || '',
+      transaction_type: normalizeTransactionType(post.transaction_type)
     })
   },
 
-  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
+  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string; transaction_type?: string | null }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
     return callAIWithPrompt('ai_prompt_secondary_article_body', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
       url: post.source_url || '',
-      headline: headline
+      headline: headline,
+      transaction_type: normalizeTransactionType(post.transaction_type)
     })
   },
 
