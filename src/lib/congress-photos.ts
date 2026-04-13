@@ -33,30 +33,64 @@ const LEGISLATORS_CURRENT_URL =
 const LEGISLATORS_HISTORICAL_URL =
   'https://unitedstates.github.io/congress-legislators/legislators-historical.json'
 
+// Dedupe in-flight legislator loads so parallel callers (runIngestion's
+// batch of 5) share a single network fetch instead of racing.
+let legislatorsLoadPromise: Promise<LegislatorSets> | null = null
+
 async function loadLegislators(): Promise<LegislatorSets> {
   if (legislatorsCache && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
     return legislatorsCache
   }
+  if (legislatorsLoadPromise) return legislatorsLoadPromise
 
-  try {
-    // Load current + historical in parallel so former-member trades still resolve.
-    // Keeping them separate is critical: we MUST exhaust every matching strategy
-    // on current members before touching historical, otherwise a 19th-century
-    // "Richard McCormick" can beat current "Rich McCormick" (nickname form).
-    const [currentRes, historicalRes] = await Promise.all([
-      fetch(LEGISLATORS_CURRENT_URL, { signal: AbortSignal.timeout(10_000) }),
-      fetch(LEGISLATORS_HISTORICAL_URL, { signal: AbortSignal.timeout(15_000) }),
+  legislatorsLoadPromise = (async (): Promise<LegislatorSets> => {
+    // allSettled so a partial failure still returns whichever list loaded.
+    // Promise.all would reject the whole call on a single timeout, leaving
+    // resolveBioguideId with empty arrays and silently breaking matching.
+    const [currentRes, historicalRes] = await Promise.allSettled([
+      fetch(LEGISLATORS_CURRENT_URL, { signal: AbortSignal.timeout(15_000) }),
+      fetch(LEGISLATORS_HISTORICAL_URL, { signal: AbortSignal.timeout(20_000) }),
     ])
 
-    const current = currentRes.ok ? ((await currentRes.json()) as Legislator[]) : []
-    const historical = historicalRes.ok ? ((await historicalRes.json()) as Legislator[]) : []
+    let current: Legislator[] = []
+    let historical: Legislator[] = []
 
-    legislatorsCache = { current, historical }
-    cacheTimestamp = Date.now()
-    return legislatorsCache
-  } catch (error) {
-    console.error('[congress-photos] Failed to fetch legislators:', error)
-    return legislatorsCache || { current: [], historical: [] }
+    if (currentRes.status === 'fulfilled' && currentRes.value.ok) {
+      try {
+        current = (await currentRes.value.json()) as Legislator[]
+      } catch (err) {
+        console.error('[congress-photos] Failed to parse current legislators:', err)
+      }
+    } else {
+      console.error('[congress-photos] Failed to fetch current legislators:',
+        currentRes.status === 'rejected' ? currentRes.reason : `status ${currentRes.value.status}`)
+    }
+
+    if (historicalRes.status === 'fulfilled' && historicalRes.value.ok) {
+      try {
+        historical = (await historicalRes.value.json()) as Legislator[]
+      } catch (err) {
+        console.error('[congress-photos] Failed to parse historical legislators:', err)
+      }
+    } else {
+      console.error('[congress-photos] Failed to fetch historical legislators:',
+        historicalRes.status === 'rejected' ? historicalRes.reason : `status ${historicalRes.value.status}`)
+    }
+
+    const sets: LegislatorSets = { current, historical }
+    // Only persist to the module-level cache if at least one list loaded.
+    // Caching empty arrays would poison every subsequent lookup for 24h.
+    if (current.length > 0 || historical.length > 0) {
+      legislatorsCache = sets
+      cacheTimestamp = Date.now()
+    }
+    return sets
+  })()
+
+  try {
+    return await legislatorsLoadPromise
+  } finally {
+    legislatorsLoadPromise = null
   }
 }
 
@@ -327,12 +361,17 @@ export async function resolveBioguideId(
   if (!name) return null
 
   const cacheKey = `${name}::${chamber || ''}::${state || ''}`
-  if (bioguideResolutionCache.has(cacheKey)) {
-    return bioguideResolutionCache.get(cacheKey) ?? null
-  }
+  // Success cache hit — return immediately
+  const cached = bioguideResolutionCache.get(cacheKey)
+  if (cached) return cached
 
   const { current, historical } = await loadLegislators()
-  if (current.length === 0 && historical.length === 0) return null
+  if (current.length === 0 && historical.length === 0) {
+    // Legislator load failed entirely. Return null for THIS call but DO NOT
+    // cache — the next call should retry the fetch rather than inheriting a
+    // poisoned null key for the rest of the warm instance.
+    return null
+  }
 
   const normalized = normalizeName(name)
   const parts = normalized.split(' ').filter(Boolean)
@@ -350,7 +389,9 @@ export async function resolveBioguideId(
     return historicalHit
   }
 
-  bioguideResolutionCache.set(cacheKey, null)
+  // IMPORTANT: do NOT cache null. A transient legislator fetch hiccup at
+  // warm-instance startup would otherwise poison every lookup for this
+  // name until the instance recycles. Re-matching on a cache miss is cheap.
   return null
 }
 
