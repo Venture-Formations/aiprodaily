@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { XMLParser } from 'fast-xml-parser'
 import { generateAndUploadTradeImage } from './trade-image-generator'
 import { normalizeTransactionType } from './transaction-type'
+import { buildTradeImageKey } from './trade-image-key'
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -1230,26 +1231,54 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     windowDays += 5
   }
 
-  // Load trade image URLs keyed by ticker
+  // Load trade card images keyed by (ticker, member, transaction).
+  // Ticker-only matching mis-assigned images when multiple members traded
+  // the same stock — every article with that ticker got whichever row
+  // Postgres happened to return last.
   const articleTickers = Array.from(new Set(articles.map((r: any) => r.ticker).filter(Boolean)))
-  const tradeImageMap = new Map<string, string>()
+  const tradeImageMap = new Map<string, string>() // composite key -> image_url
+  const tickerTradeCounts = new Map<string, number>()
+  const tickerFallbackImage = new Map<string, string>() // only retained if exactly one trade per ticker
 
   if (articleTickers.length > 0) {
     const { data: tradeImages } = await supabaseAdmin
       .from('congress_trades')
-      .select('ticker, image_url')
+      .select('ticker, image_url, name, transaction')
       .in('ticker', articleTickers)
       .not('image_url', 'is', null)
 
     for (const row of tradeImages || []) {
-      if (row.image_url) {
-        tradeImageMap.set(row.ticker.toUpperCase(), row.image_url)
+      if (!row.image_url || !row.ticker) continue
+
+      const compositeKey = buildTradeImageKey(row.ticker, row.name, row.transaction)
+      if (compositeKey) tradeImageMap.set(compositeKey, row.image_url)
+
+      const tickerKey = row.ticker.toUpperCase()
+      const nextCount = (tickerTradeCounts.get(tickerKey) || 0) + 1
+      tickerTradeCounts.set(tickerKey, nextCount)
+      if (nextCount === 1) {
+        tickerFallbackImage.set(tickerKey, row.image_url)
+      } else {
+        // Ambiguous — drop the ticker fallback so we don't mix up members.
+        tickerFallbackImage.delete(tickerKey)
       }
     }
   }
 
   // Convert DB rows to NormalizedItem format
-  const items: NormalizedItem[] = articles.map((row) => ({
+  const items: NormalizedItem[] = articles.map((row) => {
+    const compositeKey = buildTradeImageKey(
+      row.ticker,
+      row.trade_meta?.member,
+      row.transaction_type
+    )
+    const tickerKey = (row.ticker || '').toUpperCase()
+    const tradeImageUrl =
+      (compositeKey ? tradeImageMap.get(compositeKey) : null) ||
+      tickerFallbackImage.get(tickerKey) ||
+      null
+
+    return {
     title: row.article_title,
     link: row.article_url,
     description: row.article_description || '',
@@ -1258,7 +1287,7 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     sourceLabel: row.company_name,
     sourceName: row.source_name || '',
     guid: row.article_url,
-    tradeImageUrl: tradeImageMap.get((row.ticker || '').toUpperCase()) || null,
+    tradeImageUrl,
     tradeMeta: {
       ticker: row.ticker,
       company_name: row.company_name,
@@ -1270,7 +1299,8 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
       chamber: row.trade_meta?.chamber || null,
       state: row.trade_meta?.state || null,
     },
-  }))
+  }
+  })
 
   const xml = generateCombinedFeedXml(items, feedTitle)
   cachedXml = xml
