@@ -418,6 +418,162 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
     }
   },
 
+  'rescore-module-posts': {
+    GET: async ({ request }) => {
+      const { searchParams } = new URL(request.url)
+      const publicationId = searchParams.get('publication_id')
+      const days = parseInt(searchParams.get('days') || '7')
+      const minScore = parseFloat(searchParams.get('min_score') || '0')
+      const limit = parseInt(searchParams.get('limit') || '20')
+      const offset = parseInt(searchParams.get('offset') || '0')
+      const dryRun = searchParams.get('dry_run') !== 'false'
+      const articleModuleId = searchParams.get('article_module_id')
+
+      if (!publicationId) {
+        return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
+      }
+
+      try {
+        const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+        const { data: feeds, error: feedsError } = await supabaseAdmin
+          .from('rss_feeds')
+          .select('id')
+          .eq('publication_id', publicationId)
+
+        if (feedsError) throw new Error(`Failed to fetch feeds: ${feedsError.message}`)
+
+        if (!feeds || feeds.length === 0) {
+          return NextResponse.json({
+            status: 'success',
+            message: 'No feeds found for publication',
+            publication_id: publicationId,
+            posts_found: 0
+          })
+        }
+
+        const feedIds = feeds.map(f => f.id)
+
+        let postsQuery = supabaseAdmin
+          .from('rss_posts')
+          .select('id, title, description, content, full_article_text, article_module_id, feed_id, ticker, publication_date, post_ratings!inner(id, total_score)')
+          .in('feed_id', feedIds)
+          .not('article_module_id', 'is', null)
+          .gte('publication_date', sinceIso)
+          .gte('post_ratings.total_score', minScore)
+          .order('publication_date', { ascending: false })
+          .range(offset, offset + limit - 1)
+
+        if (articleModuleId) {
+          postsQuery = postsQuery.eq('article_module_id', articleModuleId)
+        }
+
+        const { data: posts, error: postsError } = await postsQuery
+
+        if (postsError) throw new Error(`Failed to fetch posts: ${postsError.message}`)
+
+        if (!posts || posts.length === 0) {
+          return NextResponse.json({
+            status: 'success',
+            message: 'No posts match criteria',
+            publication_id: publicationId,
+            days,
+            min_score: minScore,
+            offset,
+            posts_found: 0
+          })
+        }
+
+        console.log(`[RESCORE-MODULE] ${dryRun ? 'DRY RUN: ' : ''}Processing ${posts.length} posts for publication ${publicationId}`)
+
+        const { Scoring } = await import('@/lib/rss-processor/scoring')
+        const scoring = new Scoring()
+
+        let successCount = 0
+        let errorCount = 0
+        const errors: Array<{ post_id: string; error: string }> = []
+
+        for (const post of posts) {
+          try {
+            const evaluation: any = await scoring.evaluatePost(
+              post as any,
+              publicationId,
+              'primary',
+              post.article_module_id
+            )
+
+            const ratingRecord: Record<string, any> = {
+              post_id: post.id,
+              interest_level: evaluation.interest_level || 0,
+              local_relevance: evaluation.local_relevance || 0,
+              community_impact: evaluation.community_impact || 0,
+              ai_reasoning: evaluation.reasoning,
+              total_score: evaluation.total_score
+            }
+
+            const criteriaScores = evaluation.criteria_scores
+            if (criteriaScores && Array.isArray(criteriaScores)) {
+              for (let k = 0; k < criteriaScores.length && k < 5; k++) {
+                const criterionNum = criteriaScores[k].criteria_number || (k + 1)
+                ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[k].score
+                ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[k].reason
+                ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[k].weight
+              }
+            }
+
+            if (!dryRun) {
+              const { error: deleteError } = await supabaseAdmin
+                .from('post_ratings')
+                .delete()
+                .eq('post_id', post.id)
+
+              if (deleteError) throw new Error(`Delete failed: ${deleteError.message}`)
+
+              const { error: insertError } = await supabaseAdmin
+                .from('post_ratings')
+                .insert([ratingRecord])
+
+              if (insertError) throw new Error(`Insert failed: ${insertError.message}`)
+            }
+
+            successCount++
+            await new Promise(resolve => setTimeout(resolve, 300))
+
+          } catch (error) {
+            errorCount++
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+            console.error(`[RESCORE-MODULE] Error for ${post.id}:`, errorMsg)
+            errors.push({ post_id: post.id, error: errorMsg })
+          }
+        }
+
+        console.log(`[RESCORE-MODULE] Complete: ${successCount} succeeded, ${errorCount} failed`)
+
+        return NextResponse.json({
+          status: 'success',
+          dry_run: dryRun,
+          publication_id: publicationId,
+          days,
+          min_score: minScore,
+          article_module_id: articleModuleId,
+          offset,
+          next_offset: posts.length === limit ? offset + limit : null,
+          posts_processed: posts.length,
+          succeeded: successCount,
+          failed: errorCount,
+          errors: errors.slice(0, 10)
+        })
+
+      } catch (error) {
+        console.error('[RESCORE-MODULE] Error:', error)
+        return NextResponse.json({
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 })
+      }
+    }
+  },
+
   'rss-images': {
     GET: async ({ logger }) => {
       try {

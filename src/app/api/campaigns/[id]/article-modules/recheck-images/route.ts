@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { buildTradeImageKey } from '@/lib/trade-image-key'
 
 /**
  * Refresh trade images for all module_articles in an issue.
  *
  * Resolves the current trade card image for each article by:
- *   1. Looking up the latest image_url in congress_trades matching the ticker
+ *   1. Looking up the latest image_url in congress_trades matching the
+ *      article's (ticker, member_name, transaction_type) — NOT ticker alone,
+ *      which mixed up images between different members trading the same stock
  *   2. Verifying the underlying file actually exists in Supabase storage
  *      (previously this endpoint could copy stale URLs pointing to deleted files)
  *   3. Falling back to rss_posts.image_url if no valid congress_trades image
@@ -39,7 +42,9 @@ export async function POST(
       trade_image_url,
       trade_image_alt,
       ticker,
-      rss_post:rss_posts(image_url, image_alt, ticker)
+      member_name,
+      transaction_type,
+      rss_post:rss_posts(image_url, image_alt, ticker, member_name, transaction_type)
     `)
     .eq('issue_id', issueId)
 
@@ -52,24 +57,29 @@ export async function POST(
     return NextResponse.json({ success: true, results: [], message: 'No module articles for this issue' })
   }
 
-  // Build a map of ticker → valid trade card image URL from congress_trades.
+  // Build maps of trade card image URL from congress_trades:
+  //   - validImageByKey: keyed by (ticker, member, transaction) — primary match
+  //   - unambiguousImageByTicker: fallback only when exactly one trade exists
+  //     for a ticker, so we never mix members who share a stock
   // Only include tickers whose underlying file actually exists in Supabase Storage
   // (previously this endpoint could copy stale URLs pointing to deleted files).
-  // Collect tickers from both module_articles and their linked rss_posts
+  // Collect tickers from both module_articles and their linked rss_posts.
   const tickers = Array.from(new Set(
     articles.flatMap(a => {
       const rssPost = Array.isArray((a as any).rss_post) ? (a as any).rss_post[0] : (a as any).rss_post
       return [a.ticker, rssPost?.ticker].filter(Boolean)
     })
   )) as string[]
-  const validImageByTicker = new Map<string, string>()
+  const validImageByKey = new Map<string, string>()
+  const verifiedTradesByTicker = new Map<string, number>()
+  const unambiguousImageByTicker = new Map<string, string>()
 
   if (tickers.length > 0) {
     // Fetch all congress_trades rows for these tickers with non-null image_url.
-    // Order by most recent so the first per ticker wins.
+    // Order by most recent so the first per (ticker,member,transaction) wins.
     const { data: tradeRows, error: tradeError } = await supabaseAdmin
       .from('congress_trades')
-      .select('id, ticker, image_url, quiver_upload_time')
+      .select('id, ticker, image_url, name, transaction, quiver_upload_time')
       .in('ticker', tickers)
       .not('image_url', 'is', null)
       .order('quiver_upload_time', { ascending: false, nullsFirst: false })
@@ -112,11 +122,23 @@ export async function POST(
       })
     }
 
-    // Walk rows in order — first matching ticker with a verified file wins
+    // Walk rows newest-first. First composite-key hit wins. Track whether
+    // each ticker has 1 or many verified rows for the fallback map.
     for (const row of tradeRows || []) {
-      if (validImageByTicker.has(row.ticker)) continue
-      if (existingFiles.has(`${row.id}.png`)) {
-        validImageByTicker.set(row.ticker, row.image_url)
+      if (!existingFiles.has(`${row.id}.png`)) continue
+
+      const compositeKey = buildTradeImageKey(row.ticker, row.name, row.transaction)
+      if (compositeKey && !validImageByKey.has(compositeKey)) {
+        validImageByKey.set(compositeKey, row.image_url)
+      }
+
+      const tickerKey = row.ticker.toUpperCase()
+      const nextCount = (verifiedTradesByTicker.get(tickerKey) || 0) + 1
+      verifiedTradesByTicker.set(tickerKey, nextCount)
+      if (nextCount === 1) {
+        unambiguousImageByTicker.set(tickerKey, row.image_url)
+      } else {
+        unambiguousImageByTicker.delete(tickerKey)
       }
     }
   }
@@ -137,11 +159,18 @@ export async function POST(
       ? (article as any).rss_post[0]
       : (article as any).rss_post
 
-    // Prefer a verified congress_trades image (try article ticker, then rss_post ticker),
-    // then fall back to rss_posts.image_url
-    const articleTicker = article.ticker || rssPost?.ticker || null
+    // Resolve the trade image by (ticker, member, transaction). Fall through
+    // article → rss_post → unambiguous ticker fallback → rss_post.image_url.
+    const articleTicker = (article as any).ticker || rssPost?.ticker || null
+    const memberName = (article as any).member_name || rssPost?.member_name || null
+    const transaction = (article as any).transaction_type || rssPost?.transaction_type || null
+
+    const articleCompositeKey = buildTradeImageKey(articleTicker, memberName, transaction)
+    const tickerKey = (articleTicker || '').toUpperCase()
+
     const resolvedImage =
-      (articleTicker && validImageByTicker.get(articleTicker)) ||
+      (articleCompositeKey ? validImageByKey.get(articleCompositeKey) : null) ||
+      (tickerKey ? unambiguousImageByTicker.get(tickerKey) : null) ||
       rssPost?.image_url ||
       null
 
