@@ -428,6 +428,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       const offset = parseInt(searchParams.get('offset') || '0')
       const dryRun = searchParams.get('dry_run') !== 'false'
       const articleModuleId = searchParams.get('article_module_id')
+      const ratedBefore = searchParams.get('rated_before')
 
       if (!publicationId) {
         return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
@@ -456,7 +457,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         let postsQuery = supabaseAdmin
           .from('rss_posts')
-          .select('id, title, description, content, full_article_text, article_module_id, feed_id, ticker, publication_date, post_ratings!inner(id, total_score)')
+          .select('id, title, description, content, full_article_text, article_module_id, feed_id, ticker, publication_date, post_ratings!inner(id, total_score, created_at)')
           .in('feed_id', feedIds)
           .not('article_module_id', 'is', null)
           .gte('publication_date', sinceIso)
@@ -466,6 +467,10 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         if (articleModuleId) {
           postsQuery = postsQuery.eq('article_module_id', articleModuleId)
+        }
+
+        if (ratedBefore) {
+          postsQuery = postsQuery.lt('post_ratings.created_at', ratedBefore)
         }
 
         const { data: posts, error: postsError } = await postsQuery
@@ -556,6 +561,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
           days,
           min_score: minScore,
           article_module_id: articleModuleId,
+          rated_before: ratedBefore,
           offset,
           next_offset: posts.length === limit ? offset + limit : null,
           posts_processed: posts.length,
