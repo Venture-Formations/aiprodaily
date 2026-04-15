@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../supabase'
 import { callWithStructuredPrompt } from '../openai'
+import { normalizeTransactionType } from '../transaction-type'
 import type { RssPost, ContentEvaluation } from '@/types/database'
 import { getNewsletterIdFromIssue } from './shared-context'
 
@@ -162,6 +163,8 @@ export class Scoring {
       companyName = tickerMapping?.company_name || ''
     }
 
+    const transactionType = normalizeTransactionType((post as any).transaction_type)
+
     // Evaluate post against each enabled criterion
     const criteriaScores: Array<{ score: number; reason: string; weight: number; criteria_number: number }> = []
 
@@ -183,7 +186,8 @@ export class Scoring {
             title: post.title,
             description: post.description || '',
             content: fullText,
-            company_name: companyName
+            company_name: companyName,
+            transaction_type: transactionType
           },
           provider,
           `module_criteria_${criterion.number}`

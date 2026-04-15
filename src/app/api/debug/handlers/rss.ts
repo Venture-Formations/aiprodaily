@@ -457,7 +457,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         let postsQuery = supabaseAdmin
           .from('rss_posts')
-          .select('id, title, description, content, full_article_text, article_module_id, feed_id, ticker, publication_date, post_ratings!inner(id, total_score, created_at)')
+          .select('id, title, description, content, full_article_text, article_module_id, feed_id, ticker, transaction_type, publication_date, post_ratings!inner(id, total_score, created_at)')
           .in('feed_id', feedIds)
           .not('article_module_id', 'is', null)
           .gte('publication_date', sinceIso)
