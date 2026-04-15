@@ -429,6 +429,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       const dryRun = searchParams.get('dry_run') !== 'false'
       const articleModuleId = searchParams.get('article_module_id')
       const ratedBefore = searchParams.get('rated_before')
+      const ratedAfter = searchParams.get('rated_after')
 
       if (!publicationId) {
         return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
@@ -471,6 +472,10 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
 
         if (ratedBefore) {
           postsQuery = postsQuery.lt('post_ratings.created_at', ratedBefore)
+        }
+
+        if (ratedAfter) {
+          postsQuery = postsQuery.gte('post_ratings.created_at', ratedAfter)
         }
 
         const { data: posts, error: postsError } = await postsQuery
@@ -562,6 +567,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
           min_score: minScore,
           article_module_id: articleModuleId,
           rated_before: ratedBefore,
+          rated_after: ratedAfter,
           offset,
           next_offset: posts.length === limit ? offset + limit : null,
           posts_processed: posts.length,
