@@ -18,15 +18,15 @@ export const GET = withApiHandler(
       return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
     }
 
-    const [apiKey, upscribeId, webhookSecret, afteroffersFormId] = await Promise.all([
-      getPublicationSetting(publicationId, 'sparkloop_api_key'),
+    const [upscribeId, webhookSecret, afteroffersFormId] = await Promise.all([
       getPublicationSetting(publicationId, 'sparkloop_upscribe_id'),
       getPublicationSetting(publicationId, 'sparkloop_webhook_secret'),
       getPublicationSetting(publicationId, 'afteroffers_form_id'),
     ])
 
     return NextResponse.json({
-      hasApiKey: !!apiKey,
+      // SparkLoop API key is sourced from the SPARKLOOP_API_KEY env var — shared across publications.
+      hasApiKey: !!process.env.SPARKLOOP_API_KEY,
       upscribeId: upscribeId || '',
       hasWebhookSecret: !!webhookSecret,
       afteroffersFormId: afteroffersFormId || '',
@@ -52,12 +52,6 @@ export const POST = withApiHandler(
 
     const body = await request.json()
     const results: string[] = []
-
-    if (body.apiKey) {
-      const { error } = await updatePublicationSetting(publicationId, 'sparkloop_api_key', body.apiKey)
-      if (error) throw new Error(`Failed to save API key: ${error}`)
-      results.push('API key updated')
-    }
 
     if (body.upscribeId !== undefined) {
       const { error } = await updatePublicationSetting(publicationId, 'sparkloop_upscribe_id', body.upscribeId)

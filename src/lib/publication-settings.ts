@@ -256,12 +256,13 @@ export async function getSparkLoopCredentials(publicationId: string): Promise<{
     .from('publication_settings')
     .select('key, value')
     .eq('publication_id', publicationId)
-    .in('key', ['sparkloop_api_key', 'sparkloop_upscribe_id', 'sparkloop_webhook_secret'])
+    .in('key', ['sparkloop_upscribe_id', 'sparkloop_webhook_secret'])
 
   const map = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
 
   return {
-    apiKey: map['sparkloop_api_key'] || process.env.SPARKLOOP_API_KEY || '',
+    // SparkLoop API key is a single shared account-level secret — always sourced from env.
+    apiKey: process.env.SPARKLOOP_API_KEY || '',
     upscribeId: map['sparkloop_upscribe_id'] || process.env.SPARKLOOP_UPSCRIBE_ID || '',
     webhookSecret: map['sparkloop_webhook_secret'] || process.env.SPARKLOOP_WEBHOOK_SECRET || '',
   }
