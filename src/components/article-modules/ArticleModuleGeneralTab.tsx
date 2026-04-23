@@ -127,7 +127,8 @@ export default function ArticleModuleGeneralTab({ module, onUpdate, disabled = f
         </div>
       </div>
 
-      <RssOutputSection module={module} onUpdate={onUpdate} disabled={isDisabled} saving={saving} setSaving={setSaving} />
+      <RssOutputSection module={module} onUpdate={onUpdate} disabled={isDisabled} saving={saving} setSaving={setSaving} variant="draft" />
+      <RssOutputSection module={module} onUpdate={onUpdate} disabled={isDisabled} saving={saving} setSaving={setSaving} variant="sent" />
 
       {saving && (
         <div className="fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50">
@@ -148,15 +149,23 @@ function generateToken(): string {
   return token
 }
 
-function RssOutputSection({ module, onUpdate, disabled, saving, setSaving }: { module: ArticleModule; onUpdate: (updates: Partial<ArticleModule>) => Promise<void>; disabled: boolean; saving: boolean; setSaving: (v: boolean) => void }) {
+type RssVariant = 'draft' | 'sent'
+
+function RssOutputSection({ module, onUpdate, disabled, saving, setSaving, variant }: { module: ArticleModule; onUpdate: (updates: Partial<ArticleModule>) => Promise<void>; disabled: boolean; saving: boolean; setSaving: (v: boolean) => void; variant: RssVariant }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const config = (module.config as Record<string, any>) || {}
   const rssConfig = config.rss_output || {}
-  const enabled = !!rssConfig.enabled
+
+  const isSent = variant === 'sent'
+  const enabledKey = isSent ? 'enabled_sent' : 'enabled'
+
+  const enabled = !!rssConfig[enabledKey]
   const feedToken = rssConfig.feed_token || ''
-  const feedUrl = feedToken ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/module/${module.id}?token=${feedToken}` : ''
+  const feedUrl = feedToken
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/module/${module.id}${isSent ? '/sent' : ''}?token=${feedToken}`
+    : ''
 
   const updateRssConfig = useCallback(async (updates: Record<string, any>) => {
     setSaving(true)
@@ -171,17 +180,21 @@ function RssOutputSection({ module, onUpdate, disabled, saving, setSaving }: { m
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-700">RSS Output</span>
+          <span className="font-medium text-gray-700">{isSent ? 'RSS Output (Sent)' : 'RSS Output'}</span>
           <span className={`text-xs px-2 py-0.5 rounded-full ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>{enabled ? 'Enabled' : 'Disabled'}</span>
         </div>
         <svg className={`w-5 h-5 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
         <div className="p-4 space-y-4 border-t border-gray-100">
-          <p className="text-xs text-gray-500">Generates an RSS feed from this module&apos;s articles for use with Beehiiv or other RSS consumers.</p>
+          <p className="text-xs text-gray-500">
+            {isSent
+              ? 'Generates an RSS feed from the most recently sent issue’s articles for use with Beehiiv or other RSS consumers.'
+              : 'Generates an RSS feed from this module’s articles for use with Beehiiv or other RSS consumers.'}
+          </p>
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-gray-700">Enable RSS Feed</label>
-            <button type="button" onClick={() => updateRssConfig(enabled ? { enabled: false } : { enabled: true, feed_token: feedToken || generateToken() })} disabled={disabled || saving} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-gray-300'} ${disabled || saving ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+            <button type="button" onClick={() => updateRssConfig(enabled ? { [enabledKey]: false } : { [enabledKey]: true, feed_token: feedToken || generateToken() })} disabled={disabled || saving} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-gray-300'} ${disabled || saving ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
@@ -195,8 +208,8 @@ function RssOutputSection({ module, onUpdate, disabled, saving, setSaving }: { m
                 </div>
               </div>
               <div className="pt-2 border-t border-gray-100">
-                <button onClick={() => { if (confirm('Regenerating the token will break any existing RSS consumers using the old URL. Continue?')) updateRssConfig({ feed_token: generateToken() }) }} disabled={disabled || saving} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50">Regenerate Token</button>
-                <p className="text-xs text-gray-400 mt-1">This will invalidate the current feed URL.</p>
+                <button onClick={() => { if (confirm('Regenerating the token will break any existing RSS consumers using the old URL, including both the draft and sent feeds. Continue?')) updateRssConfig({ feed_token: generateToken() }) }} disabled={disabled || saving} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50">Regenerate Token</button>
+                <p className="text-xs text-gray-400 mt-1">This will invalidate both the draft and sent feed URLs.</p>
               </div>
             </>
           )}
