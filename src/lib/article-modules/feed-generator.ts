@@ -4,11 +4,17 @@ import { htmlToText } from 'html-to-text'
 import { supabaseAdmin } from '../supabase'
 import { normalizeTransactionType } from '../transaction-type'
 import { wrapTrackingUrl } from '../url-tracking'
+import type { IssueStatus } from '@/types/database'
 
-// Module-level cache keyed by moduleId:publicationId
+// Module-level cache keyed by moduleId:publicationId:variant
 const feedCache = new Map<string, { xml: string; cachedAt: number }>()
 const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
 const MAX_CACHE_ENTRIES = 100
+
+export type FeedVariant = 'draft' | 'sent'
+
+// Statuses considered "in-flight" for the draft feed (not yet sent)
+const DRAFT_STATUSES: readonly IssueStatus[] = ['draft', 'in_review']
 
 /**
  * Generates RSS 2.0 feeds from module articles for use with
@@ -18,13 +24,18 @@ export class ModuleFeedGenerator {
   /**
    * Generate RSS 2.0 XML for a module's latest issue articles.
    * Uses in-memory cache with 15-minute TTL.
+   *
+   * @param variant - 'draft' for the most recent in-flight issue
+   *   (draft/in_review/approved), 'sent' for the most recent issue
+   *   that has been sent.
    */
   static async generateFeed(
     moduleId: string,
     publicationId: string,
-    forceRefresh = false
+    forceRefresh = false,
+    variant: FeedVariant = 'draft'
   ): Promise<string> {
-    const cacheKey = `${moduleId}:${publicationId}`
+    const cacheKey = `${moduleId}:${publicationId}:${variant}`
 
     // Check cache
     if (!forceRefresh) {
@@ -55,32 +66,43 @@ export class ModuleFeedGenerator {
     const includeImages = rssConfig.include_images !== false
     const includeFullContent = rssConfig.include_full_content !== false
 
-    // Get publication info for feed metadata
-    const { data: pub, error: pubError } = await supabaseAdmin
-      .from('publications')
-      .select('name, slug')
-      .eq('id', publicationId)
-      .single()
+    // Find the most recent issue with articles for this module
+    let issueQuery = supabaseAdmin
+      .from('publication_issues')
+      .select('id, date, status')
+      .eq('publication_id', publicationId)
+
+    if (variant === 'sent') {
+      issueQuery = issueQuery.eq('status', 'sent')
+    } else {
+      issueQuery = issueQuery.in('status', DRAFT_STATUSES)
+    }
+
+    // Publication and issue lookups are independent — run in parallel
+    const [pubResult, issueResult] = await Promise.all([
+      supabaseAdmin
+        .from('publications')
+        .select('name, slug')
+        .eq('id', publicationId)
+        .single(),
+      issueQuery
+        .order('date', { ascending: false })
+        .limit(1)
+        .single(),
+    ])
+
+    const { data: pub, error: pubError } = pubResult
+    const { data: recentIssue, error: issueError } = issueResult
 
     if (pubError) {
       console.error(`[ModuleFeed] Failed to fetch publication ${publicationId}: ${pubError.message}`)
     }
 
-    const pubName = pub?.name || 'Newsletter'
-
-    // Find the most recent issue with articles for this module
-    const { data: recentIssue, error: issueError } = await supabaseAdmin
-      .from('publication_issues')
-      .select('id, date, status')
-      .eq('publication_id', publicationId)
-      .in('status', ['draft', 'in_review', 'approved'])
-      .order('date', { ascending: false })
-      .limit(1)
-      .single()
-
     if (issueError) {
-      console.error(`[ModuleFeed] Failed to fetch recent issue for publication ${publicationId}: ${issueError.message}`)
+      console.error(`[ModuleFeed] Failed to fetch recent ${variant} issue for publication ${publicationId}: ${issueError.message}`)
     }
+
+    const pubName = pub?.name || 'Newsletter'
 
     if (!recentIssue) {
       // Return empty but valid RSS feed
@@ -206,13 +228,14 @@ export class ModuleFeedGenerator {
 
   /**
    * Invalidate the cache for a specific module (across all publications),
-   * a specific module+publication pair, or the entire cache.
+   * a specific module+publication pair (both variants), or the entire cache.
    */
   static invalidateCache(moduleId?: string, publicationId?: string): void {
     if (moduleId && publicationId) {
-      feedCache.delete(`${moduleId}:${publicationId}`)
+      feedCache.delete(`${moduleId}:${publicationId}:draft`)
+      feedCache.delete(`${moduleId}:${publicationId}:sent`)
     } else if (moduleId) {
-      // Clear all entries for this module (any publication)
+      // Clear all entries for this module (any publication, any variant)
       for (const key of Array.from(feedCache.keys())) {
         if (key.startsWith(`${moduleId}:`)) {
           feedCache.delete(key)
@@ -225,10 +248,13 @@ export class ModuleFeedGenerator {
 
   /**
    * Validate a feed token against the module's stored token.
+   * The token is shared across variants; the variant-specific enabled flag
+   * (`enabled` for draft, `enabled_sent` for sent) must also be true.
    */
   static async validateFeedToken(
     moduleId: string,
-    token: string
+    token: string,
+    variant: FeedVariant = 'draft'
   ): Promise<{ valid: boolean; publicationId: string | null }> {
     const { data: mod, error: modError } = await supabaseAdmin
       .from('article_modules')
@@ -247,7 +273,8 @@ export class ModuleFeedGenerator {
     const config = (mod.config as Record<string, any>) || {}
     const rssConfig = config.rss_output || {}
 
-    if (!rssConfig.enabled || !rssConfig.feed_token || rssConfig.feed_token.length < 16) {
+    const variantEnabled = variant === 'sent' ? !!rssConfig.enabled_sent : !!rssConfig.enabled
+    if (!variantEnabled || !rssConfig.feed_token || rssConfig.feed_token.length < 16) {
       return { valid: false, publicationId: null }
     }
 
