@@ -41,10 +41,13 @@ export default async function WebsiteHome() {
     'website_callout_text',
     'website_heading',
     'website_subheading',
+    'archive_cover_image_url',
   ])
 
-  // Newsletter cover image
-  const newsletterCoverImage = `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
+  // Newsletter cover image (per-publication, with fallback)
+  const newsletterCoverImage =
+    websiteSettings.archive_cover_image_url ||
+    `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
 
   // Fetch newsletters (filtered by publication)
   const { data: newsletters } = await supabaseAdmin

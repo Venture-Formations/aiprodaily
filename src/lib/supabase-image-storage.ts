@@ -89,14 +89,18 @@ export class SupabaseImageStorage {
    */
   async uploadBusinessImage(
     buffer: Buffer,
-    type: 'header' | 'logo' | 'website_header',
+    type: 'header' | 'logo' | 'website_header' | 'archive_cover',
     publicationId: string
   ): Promise<string | null> {
     try {
       if (buffer.length > MAX_FILE_SIZE) return null
 
-      const optimized = await optimizeBuffer(buffer, { preset: 'header' })
-      const prefix = type === 'logo' ? PREFIX.businessLogo : PREFIX.businessHeader
+      const preset = type === 'archive_cover' ? 'newsletter' : 'header'
+      const optimized = await optimizeBuffer(buffer, { preset })
+      const prefix =
+        type === 'logo' ? PREFIX.businessLogo
+        : type === 'archive_cover' ? PREFIX.cover
+        : PREFIX.businessHeader
       const timestamp = Date.now()
       const objectPath = `${prefix}/${publicationId}-${timestamp}.png`
 

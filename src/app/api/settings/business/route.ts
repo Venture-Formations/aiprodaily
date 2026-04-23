@@ -13,6 +13,7 @@ const BUSINESS_SETTINGS_KEYS = [
   'header_image_url',
   'website_header_url',
   'logo_url',
+  'archive_cover_image_url',
   'contact_email',
   'website_url',
   'heading_font',
