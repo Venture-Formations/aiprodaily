@@ -18,7 +18,7 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    if (!type || !['header', 'logo', 'website_header'].includes(type)) {
+    if (!type || !['header', 'logo', 'website_header', 'archive_cover'].includes(type)) {
       return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 })
     }
 
@@ -44,7 +44,7 @@ export const POST = withApiHandler(
     const storage = new SupabaseImageStorage()
     const publicUrl = await storage.uploadBusinessImage(
       buffer,
-      type as 'header' | 'logo' | 'website_header',
+      type as 'header' | 'logo' | 'website_header' | 'archive_cover',
       publicationId
     )
 
@@ -52,10 +52,16 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 })
     }
 
+    const label =
+      type === 'logo' ? 'Logo'
+      : type === 'website_header' ? 'Website header'
+      : type === 'archive_cover' ? 'Archive cover'
+      : 'Header'
+
     return NextResponse.json({
       success: true,
       url: publicUrl,
-      message: `${type === 'logo' ? 'Logo' : type === 'website_header' ? 'Website header' : 'Header'} image uploaded successfully`
+      message: `${label} image uploaded successfully`
     })
   }
 )

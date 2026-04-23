@@ -12,6 +12,7 @@ export interface BusinessSettingsState {
   header_image_url: string
   website_header_url: string
   logo_url: string
+  archive_cover_image_url: string
   contact_email: string
   website_url: string
   heading_font: string
@@ -36,6 +37,7 @@ const defaultSettings: BusinessSettingsState = {
   header_image_url: '',
   website_header_url: '',
   logo_url: '',
+  archive_cover_image_url: '',
   contact_email: '',
   website_url: '',
   heading_font: 'Arial, sans-serif',
@@ -68,6 +70,7 @@ export function useBusinessSettings(publicationId: string) {
   const [uploadingHeader, setUploadingHeader] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingWebsiteHeader, setUploadingWebsiteHeader] = useState(false)
+  const [uploadingArchiveCover, setUploadingArchiveCover] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -113,8 +116,12 @@ export function useBusinessSettings(publicationId: string) {
     }
   }
 
-  const handleImageUpload = async (file: File, type: 'header' | 'logo' | 'website_header') => {
-    const setUploading = type === 'header' ? setUploadingHeader : type === 'logo' ? setUploadingLogo : setUploadingWebsiteHeader
+  const handleImageUpload = async (file: File, type: 'header' | 'logo' | 'website_header' | 'archive_cover') => {
+    const setUploading =
+      type === 'header' ? setUploadingHeader
+      : type === 'logo' ? setUploadingLogo
+      : type === 'website_header' ? setUploadingWebsiteHeader
+      : setUploadingArchiveCover
     setMessage('')
 
     try {
@@ -135,9 +142,18 @@ export function useBusinessSettings(publicationId: string) {
 
       const data = await uploadResponse.json()
 
-      const fieldName = type === 'header' ? 'header_image_url' : type === 'logo' ? 'logo_url' : 'website_header_url'
+      const fieldName =
+        type === 'header' ? 'header_image_url'
+        : type === 'logo' ? 'logo_url'
+        : type === 'website_header' ? 'website_header_url'
+        : 'archive_cover_image_url'
+      const label =
+        type === 'header' ? 'Header'
+        : type === 'logo' ? 'Logo'
+        : type === 'website_header' ? 'Website Header'
+        : 'Archive Cover'
       setSettings(prev => ({ ...prev, [fieldName]: data.url }))
-      setMessage(data.message || `${type === 'header' ? 'Header' : type === 'logo' ? 'Logo' : 'Website Header'} image uploaded successfully!`)
+      setMessage(data.message || `${label} image uploaded successfully!`)
       setTimeout(async () => {
         await handleSave()
       }, 500)
@@ -163,6 +179,7 @@ export function useBusinessSettings(publicationId: string) {
     uploadingHeader,
     uploadingLogo,
     uploadingWebsiteHeader,
+    uploadingArchiveCover,
     message,
     handleSave,
     handleImageUpload,

@@ -61,6 +61,7 @@ export async function fetchNewsPageData(params: SearchParams): Promise<NewsPageD
 
   const settings = await getPublicationSettings(publicationId, [
     'website_header_url', 'logo_url', 'newsletter_name', 'business_name', 'tools_directory_enabled',
+    'archive_cover_image_url',
   ])
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
@@ -105,7 +106,9 @@ export async function fetchNewsPageData(params: SearchParams): Promise<NewsPageD
 
   const { data: manualArticles } = await articlesQuery
 
-  const newsletterCoverImage = `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
+  const newsletterCoverImage =
+    settings.archive_cover_image_url ||
+    `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
   const newsItems: NewsItem[] = []
 
   if (!params.category || params.category === 'newsletter') {

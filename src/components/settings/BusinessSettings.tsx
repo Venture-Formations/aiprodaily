@@ -11,6 +11,7 @@ export default function BusinessSettings({ publicationId }: { publicationId: str
     uploadingHeader,
     uploadingLogo,
     uploadingWebsiteHeader,
+    uploadingArchiveCover,
     message,
     handleSave,
     handleImageUpload,
@@ -99,6 +100,22 @@ export default function BusinessSettings({ publicationId }: { publicationId: str
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               disabled={uploadingWebsiteHeader} />
             {uploadingWebsiteHeader && <span className="text-sm text-gray-500">Uploading...</span>}
+          </div>
+        </div>
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Issues Archive Cover Image</label>
+          <p className="text-xs text-gray-500 mb-2">This image appears on each newsletter issue card in the website archive. Recommended size: 1200 x 675.</p>
+          {settings.archive_cover_image_url && (
+            <div className="mb-2 p-4 rounded border">
+              <img src={settings.archive_cover_image_url} alt="Archive cover preview" className="max-w-md h-32 object-contain mx-auto" />
+            </div>
+          )}
+          <div className="flex items-center space-x-2">
+            <input type="file" accept="image/*"
+              onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImageUpload(file, 'archive_cover') }}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              disabled={uploadingArchiveCover} />
+            {uploadingArchiveCover && <span className="text-sm text-gray-500">Uploading...</span>}
           </div>
         </div>
       </div>
