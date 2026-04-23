@@ -207,12 +207,10 @@ function RssOutputSection({ module, onUpdate, disabled, saving, setSaving, varia
                   <button onClick={() => { navigator.clipboard.writeText(feedUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">{copied ? 'Copied!' : 'Copy'}</button>
                 </div>
               </div>
-              {!isSent && (
-                <div className="pt-2 border-t border-gray-100">
-                  <button onClick={() => { if (confirm('Regenerating the token will break any existing RSS consumers using the old URL, including both the draft and sent feeds. Continue?')) updateRssConfig({ feed_token: generateToken() }) }} disabled={disabled || saving} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50">Regenerate Token</button>
-                  <p className="text-xs text-gray-400 mt-1">This will invalidate both the draft and sent feed URLs.</p>
-                </div>
-              )}
+              <div className="pt-2 border-t border-gray-100">
+                <button onClick={() => { if (confirm('Regenerating the token will break any existing RSS consumers using the old URL, including both the draft and sent feeds. Continue?')) updateRssConfig({ feed_token: generateToken() }) }} disabled={disabled || saving} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50">Regenerate Token</button>
+                <p className="text-xs text-gray-400 mt-1">This will invalidate both the draft and sent feed URLs.</p>
+              </div>
             </>
           )}
         </div>

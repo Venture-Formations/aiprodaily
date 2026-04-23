@@ -26,7 +26,7 @@ export class ModuleFeedGenerator {
    * Uses in-memory cache with 15-minute TTL.
    *
    * @param variant - 'draft' for the most recent in-flight issue
-   *   (draft/in_review/approved), 'sent' for the most recent issue
+   *   (statuses in `DRAFT_STATUSES`), 'sent' for the most recent issue
    *   that has been sent.
    */
   static async generateFeed(
@@ -78,7 +78,10 @@ export class ModuleFeedGenerator {
       issueQuery = issueQuery.in('status', DRAFT_STATUSES)
     }
 
-    // Publication and issue lookups are independent — run in parallel
+    // Publication and issue lookups are independent — run in parallel.
+    // maybeSingle() on the issue query returns null (not an error) when no
+    // matching issue exists — a normal state for the 'sent' variant on a
+    // publication that hasn't sent anything yet.
     const [pubResult, issueResult] = await Promise.all([
       supabaseAdmin
         .from('publications')
@@ -88,7 +91,7 @@ export class ModuleFeedGenerator {
       issueQuery
         .order('date', { ascending: false })
         .limit(1)
-        .single(),
+        .maybeSingle(),
     ])
 
     const { data: pub, error: pubError } = pubResult
@@ -105,8 +108,7 @@ export class ModuleFeedGenerator {
     const pubName = pub?.name || 'Newsletter'
 
     if (!recentIssue) {
-      // Return empty but valid RSS feed
-      return ModuleFeedGenerator.buildEmptyFeed(mod.name, pubName)
+      return ModuleFeedGenerator.cacheAndReturn(cacheKey, ModuleFeedGenerator.buildEmptyFeed(mod.name, pubName))
     }
 
     // Get active module articles for this issue, ordered by rank
@@ -128,7 +130,7 @@ export class ModuleFeedGenerator {
     }
 
     if (!articles || articles.length === 0) {
-      return ModuleFeedGenerator.buildEmptyFeed(mod.name, pubName)
+      return ModuleFeedGenerator.cacheAndReturn(cacheKey, ModuleFeedGenerator.buildEmptyFeed(mod.name, pubName))
     }
 
     // Build RSS feed
@@ -196,17 +198,20 @@ export class ModuleFeedGenerator {
       feed.addItem(itemData)
     }
 
-    const xml = feed.rss2()
+    return ModuleFeedGenerator.cacheAndReturn(cacheKey, feed.rss2())
+  }
 
-    // Evict oldest entry if cache is full
-    if (feedCache.size >= MAX_CACHE_ENTRIES) {
+  /**
+   * Cache an XML payload under `cacheKey`, evicting the oldest entry if
+   * the cache is full, then return the XML. Used for every return path
+   * in `generateFeed` so empty and populated feeds are cached uniformly.
+   */
+  private static cacheAndReturn(cacheKey: string, xml: string): string {
+    if (feedCache.size >= MAX_CACHE_ENTRIES && !feedCache.has(cacheKey)) {
       const oldestKey = feedCache.keys().next().value
       if (oldestKey) feedCache.delete(oldestKey)
     }
-
-    // Cache the result
     feedCache.set(cacheKey, { xml, cachedAt: Date.now() })
-
     return xml
   }
 
