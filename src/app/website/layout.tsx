@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
-import Script from "next/script"
 import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 export const metadata: Metadata = {
@@ -57,10 +56,11 @@ export default async function WebsiteLayout({
 
   return (
     <>
-      {/* Consent Mode v2 defaults — must run before any Google/ad scripts */}
-      <Script
-        id="consent-mode-defaults"
-        strategy="beforeInteractive"
+      {/* Consent Mode v2 defaults — must run before any Google/ad scripts.
+          Raw <script> tags (not Next.js <Script>) so they land in the SSR HTML
+          — AdSense / Meta Pixel verification crawlers read the initial HTML and
+          miss scripts that are only JS-injected post-hydration. */}
+      <script
         dangerouslySetInnerHTML={{
           __html: `
             window.dataLayer = window.dataLayer || [];
@@ -77,9 +77,7 @@ export default async function WebsiteLayout({
       />
 
       {/* Hide default CCPA bar; we show a footer link that opens the opt-out dialog (Privacy & Messaging API) */}
-      <Script
-        id="google-fc-override-dns-link"
-        strategy="beforeInteractive"
+      <script
         dangerouslySetInnerHTML={{
           __html: `
             window.googlefc = window.googlefc || {};
@@ -90,26 +88,21 @@ export default async function WebsiteLayout({
       />
 
       {/* Google Funding Choices — loads the CMP consent banner configured in AdSense Privacy & Messaging */}
-      <Script
-        id="google-fc"
-        strategy="beforeInteractive"
+      <script
+        async
         src="https://fundingchoicesmessages.google.com/i/pub-1173459595320946?ers=1"
-        nonce=""
       />
-      <Script
-        id="google-fc-init"
-        strategy="beforeInteractive"
+      <script
         dangerouslySetInnerHTML={{
           __html: `(function() {function signalGooglefcPresent(){if(!window.frames['googlefcPresent']){if(document.body){var i=document.createElement('iframe');i.style='width:0;height:0;border:none;z-index:-1000;left:-1000px;top:-1000px;';i.style.display='none';i.name='googlefcPresent';document.body.appendChild(i);}else{setTimeout(signalGooglefcPresent,0);}}}signalGooglefcPresent();})();`,
         }}
       />
 
       {/* Google AdSense */}
-      <Script
+      <script
         async
         src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1173459595320946"
         crossOrigin="anonymous"
-        strategy="afterInteractive"
       />
 
       {/* JSON-LD Structured Data */}
@@ -125,9 +118,7 @@ export default async function WebsiteLayout({
       {/* Facebook Pixel — respects Consent Mode; loads SDK but defers tracking until consent granted */}
       {pixelId && (
         <>
-          <Script
-            id="facebook-pixel"
-            strategy="afterInteractive"
+          <script
             dangerouslySetInnerHTML={{
               __html: `
                 !function(f,b,e,v,n,t,s)
