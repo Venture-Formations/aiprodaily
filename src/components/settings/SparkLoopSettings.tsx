@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 
 export default function SparkLoopSettings({ publicationId }: { publicationId: string }) {
   const [settings, setSettings] = useState({
-    apiKey: '',
     upscribeId: '',
     webhookSecret: '',
     afteroffersFormId: '',
@@ -26,7 +25,6 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
       if (response.ok) {
         const data = await response.json()
         setSettings({
-          apiKey: '', // Never pre-fill secrets
           upscribeId: data.upscribeId || '',
           webhookSecret: '', // Never pre-fill secrets
           afteroffersFormId: data.afteroffersFormId || '',
@@ -85,7 +83,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
       <div>
         <h2 className="text-lg font-semibold text-gray-900">SparkLoop Integration</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Configure SparkLoop credentials for this publication. Each publication needs its own SparkLoop API key and Upscribe ID.
+          Configure SparkLoop credentials for this publication. The API key is shared across all publications via env var; Upscribe ID and webhook secret are per-publication.
         </p>
       </div>
 
@@ -96,20 +94,16 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
       )}
 
       <div className="space-y-4">
-        {/* API Key */}
+        {/* API Key (managed via SPARKLOOP_API_KEY env var — shared across publications) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             SparkLoop API Key
           </label>
-          <input
-            type="password"
-            value={settings.apiKey}
-            onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-            placeholder={hasApiKey ? '******** (saved, enter new value to update)' : 'Enter API key'}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
-          />
+          <div className={`px-3 py-2 border rounded-md text-sm ${hasApiKey ? 'border-gray-200 bg-gray-50 text-gray-600' : 'border-red-200 bg-red-50 text-red-700'}`}>
+            {hasApiKey ? 'Configured (managed via SPARKLOOP_API_KEY environment variable)' : 'Not configured — set SPARKLOOP_API_KEY in Vercel environment variables'}
+          </div>
           <p className="text-xs text-gray-400 mt-1">
-            Found in your SparkLoop dashboard under Account Settings &gt; API
+            The SparkLoop API key is shared across all publications and managed via the <code className="font-mono">SPARKLOOP_API_KEY</code> env var.
           </p>
         </div>
 

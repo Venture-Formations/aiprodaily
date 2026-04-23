@@ -131,48 +131,68 @@ export const POST = withApiHandler(
       console.error('[SparkLoop Recommend Subscribe] Create/fetch subscriber failed:', subError)
     }
 
-    // Subscribe with UUID for proper referral attribution
-    await service.subscribeToNewsletters({
-      subscriber_email: email,
-      subscriber_uuid: subscriberUuid || undefined,
-      country_code: countryCode,
-      recommendations: refCode,
-      utm_source: 'newsletter_module',
-    })
+    // Subscribe with UUID for proper referral attribution (non-blocking so we can still
+    // record the attempt cleanly if SparkLoop is down)
+    let sparkloopSuccess = false
+    let sparkloopError: string | undefined
+    try {
+      await service.subscribeToNewsletters({
+        subscriber_email: email,
+        subscriber_uuid: subscriberUuid || undefined,
+        country_code: countryCode,
+        recommendations: refCode,
+        utm_source: 'newsletter_module',
+      })
+      sparkloopSuccess = true
+    } catch (subscribeErr) {
+      sparkloopError = subscribeErr instanceof Error ? subscribeErr.message : String(subscribeErr)
+      console.error('[SparkLoop Recommend Subscribe] SparkLoop subscribe failed:', sparkloopError)
+    }
 
     // Update click record (fire-and-forget)
     supabaseAdmin
       .from('sparkloop_module_clicks')
-      .update({ sparkloop_called: true, sparkloop_success: true })
+      .update({ sparkloop_called: true, sparkloop_success: sparkloopSuccess })
       .eq('id', clickRecordId)
       .then(({ error }) => {
         if (error) console.error('[SparkLoop Recommend Subscribe] Failed to update click record:', error)
       })
 
-    // Record referral
-    try {
-      await supabaseAdmin
-        .from('sparkloop_referrals')
-        .upsert({
-          publication_id: publicationId,
-          subscriber_email: email,
-          ref_code: refCode,
-          source: 'newsletter_module',
-          status: 'subscribed',
-          subscribed_at: new Date().toISOString(),
-        }, {
-          onConflict: 'publication_id,subscriber_email,ref_code',
-          ignoreDuplicates: true,
+    // Only record referral + aggregates on actual success (don't lie about subscription state)
+    if (sparkloopSuccess) {
+      try {
+        await supabaseAdmin
+          .from('sparkloop_referrals')
+          .upsert({
+            publication_id: publicationId,
+            subscriber_email: email,
+            ref_code: refCode,
+            source: 'newsletter_module',
+            status: 'subscribed',
+            subscribed_at: new Date().toISOString(),
+          }, {
+            onConflict: 'publication_id,subscriber_email,ref_code',
+            ignoreDuplicates: true,
+          })
+      } catch (refErr) {
+        console.error('[SparkLoop Recommend Subscribe] Failed to record referral:', refErr)
+      }
+
+      try {
+        await supabaseAdmin.rpc('increment_our_subscribes', {
+          p_publication_id: publicationId,
+          p_ref_codes: [refCode],
         })
-    } catch (refErr) {
-      console.error('[SparkLoop Recommend Subscribe] Failed to record referral:', refErr)
+      } catch (aggErr) {
+        console.error('[SparkLoop Recommend Subscribe] Failed to increment aggregates:', aggErr)
+      }
     }
 
-    // Record event
+    // Record event regardless (attempt is real even if SparkLoop failed)
     try {
       await supabaseAdmin.from('sparkloop_events').insert({
         publication_id: publicationId,
-        event_type: 'newsletter_module_subscribe',
+        event_type: sparkloopSuccess ? 'newsletter_module_subscribe' : 'newsletter_module_subscribe_failed',
         subscriber_email: email,
         raw_payload: {
           source: 'newsletter_module',
@@ -180,6 +200,7 @@ export const POST = withApiHandler(
           issue_id: issueId || null,
           subscriber_uuid: subscriberUuid,
           country_code: countryCode,
+          sparkloop_error: sparkloopError,
           ip_hash: ipAddress ? createHash('sha256').update(ipAddress).digest('hex').slice(0, 16) : null,
         },
         event_timestamp: new Date().toISOString(),
@@ -188,21 +209,14 @@ export const POST = withApiHandler(
       console.error('[SparkLoop Recommend Subscribe] Failed to record event:', eventErr)
     }
 
-    // Increment aggregates
-    try {
-      await supabaseAdmin.rpc('increment_our_subscribes', {
-        p_publication_id: publicationId,
-        p_ref_codes: [refCode],
-      })
-    } catch (aggErr) {
-      console.error('[SparkLoop Recommend Subscribe] Failed to increment aggregates:', aggErr)
+    if (sparkloopSuccess) {
+      console.log(`[SparkLoop Recommend Subscribe] ${email} subscribed to ${rec.publication_name} via landing page`)
     }
 
-    console.log(`[SparkLoop Recommend Subscribe] ${email} subscribed to ${rec.publication_name} via landing page`)
-
     return NextResponse.json({
-      success: true,
+      success: sparkloopSuccess,
       publication_name: rec.publication_name,
+      error: sparkloopError,
     })
   }
 )
