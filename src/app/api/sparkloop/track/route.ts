@@ -26,6 +26,7 @@ const trackEventSchema = z.object({
   selected_count: z.number().int().min(0).max(100).optional(),
   timestamp: z.string().optional(),
   error_message: z.string().max(500).optional(),
+  publication_id: z.string().uuid().optional(),
 })
 
 // Simple in-memory rate limiting: max 30 events per IP per minute
@@ -63,8 +64,9 @@ setInterval(() => {
 export const POST = withApiHandler(
   { authTier: 'public', logContext: 'sparkloop-track', inputSchema: trackEventSchema },
   async ({ input, request, logger }) => {
-    // Resolve publication from server-side default (no trust anchor available)
-    const publicationId = PUBLICATION_ID
+    // Prefer the publication_id from the client (set by the page/modal that resolved it from
+    // the request domain). Fall back to the env default for legacy callers.
+    const publicationId = input.publication_id || PUBLICATION_ID
 
     const eventType = input.event_type
 

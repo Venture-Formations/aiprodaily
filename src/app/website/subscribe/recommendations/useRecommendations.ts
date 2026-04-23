@@ -12,6 +12,7 @@ const SOURCE = 'recs_page' as const
 async function trackEvent(
   eventType: SparkLoopPopupEventType,
   email: string,
+  publicationId: string | undefined,
   data?: {
     refCodes?: string[]
     recommendationCount?: number
@@ -32,6 +33,7 @@ async function trackEvent(
         error_message: data?.errorMessage,
         timestamp: new Date().toISOString(),
         source: SOURCE,
+        publication_id: publicationId,
       }),
     })
   } catch (e) {
@@ -39,7 +41,7 @@ async function trackEvent(
   }
 }
 
-export function useRecommendations() {
+export function useRecommendations(publicationId: string) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -74,14 +76,16 @@ export function useRecommendations() {
       setError(null)
 
       try {
-        const response = await fetch('/api/sparkloop/recommendations?offset=5&limit=3')
+        const params = new URLSearchParams({ offset: '5', limit: '3' })
+        if (publicationId) params.set('publicationId', publicationId)
+        const response = await fetch(`/api/sparkloop/recommendations?${params.toString()}`)
         const data = await response.json()
 
         if (data.recommendations && data.recommendations.length > 0) {
           setRecommendations(data.recommendations)
           setSelectedRefCodes(new Set(data.preSelectedRefCodes || []))
 
-          await trackEvent('popup_opened', email, {
+          await trackEvent('popup_opened', email, publicationId, {
             refCodes: data.recommendations.map((r: SparkLoopRecommendation) => r.ref_code),
             recommendationCount: data.recommendations.length,
             selectedCount: data.preSelectedRefCodes?.length || 0,
@@ -96,7 +100,7 @@ export function useRecommendations() {
     }
 
     fetchRecs()
-  }, [email])
+  }, [email, publicationId])
 
   const toggleSelection = useCallback((refCode: string) => {
     setSelectedRefCodes((prev) => {
@@ -117,13 +121,13 @@ export function useRecommendations() {
 
   const handleSkip = useCallback(async () => {
     if (email && email.includes('@')) {
-      await trackEvent('popup_skipped', email, {
+      await trackEvent('popup_skipped', email, publicationId, {
         recommendationCount: recommendations.length,
         selectedCount: selectedRefCodes.size,
       })
     }
     goToInfo()
-  }, [email, recommendations.length, selectedRefCodes.size, goToInfo])
+  }, [email, recommendations.length, selectedRefCodes.size, goToInfo, publicationId])
 
   const handleSubscribe = useCallback(async () => {
     if (selectedRefCodes.size === 0) {
@@ -144,6 +148,7 @@ export function useRecommendations() {
           email,
           refCodes,
           source: SOURCE,
+          publicationId,
         }),
       })
 
@@ -153,14 +158,14 @@ export function useRecommendations() {
         const allShownRefCodes = recommendations.map(r => r.ref_code)
         const notSelectedRefCodes = allShownRefCodes.filter(code => !selectedRefCodes.has(code))
 
-        await trackEvent('subscriptions_success', email, {
+        await trackEvent('subscriptions_success', email, publicationId, {
           refCodes,
           selectedCount: refCodes.length,
           recommendationCount: recommendations.length,
         })
 
         if (notSelectedRefCodes.length > 0) {
-          await trackEvent('recommendations_not_selected', email, {
+          await trackEvent('recommendations_not_selected', email, publicationId, {
             refCodes: notSelectedRefCodes,
             selectedCount: notSelectedRefCodes.length,
           })
@@ -173,14 +178,14 @@ export function useRecommendations() {
       }
     } catch (err) {
       console.error('[SparkLoop RecsPage] Subscribe failed:', err)
-      await trackEvent('subscriptions_failed', email, {
+      await trackEvent('subscriptions_failed', email, publicationId, {
         errorMessage: err instanceof Error ? err.message : 'Unknown error',
       })
       setError('Failed to subscribe. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
-  }, [selectedRefCodes, email, recommendations, goToInfo, handleSkip])
+  }, [selectedRefCodes, email, recommendations, goToInfo, handleSkip, publicationId])
 
   return {
     email,

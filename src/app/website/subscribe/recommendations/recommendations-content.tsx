@@ -7,14 +7,15 @@ import { useRecommendations } from './useRecommendations'
 interface RecommendationsContentProps {
   logoUrl: string
   newsletterName: string
+  publicationId: string
 }
 
-export function RecommendationsContent({ logoUrl, newsletterName }: RecommendationsContentProps) {
+export function RecommendationsContent({ logoUrl, newsletterName, publicationId }: RecommendationsContentProps) {
   const {
     email, recommendations, selectedRefCodes,
     isLoading, isSubmitting, error, submitted,
     toggleSelection, goToInfo, handleSkip, handleSubscribe,
-  } = useRecommendations()
+  } = useRecommendations(publicationId)
 
   // Missing email state
   if (!email || !email.includes('@')) {

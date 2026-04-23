@@ -12,6 +12,7 @@ import type {
 async function trackEvent(
   eventType: SparkLoopPopupEventType,
   email: string,
+  publicationId: string | undefined,
   data?: {
     refCodes?: string[]
     recommendationCount?: number
@@ -31,6 +32,7 @@ async function trackEvent(
         selected_count: data?.selectedCount,
         error_message: data?.errorMessage,
         timestamp: new Date().toISOString(),
+        publication_id: publicationId,
       }),
     })
   } catch (e) {
@@ -79,7 +81,7 @@ export function useSparkLoopModal({
           setRecommendations(data.recommendations)
           setSelectedRefCodes(new Set(data.preSelectedRefCodes || []))
 
-          await trackEvent('popup_opened', subscriberEmail, {
+          await trackEvent('popup_opened', subscriberEmail, publicationId, {
             refCodes: data.recommendations.map((r: SparkLoopRecommendation) => r.ref_code),
             recommendationCount: data.recommendations.length,
             selectedCount: data.preSelectedRefCodes?.length || 0,
@@ -113,13 +115,13 @@ export function useSparkLoopModal({
   }, [])
 
   const handleSkip = useCallback(async () => {
-    await trackEvent('popup_skipped', subscriberEmail, {
+    await trackEvent('popup_skipped', subscriberEmail, publicationId, {
       recommendationCount: recommendations.length,
       selectedCount: selectedRefCodes.size,
     })
     onClose()
     onSubscribeComplete()
-  }, [subscriberEmail, recommendations.length, selectedRefCodes.size, onClose, onSubscribeComplete])
+  }, [subscriberEmail, recommendations.length, selectedRefCodes.size, onClose, onSubscribeComplete, publicationId])
 
   const handleSubscribe = useCallback(async () => {
     if (selectedRefCodes.size === 0) {
@@ -148,14 +150,14 @@ export function useSparkLoopModal({
         const allShownRefCodes = recommendations.map(r => r.ref_code)
         const notSelectedRefCodes = allShownRefCodes.filter(code => !selectedRefCodes.has(code))
 
-        await trackEvent('subscriptions_success', subscriberEmail, {
+        await trackEvent('subscriptions_success', subscriberEmail, publicationId, {
           refCodes,
           selectedCount: refCodes.length,
           recommendationCount: recommendations.length,
         })
 
         if (notSelectedRefCodes.length > 0) {
-          await trackEvent('recommendations_not_selected', subscriberEmail, {
+          await trackEvent('recommendations_not_selected', subscriberEmail, publicationId, {
             refCodes: notSelectedRefCodes,
             selectedCount: notSelectedRefCodes.length,
           })
@@ -168,14 +170,14 @@ export function useSparkLoopModal({
       }
     } catch (err) {
       console.error('[SparkLoop] Subscribe failed:', err)
-      await trackEvent('subscriptions_failed', subscriberEmail, {
+      await trackEvent('subscriptions_failed', subscriberEmail, publicationId, {
         errorMessage: err instanceof Error ? err.message : 'Unknown error',
       })
       setError('Failed to subscribe. Please try again or skip.')
     } finally {
       setIsSubmitting(false)
     }
-  }, [selectedRefCodes, subscriberEmail, onClose, onSubscribeComplete, handleSkip])
+  }, [selectedRefCodes, subscriberEmail, onClose, onSubscribeComplete, handleSkip, publicationId])
 
   return {
     isLoading,
