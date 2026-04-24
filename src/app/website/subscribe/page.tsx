@@ -3,6 +3,7 @@ import { Container } from "@/components/salient/Container"
 import { SubscribeForm } from "./subscribe-form"
 import { renderStyledHeading } from "@/components/StyledHeading"
 import { resolvePublicationFromRequest, getPublicationSettings } from '@/lib/publication-settings'
+import { supabaseAdmin } from '@/lib/supabase'
 import {
   getActiveTestForPublication,
   getDefaultPageForPublication,
@@ -15,8 +16,41 @@ import { checkUserAgent } from '@/lib/bot-detection/ua-detector'
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
 
-export default async function SubscribePage() {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Resolve a publication from optional query-param overrides, else fall back
+ * to the request's host header. Exists so staging/preview URLs can target a
+ * specific publication without DNS changes:
+ *   /website/subscribe?pub_slug=accounting
+ *   /website/subscribe?publication_id=<uuid>
+ */
+async function resolvePublicationId(
+  searchParams: { publication_id?: string; pub_slug?: string }
+): Promise<string> {
+  if (searchParams.publication_id && UUID_RE.test(searchParams.publication_id)) {
+    return searchParams.publication_id
+  }
+  if (searchParams.pub_slug) {
+    const { data } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('slug', searchParams.pub_slug)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (data?.id) return data.id
+  }
   const { publicationId } = await resolvePublicationFromRequest()
+  return publicationId
+}
+
+export default async function SubscribePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ publication_id?: string; pub_slug?: string }>
+}) {
+  const sp = await searchParams
+  const publicationId = await resolvePublicationId(sp)
 
   // Fetch publication-level defaults (used when no variant overrides exist)
   const settings = await getPublicationSettings(publicationId, [

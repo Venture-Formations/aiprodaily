@@ -82,6 +82,34 @@ async function lookupPublicationByDomain(hostname: string): Promise<CachedPub | 
   }
 }
 
+/**
+ * Attach a stable anonymous visitor_id cookie on any subscribe-related
+ * request so server-rendered A/B variant assignment is sticky. Applied
+ * on every middleware return path, on every domain — required so that
+ * staging/preview URLs (e.g. aiprodaily-staging.vercel.app/website/subscribe)
+ * can exercise the A/B flow without DNS changes.
+ */
+function attachVisitorCookie(request: NextRequest, response: NextResponse): NextResponse {
+  const path = request.nextUrl.pathname
+  const isSubscribePath =
+    path === '/subscribe' ||
+    path.startsWith('/subscribe/') ||
+    path === '/website/subscribe' ||
+    path.startsWith('/website/subscribe/')
+  if (!isSubscribePath) return response
+
+  const existing = request.cookies.get('subv_vid')?.value
+  if (!existing) {
+    response.cookies.set('subv_vid', crypto.randomUUID(), {
+      maxAge: 60 * 60 * 24 * 365, // 1 year
+      sameSite: 'lax',
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+    })
+  }
+  return response
+}
+
 // Custom middleware logic for non-tools routes
 async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   const hostname = request.headers.get('host') || ''
@@ -120,27 +148,11 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
       requestHeaders.set('x-newsletter-slug', publication.slug)
       requestHeaders.set('x-newsletter-id', publication.id)
 
-      const response = NextResponse.rewrite(rewriteUrl, {
+      return NextResponse.rewrite(rewriteUrl, {
         request: {
           headers: requestHeaders,
         },
       })
-
-      // Ensure every visitor on subscribe-related routes carries a stable
-      // anonymous visitor_id so server-rendered A/B variant assignment is sticky.
-      if (url.pathname === '/subscribe' || url.pathname.startsWith('/subscribe/')) {
-        const existing = request.cookies.get('subv_vid')?.value
-        if (!existing) {
-          response.cookies.set('subv_vid', crypto.randomUUID(), {
-            maxAge: 60 * 60 * 24 * 365, // 1 year
-            sameSite: 'lax',
-            path: '/',
-            secure: process.env.NODE_ENV === 'production',
-          })
-        }
-      }
-
-      return response
     }
   }
 
@@ -280,16 +292,21 @@ export default clerkMiddleware(async (auth, request) => {
     method: request.method
   })
 
-  // Handle /tools and /account routes with Clerk
+  let response: NextResponse
   if (isToolsRoute(request) || isAccountRoute(request)) {
     // Don't use auth.protect() here - the submit page has SignedIn/SignedOut
     // components that handle authentication state gracefully
     // Let Clerk process the request to provide auth context
-    return NextResponse.next()
+    response = NextResponse.next()
+  } else {
+    // For all other routes, use custom middleware logic
+    response = await customMiddleware(request)
   }
 
-  // For all other routes, use custom middleware logic
-  return customMiddleware(request)
+  // Centralized: ensure subscribe-related requests carry a visitor_id cookie
+  // regardless of which branch produced the response. This makes /website/subscribe*
+  // testable on preview URLs without DNS changes.
+  return attachVisitorCookie(request, response)
 })
 
 export const config = {
