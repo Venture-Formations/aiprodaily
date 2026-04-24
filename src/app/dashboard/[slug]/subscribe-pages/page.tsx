@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
@@ -30,6 +30,22 @@ const CONTENT_FIELDS: Array<{ key: string; label: string; multiline?: boolean; p
   { key: 'cta_text', label: 'CTA button text (override)', placeholder: '' },
 ]
 
+/**
+ * Build a `/website/subscribe?preview=<base64-JSON>&pub_slug=<slug>` URL the
+ * subscribe server component knows how to render in preview mode (no DB
+ * lookups for variant/default, no event recording, form submissions disabled).
+ */
+function buildPreviewUrl(slug: string, content: Record<string, string | undefined>): string {
+  // Strip undefined/empty so the preview matches what would actually be saved
+  const clean: Record<string, string> = {}
+  for (const [k, v] of Object.entries(content)) {
+    const trimmed = (v || '').trim()
+    if (trimmed) clean[k] = trimmed
+  }
+  const blob = btoa(JSON.stringify({ pub_slug: slug, content: clean }))
+  return `/website/subscribe?preview=${encodeURIComponent(blob)}`
+}
+
 export default function SubscribePagesDashboardPage() {
   const { slug } = useParams() as { slug: string }
   const [newsletter, setNewsletter] = useState<Newsletter | null>(null)
@@ -43,6 +59,9 @@ export default function SubscribePagesDashboardPage() {
     is_default: false,
   })
   const [busy, setBusy] = useState(false)
+  // Debounced preview URL — avoids thrashing the iframe on every keystroke
+  const [previewUrl, setPreviewUrl] = useState<string>('')
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const publicationId = newsletter?.id
 
@@ -196,6 +215,24 @@ export default function SubscribePagesDashboardPage() {
   const visiblePages = useMemo(() => pages.filter(p => !p.is_archived), [pages])
   const hasDefault = useMemo(() => visiblePages.some(p => p.is_default), [visiblePages])
 
+  // Debounce-update the preview iframe URL whenever the form content changes
+  // while the modal is open. 400ms feels responsive but doesn't reload the
+  // iframe on every keystroke.
+  useEffect(() => {
+    if (!creating && !editing) {
+      setPreviewUrl('')
+      return
+    }
+    if (previewTimer.current) clearTimeout(previewTimer.current)
+    previewTimer.current = setTimeout(() => {
+      setPreviewUrl(buildPreviewUrl(slug, form.content))
+    }, 400)
+    return () => {
+      if (previewTimer.current) clearTimeout(previewTimer.current)
+    }
+    // form.name doesn't affect the rendered subscribe page, so only watch content
+  }, [form.content, creating, editing, slug])
+
   return (
     <Layout>
       <div className="px-4 py-6 sm:px-0">
@@ -261,6 +298,14 @@ export default function SubscribePagesDashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
+                  <a
+                    href={buildPreviewUrl(slug, p.content || {})}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-gray-600 hover:underline"
+                  >
+                    Preview
+                  </a>
                   {!p.is_default && (
                     <button
                       onClick={() => setAsDefault(p)}
@@ -286,7 +331,8 @@ export default function SubscribePagesDashboardPage() {
 
         {(creating || editing) && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="p-6 overflow-y-auto">
               <h2 className="text-xl font-bold mb-4">
                 {creating ? 'New Subscribe Page' : `Edit: ${editing?.name}`}
               </h2>
@@ -397,6 +443,39 @@ export default function SubscribePagesDashboardPage() {
                 >
                   {busy ? 'Saving…' : creating ? 'Create' : 'Save'}
                 </button>
+              </div>
+              </div>
+
+              {/* Live preview pane (right column on lg+, hidden on mobile to save room) */}
+              <div className="hidden lg:flex border-l flex-col bg-gray-50">
+                <div className="flex items-center justify-between px-4 py-2 border-b bg-white">
+                  <span className="text-sm font-medium text-gray-700">Live Preview</span>
+                  {previewUrl && (
+                    <a
+                      href={previewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Open in new tab ↗
+                    </a>
+                  )}
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  {previewUrl ? (
+                    <iframe
+                      key={previewUrl}
+                      src={previewUrl}
+                      title="Subscribe page preview"
+                      className="w-full h-full border-0"
+                      sandbox="allow-same-origin allow-scripts allow-forms"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-sm text-gray-400">
+                      Loading preview…
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

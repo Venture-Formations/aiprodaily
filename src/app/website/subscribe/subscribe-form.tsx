@@ -65,6 +65,7 @@ interface SubscribeFormProps {
   collectPhone?: boolean
   phoneLabel?: string
   phonePlaceholder?: string
+  previewMode?: boolean
 }
 
 export function SubscribeForm({
@@ -74,6 +75,7 @@ export function SubscribeForm({
   collectPhone = false,
   phoneLabel = 'Phone (optional)',
   phonePlaceholder = 'Your phone number',
+  previewMode = false,
 }: SubscribeFormProps) {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -114,6 +116,12 @@ export function SubscribeForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (previewMode) {
+      // Preview pages render the form for visual inspection only — never POST.
+      setError('Preview mode — submissions are disabled.')
+      return
+    }
 
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address')
@@ -166,6 +174,11 @@ export function SubscribeForm({
   return (
     <>
       <div className="space-y-4">
+        {previewMode && (
+          <div className="mx-auto max-w-lg rounded-md bg-yellow-100 px-3 py-2 text-xs font-medium text-yellow-900 ring-1 ring-yellow-300">
+            Preview mode — form submissions are disabled.
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="mx-auto w-full max-w-lg space-y-3">
           <div className="relative">
             <label htmlFor="email" className="sr-only">Email address</label>
