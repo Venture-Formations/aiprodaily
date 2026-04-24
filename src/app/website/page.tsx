@@ -4,7 +4,7 @@ import { Footer } from "@/components/salient/Footer"
 import { LatestNewsList } from "@/components/website/latest-news-list"
 import { supabaseAdmin } from "@/lib/supabase"
 import { resolvePublicationFromRequest, getPublicationSettings } from '@/lib/publication-settings'
-import { STORAGE_PUBLIC_URL } from '@/lib/config'
+import { resolveArchiveCoverImage } from '@/lib/archive-cover'
 
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
@@ -43,11 +43,6 @@ export default async function WebsiteHome() {
     'website_subheading',
     'archive_cover_image_url',
   ])
-
-  // Newsletter cover image (per-publication, with fallback)
-  const newsletterCoverImage =
-    websiteSettings.archive_cover_image_url ||
-    `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
 
   // Fetch newsletters (filtered by publication)
   const { data: newsletters } = await supabaseAdmin
@@ -88,7 +83,7 @@ export default async function WebsiteHome() {
       title: nl.subject_line || `Newsletter - ${nl.issue_date}`,
       date: nl.issue_date,
       category: 'Newsletter',
-      image_url: newsletterCoverImage,
+      image_url: resolveArchiveCoverImage(nl, websiteSettings.archive_cover_image_url),
       metadata: nl.metadata as NewsItem['metadata']
     })
   })
