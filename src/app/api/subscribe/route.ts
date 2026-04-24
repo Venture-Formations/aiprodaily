@@ -33,7 +33,7 @@ export const POST = withApiHandler(
   { authTier: 'public', logContext: 'subscribe' },
   async ({ request, logger }) => {
     const body = await request.json()
-    const { email, facebook_pixel, name } = body
+    const { email, facebook_pixel, name, phone } = body
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({
@@ -99,6 +99,14 @@ export const POST = withApiHandler(
     // Add Kickbox verification fields
     if (Object.keys(kickboxFields).length > 0) {
       Object.assign(customFields, kickboxFields)
+    }
+
+    // Optional phone number from the subscribe form (collected when the active
+    // subscribe_page has collect_phone = 'true'). Stored as a `phone` custom
+    // field on the subscriber — maps cleanly across MailerLite, SendGrid, and
+    // Beehiiv, which all accept arbitrary custom fields.
+    if (typeof phone === 'string' && phone.trim().length > 0) {
+      customFields.phone = phone.trim()
     }
 
     if (facebook_pixel) {

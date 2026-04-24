@@ -58,8 +58,27 @@ function generateAfterOffersClickId() {
   return `ao_${Date.now()}_${randomPart}`
 }
 
-export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline = 'FREE FOREVER', publicationId }: { newsletterName?: string; tagline?: string; publicationId?: string }) {
+interface SubscribeFormProps {
+  newsletterName?: string
+  tagline?: string
+  publicationId?: string
+  collectPhone?: boolean
+  phoneLabel?: string
+  phonePlaceholder?: string
+  previewMode?: boolean
+}
+
+export function SubscribeForm({
+  newsletterName = 'AI Accounting Daily',
+  tagline = 'FREE FOREVER',
+  publicationId,
+  collectPhone = false,
+  phoneLabel = 'Phone (optional)',
+  phonePlaceholder = 'Your phone number',
+  previewMode = false,
+}: SubscribeFormProps) {
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [didYouMean, setDidYouMean] = useState('')
@@ -98,6 +117,12 @@ export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (previewMode) {
+      // Preview pages render the form for visual inspection only — never POST.
+      setError('Preview mode — submissions are disabled.')
+      return
+    }
+
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address')
       return
@@ -111,12 +136,14 @@ export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline 
       // Get Facebook Pixel data at submit time
       const pixelData = getFacebookPixelData()
 
+      const trimmedPhone = phone.trim()
       const response = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          facebook_pixel: pixelData
+          facebook_pixel: pixelData,
+          ...(trimmedPhone ? { phone: trimmedPhone } : {}),
         })
       })
 
@@ -147,8 +174,13 @@ export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline 
   return (
     <>
       <div className="space-y-4">
-        <form onSubmit={handleSubmit} className="flex justify-center">
-          <div className="relative w-full max-w-lg">
+        {previewMode && (
+          <div className="mx-auto max-w-lg rounded-md bg-yellow-100 px-3 py-2 text-xs font-medium text-yellow-900 ring-1 ring-yellow-300">
+            Preview mode — form submissions are disabled.
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="mx-auto w-full max-w-lg space-y-3">
+          <div className="relative">
             <label htmlFor="email" className="sr-only">Email address</label>
             <input
               type="email"
@@ -170,6 +202,24 @@ export function SubscribeForm({ newsletterName = 'AI Accounting Daily', tagline 
               {isSubmitting ? 'Loading...' : 'Subscribe'}
             </button>
           </div>
+
+          {collectPhone && (
+            <div className="relative">
+              <label htmlFor="phone" className="sr-only">{phoneLabel}</label>
+              <input
+                type="tel"
+                name="phone"
+                id="phone"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={isSubmitting}
+                placeholder={phonePlaceholder}
+                aria-label={phoneLabel}
+                className="w-full rounded-full border-0 bg-white px-5 py-4 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+              />
+            </div>
+          )}
         </form>
 
         {error && (

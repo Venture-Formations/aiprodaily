@@ -44,13 +44,39 @@ async function resolvePublicationId(
   return publicationId
 }
 
+/**
+ * Decode a base64-encoded JSON preview blob: { pub_slug?, content: {...} }.
+ * Returns null on any decode/parse failure (preview falls back to normal render).
+ */
+function decodePreviewBlob(raw: string | undefined): { pub_slug?: string; content: Record<string, string | undefined> } | null {
+  if (!raw) return null
+  try {
+    const json = Buffer.from(raw, 'base64').toString('utf-8')
+    const parsed = JSON.parse(json)
+    if (!parsed || typeof parsed !== 'object' || !parsed.content || typeof parsed.content !== 'object') {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 export default async function SubscribePage({
   searchParams,
 }: {
-  searchParams: Promise<{ publication_id?: string; pub_slug?: string }>
+  searchParams: Promise<{ publication_id?: string; pub_slug?: string; preview?: string }>
 }) {
   const sp = await searchParams
-  const publicationId = await resolvePublicationId(sp)
+  const preview = decodePreviewBlob(sp.preview)
+
+  // When previewing, the slug from the preview blob takes priority so the
+  // dashboard can preview any publication's page without separately passing it.
+  const resolvedFromParams = await resolvePublicationId({
+    publication_id: sp.publication_id,
+    pub_slug: preview?.pub_slug || sp.pub_slug,
+  })
+  const publicationId = resolvedFromParams
 
   // Fetch publication-level defaults (used when no variant overrides exist)
   const settings = await getPublicationSettings(publicationId, [
@@ -61,14 +87,17 @@ export default async function SubscribePage({
     'subscribe_tagline',
   ])
 
-  // Resolve A/B test (if any) and assign a sticky variant.
-  // Also load the default subscribe page — used as the base when no test is
-  // active, and as the fallback for any variant field left blank.
-  const [active, defaultPage] = await Promise.all([
-    getActiveTestForPublication(publicationId),
-    getDefaultPageForPublication(publicationId),
-  ])
+  // In preview mode we skip live A/B and default-page lookups entirely so the
+  // preview shows exactly the content the user is editing — no mixing in the
+  // currently-active variant. We also skip event recording and cookie writes.
+  const [active, defaultPage] = preview
+    ? [null, null]
+    : await Promise.all([
+        getActiveTestForPublication(publicationId),
+        getDefaultPageForPublication(publicationId),
+      ])
   const defaultContent = (defaultPage?.content || {}) as Record<string, string | undefined>
+  const previewContent = (preview?.content || {}) as Record<string, string | undefined>
 
   let variantContent: Record<string, string | undefined> = {}
   if (active) {
@@ -106,24 +135,40 @@ export default async function SubscribePage({
     }
   }
 
-  // Fallback chain for each field: active variant → default page → publication_settings → hardcoded
-  const logoUrl = variantContent.logo_url || defaultContent.logo_url || settings.logo_url || '/logo.png'
+  // Fallback chain for each field: preview (when set) → active variant → default page → publication_settings → hardcoded
+  const logoUrl =
+    previewContent.logo_url || variantContent.logo_url || defaultContent.logo_url || settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
   const heading =
+    previewContent.heading ||
     variantContent.heading ||
     defaultContent.heading ||
     settings.subscribe_heading ||
     'Master AI Tools, Prompts & News **in Just 3 Minutes a Day**'
   const subheading =
+    previewContent.subheading ||
     variantContent.subheading ||
     defaultContent.subheading ||
     settings.subscribe_subheading ||
     'Join 10,000+ accounting professionals staying current as AI reshapes bookkeeping, tax, and advisory work.'
   const tagline =
+    previewContent.tagline ||
     variantContent.tagline ||
     defaultContent.tagline ||
     settings.subscribe_tagline ||
     'FREE FOREVER'
+
+  // Phone collection: stored as string 'true' in the JSONB content. Falls through
+  // the same preview → variant → default → (no publication setting yet) chain.
+  const collectPhone =
+    (previewContent.collect_phone || variantContent.collect_phone || defaultContent.collect_phone || 'false') === 'true'
+  const phoneLabel =
+    previewContent.phone_label || variantContent.phone_label || defaultContent.phone_label || 'Phone (optional)'
+  const phonePlaceholder =
+    previewContent.phone_placeholder ||
+    variantContent.phone_placeholder ||
+    defaultContent.phone_placeholder ||
+    'Your phone number'
 
   return (
     <main className="min-h-[100dvh] bg-white px-4">
@@ -154,7 +199,15 @@ export default async function SubscribePage({
 
             {/* Subscribe Form */}
             <div className="mt-6 sm:mt-10">
-              <SubscribeForm newsletterName={newsletterName} tagline={tagline} publicationId={publicationId} />
+              <SubscribeForm
+                newsletterName={newsletterName}
+                tagline={tagline}
+                publicationId={publicationId}
+                collectPhone={collectPhone}
+                phoneLabel={phoneLabel}
+                phonePlaceholder={phonePlaceholder}
+                previewMode={Boolean(preview)}
+              />
             </div>
           </div>
         </Container>

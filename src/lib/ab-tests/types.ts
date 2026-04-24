@@ -13,6 +13,10 @@ export interface SubscribePageContent {
   tagline?: string
   logo_url?: string
   cta_text?: string
+  /** When 'true', renders an optional phone-number input below the email field. */
+  collect_phone?: string
+  phone_label?: string
+  phone_placeholder?: string
   [key: string]: string | undefined
 }
 
