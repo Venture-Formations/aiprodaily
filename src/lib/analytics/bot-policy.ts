@@ -65,7 +65,7 @@ export async function loadExcludedIps(publicationId: string): Promise<ExcludedIp
     .eq('publication_id', publicationId)
 
   if (error || !data) {
-    log.error('Failed to load excluded_ips', { error, publicationId })
+    log.error({ err: error, publicationId }, 'Failed to load excluded_ips')
     return new ExcludedIpSet([])
   }
   return new ExcludedIpSet(data as ExcludedIpRow[])
