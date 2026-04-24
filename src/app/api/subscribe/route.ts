@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import axios from 'axios'
 import { getPublicationByDomain, getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 import { SendGridService } from '@/lib/sendgrid'
 import { verifyEmail, buildKickboxFields } from '@/lib/kickbox'
+import {
+  attributeByVisitor,
+  attachEmailToAssignment,
+  recordEvent,
+  VISITOR_COOKIE,
+} from '@/lib/ab-tests'
 
 // MailerLite API client
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
@@ -241,6 +247,27 @@ export const POST = withApiHandler(
           }, { status: 500 })
         }
       }
+    }
+
+    // Record A/B test signup conversion (no-op when no active test / no cookie)
+    try {
+      const cookieStore = await cookies()
+      const visitorId = cookieStore.get(VISITOR_COOKIE)?.value || null
+      if (visitorId) {
+        const attribution = await attributeByVisitor(publicationId, visitorId)
+        if (attribution) {
+          await attachEmailToAssignment(attribution.testId, visitorId, email)
+          await recordEvent(attribution.testId, attribution.variantId, 'signup', {
+            publicationId,
+            visitorId,
+            subscriberEmail: email,
+            ipAddress,
+            userAgent,
+          })
+        }
+      }
+    } catch (abError) {
+      console.error('[Subscribe] A/B signup event failed:', abError)
     }
 
     const successResponse: Record<string, any> = {

@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { headers } from 'next/headers'
 import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
-import { STORAGE_PUBLIC_URL } from '@/lib/config'
+import { resolveArchiveCoverImage } from '@/lib/archive-cover'
 
 interface SearchParams {
   category?: string
@@ -106,9 +106,6 @@ export async function fetchNewsPageData(params: SearchParams): Promise<NewsPageD
 
   const { data: manualArticles } = await articlesQuery
 
-  const newsletterCoverImage =
-    settings.archive_cover_image_url ||
-    `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
   const newsItems: NewsItem[] = []
 
   if (!params.category || params.category === 'newsletter') {
@@ -119,7 +116,7 @@ export async function fetchNewsPageData(params: SearchParams): Promise<NewsPageD
         title: nl.subject_line || `Newsletter - ${nl.issue_date}`,
         date: nl.issue_date,
         category: 'Newsletter',
-        image_url: newsletterCoverImage,
+        image_url: resolveArchiveCoverImage(nl, settings.archive_cover_image_url),
         metadata: nl.metadata as NewsItem['metadata']
       })
     })

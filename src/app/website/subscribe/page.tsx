@@ -1,15 +1,58 @@
+import { cookies, headers } from 'next/headers'
 import { Container } from "@/components/salient/Container"
 import { SubscribeForm } from "./subscribe-form"
 import { renderStyledHeading } from "@/components/StyledHeading"
 import { resolvePublicationFromRequest, getPublicationSettings } from '@/lib/publication-settings'
+import { supabaseAdmin } from '@/lib/supabase'
+import {
+  getActiveTestForPublication,
+  getDefaultPageForPublication,
+  ensureAssignment,
+  recordEvent,
+  VISITOR_COOKIE,
+} from '@/lib/ab-tests'
+import { checkUserAgent } from '@/lib/bot-detection/ua-detector'
 
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
 
-export default async function SubscribePage() {
-  const { publicationId } = await resolvePublicationFromRequest()
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-  // Fetch settings from publication_settings
+/**
+ * Resolve a publication from optional query-param overrides, else fall back
+ * to the request's host header. Exists so staging/preview URLs can target a
+ * specific publication without DNS changes:
+ *   /website/subscribe?pub_slug=accounting
+ *   /website/subscribe?publication_id=<uuid>
+ */
+async function resolvePublicationId(
+  searchParams: { publication_id?: string; pub_slug?: string }
+): Promise<string> {
+  if (searchParams.publication_id && UUID_RE.test(searchParams.publication_id)) {
+    return searchParams.publication_id
+  }
+  if (searchParams.pub_slug) {
+    const { data } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('slug', searchParams.pub_slug)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (data?.id) return data.id
+  }
+  const { publicationId } = await resolvePublicationFromRequest()
+  return publicationId
+}
+
+export default async function SubscribePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ publication_id?: string; pub_slug?: string }>
+}) {
+  const sp = await searchParams
+  const publicationId = await resolvePublicationId(sp)
+
+  // Fetch publication-level defaults (used when no variant overrides exist)
   const settings = await getPublicationSettings(publicationId, [
     'logo_url',
     'newsletter_name',
@@ -18,11 +61,69 @@ export default async function SubscribePage() {
     'subscribe_tagline',
   ])
 
-  const logoUrl = settings.logo_url || '/logo.png'
+  // Resolve A/B test (if any) and assign a sticky variant.
+  // Also load the default subscribe page — used as the base when no test is
+  // active, and as the fallback for any variant field left blank.
+  const [active, defaultPage] = await Promise.all([
+    getActiveTestForPublication(publicationId),
+    getDefaultPageForPublication(publicationId),
+  ])
+  const defaultContent = (defaultPage?.content || {}) as Record<string, string | undefined>
+
+  let variantContent: Record<string, string | undefined> = {}
+  if (active) {
+    const cookieStore = await cookies()
+    const headerList = await headers()
+    const visitorId = cookieStore.get(VISITOR_COOKIE)?.value
+    const userAgent = headerList.get('user-agent')
+    const ipAddress =
+      headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      headerList.get('x-real-ip') ||
+      null
+    const uaCheck = checkUserAgent(userAgent)
+
+    if (visitorId) {
+      const assignment = await ensureAssignment(active, visitorId, {
+        ipAddress,
+        userAgent,
+        isBotUa: uaCheck.isBot,
+      })
+
+      if (assignment) {
+        variantContent = (assignment.variant.page.content || {}) as Record<string, string | undefined>
+
+        // Fire-and-forget: don't block TTFB on the event insert. Errors are
+        // logged inside recordEvent. Skip obvious bots to keep stats clean.
+        if (!uaCheck.isBot) {
+          void recordEvent(active.test.id, assignment.variant.id, 'page_view', {
+            publicationId,
+            visitorId,
+            ipAddress,
+            userAgent,
+          }).catch((err) => console.error('[Subscribe] page_view recordEvent threw:', err))
+        }
+      }
+    }
+  }
+
+  // Fallback chain for each field: active variant → default page → publication_settings → hardcoded
+  const logoUrl = variantContent.logo_url || defaultContent.logo_url || settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
-  const heading = settings.subscribe_heading || 'Master AI Tools, Prompts & News **in Just 3 Minutes a Day**'
-  const subheading = settings.subscribe_subheading || 'Join 10,000+ accounting professionals staying current as AI reshapes bookkeeping, tax, and advisory work.'
-  const tagline = settings.subscribe_tagline || 'FREE FOREVER'
+  const heading =
+    variantContent.heading ||
+    defaultContent.heading ||
+    settings.subscribe_heading ||
+    'Master AI Tools, Prompts & News **in Just 3 Minutes a Day**'
+  const subheading =
+    variantContent.subheading ||
+    defaultContent.subheading ||
+    settings.subscribe_subheading ||
+    'Join 10,000+ accounting professionals staying current as AI reshapes bookkeeping, tax, and advisory work.'
+  const tagline =
+    variantContent.tagline ||
+    defaultContent.tagline ||
+    settings.subscribe_tagline ||
+    'FREE FOREVER'
 
   return (
     <main className="min-h-[100dvh] bg-white px-4">
