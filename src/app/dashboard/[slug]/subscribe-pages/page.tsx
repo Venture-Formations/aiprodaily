@@ -335,6 +335,51 @@ export default function SubscribePagesDashboardPage() {
                     )}
                   </div>
                 ))}
+
+                {/* Phone number collection */}
+                <div className="border-t pt-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.content.collect_phone === 'true'}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          content: { ...form.content, collect_phone: e.target.checked ? 'true' : 'false' },
+                        })
+                      }
+                    />
+                    Collect phone number (optional field on the form)
+                  </label>
+                  {form.content.collect_phone === 'true' && (
+                    <div className="mt-3 space-y-3 pl-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone field label</label>
+                        <input
+                          type="text"
+                          value={form.content.phone_label || ''}
+                          onChange={(e) =>
+                            setForm({ ...form, content: { ...form.content, phone_label: e.target.value } })
+                          }
+                          className="w-full border rounded px-3 py-2"
+                          placeholder="Phone (optional)"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone field placeholder</label>
+                        <input
+                          type="text"
+                          value={form.content.phone_placeholder || ''}
+                          onChange={(e) =>
+                            setForm({ ...form, content: { ...form.content, phone_placeholder: e.target.value } })
+                          }
+                          className="w-full border rounded px-3 py-2"
+                          placeholder="Your phone number"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-6">

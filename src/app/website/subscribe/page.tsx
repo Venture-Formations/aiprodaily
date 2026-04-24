@@ -125,6 +125,15 @@ export default async function SubscribePage({
     settings.subscribe_tagline ||
     'FREE FOREVER'
 
+  // Phone collection: stored as string 'true' in the JSONB content. Falls through
+  // the same variant → default → (no publication setting yet) chain.
+  const collectPhone =
+    (variantContent.collect_phone || defaultContent.collect_phone || 'false') === 'true'
+  const phoneLabel =
+    variantContent.phone_label || defaultContent.phone_label || 'Phone (optional)'
+  const phonePlaceholder =
+    variantContent.phone_placeholder || defaultContent.phone_placeholder || 'Your phone number'
+
   return (
     <main className="min-h-[100dvh] bg-white px-4">
       {/* Subscribe Section */}
@@ -154,7 +163,14 @@ export default async function SubscribePage({
 
             {/* Subscribe Form */}
             <div className="mt-6 sm:mt-10">
-              <SubscribeForm newsletterName={newsletterName} tagline={tagline} publicationId={publicationId} />
+              <SubscribeForm
+                newsletterName={newsletterName}
+                tagline={tagline}
+                publicationId={publicationId}
+                collectPhone={collectPhone}
+                phoneLabel={phoneLabel}
+                phonePlaceholder={phonePlaceholder}
+              />
             </div>
           </div>
         </Container>
