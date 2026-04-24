@@ -5,6 +5,7 @@ import type {
   SubscribeAbEventType,
   SubscribeAbTest,
   SubscribeAbTestVariantWithPage,
+  SubscribePage,
 } from './types'
 
 export const VISITOR_COOKIE = 'subv_vid'
@@ -27,6 +28,29 @@ interface RecordEventCtx {
  * Returns the single active subscribe A/B test for a publication, with
  * variants joined to their page presets. Returns null when no test is active.
  */
+/**
+ * Returns the default (non-archived) subscribe page for a publication, or null
+ * if none is marked as default. Used as the base content when no A/B test is
+ * active, before falling back to publication_settings.
+ */
+export async function getDefaultPageForPublication(
+  publicationId: string
+): Promise<SubscribePage | null> {
+  const { data, error } = await supabaseAdmin
+    .from('subscribe_pages')
+    .select('id, publication_id, name, content, is_archived, is_default, created_at, updated_at')
+    .eq('publication_id', publicationId)
+    .eq('is_default', true)
+    .eq('is_archived', false)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[SubscribeAB] Error loading default page:', error.message)
+    return null
+  }
+  return (data as SubscribePage) || null
+}
+
 export async function getActiveTestForPublication(
   publicationId: string
 ): Promise<ActiveSubscribeAbTest | null> {

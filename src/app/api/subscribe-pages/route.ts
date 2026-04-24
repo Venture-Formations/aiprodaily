@@ -14,6 +14,7 @@ const createSchema = z.object({
   publication_id: z.string().uuid(),
   name: z.string().min(1).max(120),
   content: contentSchema,
+  is_default: z.boolean().optional(),
 })
 
 export const GET = withApiHandler(
@@ -28,8 +29,9 @@ export const GET = withApiHandler(
 
     let query = supabaseAdmin
       .from('subscribe_pages')
-      .select('id, publication_id, name, content, is_archived, created_at, updated_at')
+      .select('id, publication_id, name, content, is_archived, is_default, created_at, updated_at')
       .eq('publication_id', publicationId!)
+      .order('is_default', { ascending: false })
       .order('updated_at', { ascending: false })
 
     if (!includeArchived) {
@@ -55,14 +57,24 @@ export const POST = withApiHandler(
   async ({ input, publicationId }) => {
     const parsed = input as z.infer<typeof createSchema>
 
+    // If marking as default, clear any existing default for this publication first
+    if (parsed.is_default) {
+      await supabaseAdmin
+        .from('subscribe_pages')
+        .update({ is_default: false, updated_at: new Date().toISOString() })
+        .eq('publication_id', publicationId!)
+        .eq('is_default', true)
+    }
+
     const { data, error } = await supabaseAdmin
       .from('subscribe_pages')
       .insert({
         publication_id: publicationId!,
         name: parsed.name,
         content: parsed.content ?? {},
+        is_default: parsed.is_default ?? false,
       })
-      .select('id, publication_id, name, content, is_archived, created_at, updated_at')
+      .select('id, publication_id, name, content, is_archived, is_default, created_at, updated_at')
       .single()
 
     if (error) {

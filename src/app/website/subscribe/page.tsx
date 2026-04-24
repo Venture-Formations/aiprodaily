@@ -5,6 +5,7 @@ import { renderStyledHeading } from "@/components/StyledHeading"
 import { resolvePublicationFromRequest, getPublicationSettings } from '@/lib/publication-settings'
 import {
   getActiveTestForPublication,
+  getDefaultPageForPublication,
   ensureAssignment,
   recordEvent,
   VISITOR_COOKIE,
@@ -26,8 +27,14 @@ export default async function SubscribePage() {
     'subscribe_tagline',
   ])
 
-  // Resolve A/B test (if any) and assign a sticky variant
-  const active = await getActiveTestForPublication(publicationId)
+  // Resolve A/B test (if any) and assign a sticky variant.
+  // Also load the default subscribe page — used as the base when no test is
+  // active, and as the fallback for any variant field left blank.
+  const [active, defaultPage] = await Promise.all([
+    getActiveTestForPublication(publicationId),
+    getDefaultPageForPublication(publicationId),
+  ])
+  const defaultContent = (defaultPage?.content || {}) as Record<string, string | undefined>
 
   let variantContent: Record<string, string | undefined> = {}
   if (active) {
@@ -64,17 +71,24 @@ export default async function SubscribePage() {
     }
   }
 
-  const logoUrl = variantContent.logo_url || settings.logo_url || '/logo.png'
+  // Fallback chain for each field: active variant → default page → publication_settings → hardcoded
+  const logoUrl = variantContent.logo_url || defaultContent.logo_url || settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
   const heading =
     variantContent.heading ||
+    defaultContent.heading ||
     settings.subscribe_heading ||
     'Master AI Tools, Prompts & News **in Just 3 Minutes a Day**'
   const subheading =
     variantContent.subheading ||
+    defaultContent.subheading ||
     settings.subscribe_subheading ||
     'Join 10,000+ accounting professionals staying current as AI reshapes bookkeeping, tax, and advisory work.'
-  const tagline = variantContent.tagline || settings.subscribe_tagline || 'FREE FOREVER'
+  const tagline =
+    variantContent.tagline ||
+    defaultContent.tagline ||
+    settings.subscribe_tagline ||
+    'FREE FOREVER'
 
   return (
     <main className="min-h-[100dvh] bg-white px-4">

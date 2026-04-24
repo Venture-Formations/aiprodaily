@@ -1,9 +1,22 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useWebsiteSettings } from './useWebsiteSettings'
 
 export default function WebsiteSettings({ publicationId }: { publicationId: string }) {
   const { settings, setSettings, loading, saving, message, websiteBaseUrl, handleSave } = useWebsiteSettings(publicationId)
+  const [pubSlug, setPubSlug] = useState<string>('')
+
+  useEffect(() => {
+    async function load() {
+      const res = await fetch('/api/newsletters')
+      if (!res.ok) return
+      const json = await res.json()
+      const pub = (json.newsletters || []).find((n: { id: string; slug: string }) => n.id === publicationId)
+      if (pub?.slug) setPubSlug(pub.slug)
+    }
+    load()
+  }, [publicationId])
 
   if (loading) {
     return <div className="text-gray-500">Loading website settings...</div>
@@ -53,15 +66,26 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
         </div>
       </div>
 
-      {/* Subscribe Page */}
-      <div className="border rounded-lg p-4 space-y-4">
+      {/* Subscribe Page — managed via Subscribe Pages */}
+      <div className="border rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-gray-900">Subscribe Page</h3>
           <a href={`${websiteBaseUrl}/subscribe`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800">View Page &rarr;</a>
         </div>
-        <SettingsTextarea label="Heading" value={settings.subscribe_heading} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_heading: v }))} placeholder={"Master AI Tools, Prompts & News\n**in Just 3 Minutes a Day**"} rows={2} hint="Use Enter for line breaks. Wrap text in **double asterisks** for gradient underline style." />
-        <SettingsTextarea label="Subheadline" value={settings.subscribe_subheading} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_subheading: v }))} placeholder="Join 10,000+ accounting professionals staying current as AI reshapes bookkeeping, tax, and advisory work." rows={2} />
-        <SettingsInput label="Tagline" value={settings.subscribe_tagline} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_tagline: v }))} placeholder="FREE FOREVER" hint="Shown below the subscribe form. Leave empty to hide." />
+        <p className="text-sm text-gray-600">
+          Subscribe page content is now managed as reusable <strong>pages</strong> so you can A/B test variants
+          and pick a default. Edit the default page to change what visitors see today.
+        </p>
+        {pubSlug ? (
+          <a
+            href={`/dashboard/${pubSlug}/subscribe-pages`}
+            className="inline-block bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
+          >
+            Manage Subscribe Pages →
+          </a>
+        ) : (
+          <span className="text-xs text-gray-400">Loading…</span>
+        )}
       </div>
 
       {/* Subscribe Info Page */}

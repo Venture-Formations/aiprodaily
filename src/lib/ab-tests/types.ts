@@ -22,6 +22,7 @@ export interface SubscribePage {
   name: string
   content: SubscribePageContent
   is_archived: boolean
+  is_default: boolean
   created_at: string
   updated_at: string
 }

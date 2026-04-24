@@ -11,6 +11,7 @@ interface SubscribePage {
   name: string
   content: Record<string, string | undefined>
   is_archived: boolean
+  is_default: boolean
   created_at: string
   updated_at: string
 }
@@ -36,7 +37,11 @@ export default function SubscribePagesDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<SubscribePage | null>(null)
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState<{ name: string; content: Record<string, string> }>({ name: '', content: {} })
+  const [form, setForm] = useState<{ name: string; content: Record<string, string>; is_default: boolean }>({
+    name: '',
+    content: {},
+    is_default: false,
+  })
   const [busy, setBusy] = useState(false)
 
   const publicationId = newsletter?.id
@@ -67,7 +72,9 @@ export default function SubscribePagesDashboardPage() {
 
   function openCreate() {
     setEditing(null)
-    setForm({ name: '', content: {} })
+    // If no page is default yet, suggest making the first one default
+    const suggestDefault = !pages.some(p => p.is_default && !p.is_archived)
+    setForm({ name: '', content: {}, is_default: suggestDefault })
     setCreating(true)
   }
 
@@ -79,13 +86,14 @@ export default function SubscribePagesDashboardPage() {
       content: Object.fromEntries(
         Object.entries(p.content || {}).map(([k, v]) => [k, v ?? ''])
       ) as Record<string, string>,
+      is_default: p.is_default,
     })
   }
 
   function closeForm() {
     setEditing(null)
     setCreating(false)
-    setForm({ name: '', content: {} })
+    setForm({ name: '', content: {}, is_default: false })
   }
 
   async function submit() {
@@ -108,6 +116,7 @@ export default function SubscribePagesDashboardPage() {
             publication_id: publicationId,
             name: form.name,
             content: cleanContent,
+            is_default: form.is_default,
           }),
         })
         if (!res.ok) {
@@ -122,6 +131,7 @@ export default function SubscribePagesDashboardPage() {
             publication_id: publicationId,
             name: form.name,
             content: cleanContent,
+            is_default: form.is_default,
           }),
         })
         if (!res.ok) {
@@ -138,8 +148,27 @@ export default function SubscribePagesDashboardPage() {
     }
   }
 
+  async function setAsDefault(p: SubscribePage) {
+    if (!publicationId) return
+    const res = await fetch(`/api/subscribe-pages/${p.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publication_id: publicationId, is_default: true }),
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      alert(err.error || 'Failed to set default')
+      return
+    }
+    await fetchPages()
+  }
+
   async function archive(p: SubscribePage) {
     if (!publicationId) return
+    if (p.is_default) {
+      alert('Mark another page as default before archiving this one.')
+      return
+    }
     if (!confirm(`Archive "${p.name}"? Existing tests referencing it keep working.`)) return
     const res = await fetch(`/api/subscribe-pages/${p.id}?publication_id=${publicationId}`, { method: 'DELETE' })
     if (!res.ok) {
@@ -151,6 +180,7 @@ export default function SubscribePagesDashboardPage() {
   }
 
   const visiblePages = useMemo(() => pages.filter(p => !p.is_archived), [pages])
+  const hasDefault = useMemo(() => visiblePages.some(p => p.is_default), [visiblePages])
 
   return (
     <Layout>
@@ -165,7 +195,10 @@ export default function SubscribePagesDashboardPage() {
               </ol>
             </nav>
             <h1 className="text-2xl font-bold text-gray-900 mt-2">Subscribe Pages</h1>
-            <p className="text-gray-600">Reusable /subscribe content presets you can run A/B tests against.</p>
+            <p className="text-gray-600">
+              The <strong>default</strong> page is what visitors see on /subscribe when no A/B test is running.
+              A/B tests pick 2+ pages to compare.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <Link
@@ -183,25 +216,54 @@ export default function SubscribePagesDashboardPage() {
           </div>
         </div>
 
+        {!hasDefault && visiblePages.length > 0 && (
+          <div className="mb-4 p-3 rounded border border-yellow-300 bg-yellow-50 text-sm text-yellow-900">
+            No page is currently marked as <strong>default</strong>. /subscribe will fall back to your publication_settings values.
+            Set a page as default to manage content from here instead.
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-12 text-gray-500">Loading…</div>
         ) : visiblePages.length === 0 ? (
           <div className="text-center py-12 text-gray-500 border border-dashed rounded-lg">
-            No pages yet. Create one to start A/B testing your /subscribe page.
+            No pages yet. Create one to manage your /subscribe content and start A/B testing.
           </div>
         ) : (
           <ul className="divide-y border rounded-lg bg-white">
             {visiblePages.map(p => (
               <li key={p.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <div className="font-medium text-gray-900">{p.name}</div>
-                  <div className="text-sm text-gray-500 truncate max-w-xl">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{p.name}</span>
+                    {p.is_default && (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-500 truncate max-w-xl mt-0.5">
                     {p.content?.heading || <span className="italic">(uses publication default heading)</span>}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {!p.is_default && (
+                    <button
+                      onClick={() => setAsDefault(p)}
+                      className="text-sm text-green-700 hover:underline"
+                    >
+                      Set as Default
+                    </button>
+                  )}
                   <button onClick={() => openEdit(p)} className="text-sm text-blue-600 hover:underline">Edit</button>
-                  <button onClick={() => archive(p)} className="text-sm text-red-600 hover:underline">Archive</button>
+                  <button
+                    onClick={() => archive(p)}
+                    className={`text-sm ${p.is_default ? 'text-gray-300 cursor-not-allowed' : 'text-red-600 hover:underline'}`}
+                    disabled={p.is_default}
+                    title={p.is_default ? 'Default page cannot be archived' : ''}
+                  >
+                    Archive
+                  </button>
                 </div>
               </li>
             ))}
@@ -223,6 +285,15 @@ export default function SubscribePagesDashboardPage() {
                 className="w-full border rounded px-3 py-2 mb-4"
                 placeholder="e.g. Bold heading / Control / v3"
               />
+
+              <label className="flex items-center gap-2 text-sm text-gray-700 mb-4">
+                <input
+                  type="checkbox"
+                  checked={form.is_default}
+                  onChange={(e) => setForm({ ...form, is_default: e.target.checked })}
+                />
+                Use as the default /subscribe page (replaces any current default)
+              </label>
 
               <div className="space-y-3">
                 <p className="text-xs text-gray-500">
