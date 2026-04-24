@@ -48,10 +48,18 @@ export default function SubscribePagesDashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch('/api/newsletters')
-      const json = await res.json()
-      const found = (json.newsletters || []).find((n: Newsletter) => n.slug === slug)
-      setNewsletter(found || null)
+      try {
+        const res = await fetch('/api/newsletters')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        const found = (json.newsletters || []).find((n: Newsletter) => n.slug === slug)
+        setNewsletter(found || null)
+        if (!found) setLoading(false)
+      } catch (err) {
+        console.error('[SubscribePages] newsletter load failed', err)
+        setNewsletter(null)
+        setLoading(false)
+      }
     }
     load()
   }, [slug])
@@ -64,10 +72,16 @@ export default function SubscribePagesDashboardPage() {
   async function fetchPages() {
     if (!publicationId) return
     setLoading(true)
-    const res = await fetch(`/api/subscribe-pages?publication_id=${publicationId}&include_archived=true`)
-    const json = await res.json()
-    setPages(json.pages || [])
-    setLoading(false)
+    try {
+      const res = await fetch(`/api/subscribe-pages?publication_id=${publicationId}&include_archived=true`)
+      const json = await res.json()
+      setPages(json.pages || [])
+    } catch (err) {
+      console.error('[SubscribePages] fetchPages failed', err)
+      setPages([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   function openCreate() {

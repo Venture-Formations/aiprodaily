@@ -102,6 +102,7 @@ function attachVisitorCookie(request: NextRequest, response: NextResponse): Next
   if (!existing) {
     response.cookies.set('subv_vid', crypto.randomUUID(), {
       maxAge: 60 * 60 * 24 * 365, // 1 year
+      httpOnly: true,
       sameSite: 'lax',
       path: '/',
       secure: process.env.NODE_ENV === 'production',

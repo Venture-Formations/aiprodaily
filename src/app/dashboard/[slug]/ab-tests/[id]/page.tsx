@@ -85,16 +85,24 @@ export default function AbTestDetailPage() {
   async function fetchAll() {
     if (!publicationId) return
     setLoading(true)
-    const [tRes, sRes] = await Promise.all([
-      fetch(`/api/ab-tests/${id}?publication_id=${publicationId}`),
-      fetch(`/api/ab-tests/${id}/stats?publication_id=${publicationId}`),
-    ])
-    const t = await tRes.json()
-    const s = await sRes.json()
-    setTest(t.test || null)
-    setVariants(t.variants || [])
-    setStats(s.stats || [])
-    setLoading(false)
+    try {
+      const [tRes, sRes] = await Promise.all([
+        fetch(`/api/ab-tests/${id}?publication_id=${publicationId}`),
+        fetch(`/api/ab-tests/${id}/stats?publication_id=${publicationId}`),
+      ])
+      const t = await tRes.json()
+      const s = await sRes.json()
+      setTest(t.test || null)
+      setVariants(t.variants || [])
+      setStats(s.stats || [])
+    } catch (err) {
+      console.error('[AbTestDetail] fetch failed', err)
+      setTest(null)
+      setVariants([])
+      setStats([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function lifecycle(action: 'start' | 'end') {

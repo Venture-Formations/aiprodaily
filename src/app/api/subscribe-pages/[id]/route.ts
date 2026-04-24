@@ -119,13 +119,24 @@ export const DELETE = withApiHandler(
       )
     }
 
-    const { error } = await supabaseAdmin
+    // Belt-and-suspenders: also include `is_default = false` in the WHERE so a
+    // promotion racing this delete can't archive the new default before we see it.
+    const { data: archived, error } = await supabaseAdmin
       .from('subscribe_pages')
       .update({ is_archived: true, updated_at: new Date().toISOString() })
       .eq('id', params.id)
       .eq('publication_id', publicationId!)
+      .eq('is_default', false)
+      .select('id')
+      .maybeSingle()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!archived) {
+      return NextResponse.json(
+        { error: 'Cannot archive the default page. Mark another page as default first.' },
+        { status: 409 }
+      )
+    }
 
     return NextResponse.json({ success: true })
   }

@@ -69,16 +69,18 @@ export const POST = withApiHandler(
     }
 
     // Verify all referenced pages belong to this publication (tenant isolation)
+    // and are not archived — archived pages can't be used in new tests.
     const pageIds = Array.from(new Set(parsed.variants.map(v => v.page_id)))
     const { data: pages } = await supabaseAdmin
       .from('subscribe_pages')
       .select('id')
       .eq('publication_id', publicationId!)
+      .eq('is_archived', false)
       .in('id', pageIds)
 
     if (!pages || pages.length !== pageIds.length) {
       return NextResponse.json(
-        { error: 'One or more page_ids do not belong to this publication' },
+        { error: 'One or more page_ids do not belong to this publication or are archived' },
         { status: 400 }
       )
     }

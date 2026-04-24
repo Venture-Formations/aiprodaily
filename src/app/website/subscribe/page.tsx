@@ -92,14 +92,15 @@ export default async function SubscribePage({
       if (assignment) {
         variantContent = (assignment.variant.page.content || {}) as Record<string, string | undefined>
 
-        // Only record page_view events for real visitors (skip obvious bots).
+        // Fire-and-forget: don't block TTFB on the event insert. Errors are
+        // logged inside recordEvent. Skip obvious bots to keep stats clean.
         if (!uaCheck.isBot) {
-          await recordEvent(active.test.id, assignment.variant.id, 'page_view', {
+          void recordEvent(active.test.id, assignment.variant.id, 'page_view', {
             publicationId,
             visitorId,
             ipAddress,
             userAgent,
-          })
+          }).catch((err) => console.error('[Subscribe] page_view recordEvent threw:', err))
         }
       }
     }

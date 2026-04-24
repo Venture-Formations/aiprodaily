@@ -38,10 +38,18 @@ export default function AbTestsDashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch('/api/newsletters')
-      const json = await res.json()
-      const found = (json.newsletters || []).find((n: Newsletter) => n.slug === slug)
-      setNewsletter(found || null)
+      try {
+        const res = await fetch('/api/newsletters')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        const found = (json.newsletters || []).find((n: Newsletter) => n.slug === slug)
+        setNewsletter(found || null)
+        if (!found) setLoading(false)
+      } catch (err) {
+        console.error('[AbTestsList] newsletter load failed', err)
+        setNewsletter(null)
+        setLoading(false)
+      }
     }
     load()
   }, [slug])
@@ -50,10 +58,16 @@ export default function AbTestsDashboardPage() {
     if (!publicationId) return
     async function fetchTests() {
       setLoading(true)
-      const res = await fetch(`/api/ab-tests?publication_id=${publicationId}`)
-      const json = await res.json()
-      setTests(json.tests || [])
-      setLoading(false)
+      try {
+        const res = await fetch(`/api/ab-tests?publication_id=${publicationId}`)
+        const json = await res.json()
+        setTests(json.tests || [])
+      } catch (err) {
+        console.error('[AbTestsList] fetchTests failed', err)
+        setTests([])
+      } finally {
+        setLoading(false)
+      }
     }
     fetchTests()
   }, [publicationId])

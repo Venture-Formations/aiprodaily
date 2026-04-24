@@ -25,10 +25,6 @@ interface RecordEventCtx {
 }
 
 /**
- * Returns the single active subscribe A/B test for a publication, with
- * variants joined to their page presets. Returns null when no test is active.
- */
-/**
  * Returns the default (non-archived) subscribe page for a publication, or null
  * if none is marked as default. Used as the base content when no A/B test is
  * active, before falling back to publication_settings.
@@ -51,6 +47,10 @@ export async function getDefaultPageForPublication(
   return (data as SubscribePage) || null
 }
 
+/**
+ * Returns the single active subscribe A/B test for a publication, with
+ * variants joined to their page presets. Returns null when no test is active.
+ */
 export async function getActiveTestForPublication(
   publicationId: string
 ): Promise<ActiveSubscribeAbTest | null> {
@@ -115,6 +115,11 @@ function pickWeightedVariant(
  * Look up an existing assignment for this visitor in this test, or create
  * one with a freshly picked variant. Idempotent under concurrent requests
  * via the (test_id, visitor_id) unique constraint.
+ *
+ * If a stale assignment points at a variant that no longer exists in the test
+ * (variant deleted/edited), the assignment is migrated in-place via UPDATE
+ * to a freshly-picked current variant — not re-inserted (which would violate
+ * the unique constraint).
  */
 export async function ensureAssignment(
   active: ActiveSubscribeAbTest,
@@ -133,7 +138,27 @@ export async function ensureAssignment(
   if (existing?.variant_id) {
     const v = variants.find((vv) => vv.id === existing.variant_id)
     if (v) return { variant: v, isNew: false }
-    // Fallthrough: variant id no longer matches a current variant → re-assign
+
+    // Stale row — variant id no longer matches a current variant. Migrate
+    // in-place rather than INSERT (which would violate the unique constraint).
+    const repick = pickWeightedVariant(variants)
+    const { error: updErr } = await supabaseAdmin
+      .from('subscribe_ab_assignments')
+      .update({
+        variant_id: repick.id,
+        ip_address: ctx.ipAddress,
+        user_agent: ctx.userAgent,
+        is_bot_ua: ctx.isBotUa,
+      })
+      .eq('test_id', test.id)
+      .eq('visitor_id', visitorId)
+
+    if (updErr) {
+      console.error('[SubscribeAB] Stale assignment migration failed:', updErr.message)
+      return null
+    }
+    console.warn(`[SubscribeAB] Migrated stale assignment ${visitorId} -> variant ${repick.id}`)
+    return { variant: repick, isNew: false }
   }
 
   const picked = pickWeightedVariant(variants)

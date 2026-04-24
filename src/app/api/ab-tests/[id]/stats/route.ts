@@ -13,18 +13,33 @@ const EVENT_KEYS: SubscribeAbEventType[] = [
   'sparkloop_signup',
 ]
 
+// Map event_type -> VariantStatsRow counter field. Hoisted so we don't
+// recreate the object on every row during aggregation.
+const EVENT_TYPE_TO_STAT_FIELD: Record<SubscribeAbEventType, keyof VariantStatsRow> = {
+  page_view: 'page_views',
+  signup: 'signups',
+  reached_offers: 'reached_offers',
+  completed_info: 'completed_info',
+  sparkloop_signup: 'sparkloop_signups',
+}
+
+const MAX_EVENTS_PER_TEST = 500_000
+
+const statsInputSchema = z.object({
+  publication_id: z.string().uuid(),
+  exclude_ips: z.enum(['true', 'false']).optional(),
+})
+
 export const GET = withApiHandler(
   {
     authTier: 'authenticated',
     logContext: 'ab-tests-stats',
     requirePublicationId: true,
-    inputSchema: z.object({
-      publication_id: z.string().uuid(),
-      exclude_ips: z.enum(['true', 'false']).optional(),
-    }),
+    inputSchema: statsInputSchema,
   },
-  async ({ input, publicationId, params }) => {
-    const excludeIps = (input as any).exclude_ips !== 'false'
+  async ({ input, publicationId, params, logger }) => {
+    const { exclude_ips } = input as z.infer<typeof statsInputSchema>
+    const excludeIps = exclude_ips !== 'false'
 
     // Load the test and its variants (tenant-scoped)
     const { data: test } = await supabaseAdmin
@@ -62,8 +77,8 @@ export const GET = withApiHandler(
     const rows: Array<{ variant_id: string; event_type: string; ip_address: string | null; is_bot_ua: boolean }> = []
     const PAGE = 1000
     let offset = 0
-    // Safety ceiling — 500k events per test would far exceed practical needs.
-    while (offset < 500_000) {
+    let truncated = false
+    while (offset < MAX_EVENTS_PER_TEST) {
       const { data: chunk, error } = await supabaseAdmin
         .from('subscribe_ab_events')
         .select('variant_id, event_type, ip_address, is_bot_ua')
@@ -78,6 +93,14 @@ export const GET = withApiHandler(
       rows.push(...chunk)
       if (chunk.length < PAGE) break
       offset += PAGE
+
+      if (offset >= MAX_EVENTS_PER_TEST) {
+        truncated = true
+        logger.warn(
+          { testId: test.id, loaded: rows.length, cap: MAX_EVENTS_PER_TEST },
+          'Stats aggregation hit event cap — results are partial'
+        )
+      }
     }
 
     // Aggregate
@@ -108,14 +131,7 @@ export const GET = withApiHandler(
       const s = stats[row.variant_id]
       if (!s) continue
 
-      const key: Record<SubscribeAbEventType, keyof VariantStatsRow> = {
-        page_view: 'page_views',
-        signup: 'signups',
-        reached_offers: 'reached_offers',
-        completed_info: 'completed_info',
-        sparkloop_signup: 'sparkloop_signups',
-      }
-      const field = key[row.event_type as SubscribeAbEventType]
+      const field = EVENT_TYPE_TO_STAT_FIELD[row.event_type as SubscribeAbEventType]
       if (field) {
         ;(s as any)[field] = ((s as any)[field] as number) + 1
       }
@@ -129,6 +145,7 @@ export const GET = withApiHandler(
         event_types: EVENT_KEYS,
         excluded_by_ip: excludedCount,
         total_events_considered: rows.length,
+        truncated,
       },
     })
   }

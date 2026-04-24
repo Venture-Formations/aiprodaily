@@ -59,7 +59,19 @@ export default function NewAbTestPage() {
   }
 
   function addVariant() {
-    const nextLabel = String.fromCharCode(65 + variants.length) // C, D, …
+    const used = new Set(variants.map(v => v.label.trim()))
+    let nextLabel = ''
+    // Prefer the first unused uppercase letter A..Z
+    for (let i = 0; i < 26; i++) {
+      const candidate = String.fromCharCode(65 + i)
+      if (!used.has(candidate)) { nextLabel = candidate; break }
+    }
+    // 26+ variants — fall back to V<n> incrementing until unique
+    if (!nextLabel) {
+      let n = 1
+      while (used.has(`V${n}`)) n++
+      nextLabel = `V${n}`
+    }
     setVariants(v => [...v, { page_id: '', label: nextLabel, weight: 50 }])
   }
 
@@ -107,7 +119,8 @@ export default function NewAbTestPage() {
     }
   }
 
-  const usablePages = pages.filter(p => p) // active list already from API
+  // The API already filters out archived pages by default.
+  const usablePages = pages
 
   return (
     <Layout>

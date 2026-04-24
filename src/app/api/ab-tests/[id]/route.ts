@@ -97,8 +97,19 @@ export const PATCH = withApiHandler(
       patch.status = 'active'
       patch.started_at = new Date().toISOString()
     } else if (parsed.action === 'end') {
+      // Only stamp ended_at when ending a test that was actually active.
+      // Drafts that were never started can be ended (cancelled) but get no
+      // ended_at — there's no run to bookend.
+      if (existing.status === 'ended') {
+        return NextResponse.json(
+          { error: 'Test is already ended.' },
+          { status: 400 }
+        )
+      }
       patch.status = 'ended'
-      patch.ended_at = new Date().toISOString()
+      if (existing.status === 'active') {
+        patch.ended_at = new Date().toISOString()
+      }
     }
 
     const { data, error } = await supabaseAdmin
