@@ -63,6 +63,10 @@
     {
       "path": "/api/cron/cleanup-metrics",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/ab-test-scheduler",
+      "schedule": "*/15 * * * *"
     }
   ],
   "functions": {

@@ -1,7 +1,15 @@
+import { cookies, headers } from 'next/headers'
 import { Container } from "@/components/salient/Container"
 import { SubscribeForm } from "./subscribe-form"
 import { renderStyledHeading } from "@/components/StyledHeading"
 import { resolvePublicationFromRequest, getPublicationSettings } from '@/lib/publication-settings'
+import {
+  getActiveTestForPublication,
+  ensureAssignment,
+  recordEvent,
+  VISITOR_COOKIE,
+} from '@/lib/ab-tests'
+import { checkUserAgent } from '@/lib/bot-detection/ua-detector'
 
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
@@ -9,7 +17,7 @@ export const dynamic = 'force-dynamic'
 export default async function SubscribePage() {
   const { publicationId } = await resolvePublicationFromRequest()
 
-  // Fetch settings from publication_settings
+  // Fetch publication-level defaults (used when no variant overrides exist)
   const settings = await getPublicationSettings(publicationId, [
     'logo_url',
     'newsletter_name',
@@ -18,11 +26,55 @@ export default async function SubscribePage() {
     'subscribe_tagline',
   ])
 
-  const logoUrl = settings.logo_url || '/logo.png'
+  // Resolve A/B test (if any) and assign a sticky variant
+  const active = await getActiveTestForPublication(publicationId)
+
+  let variantContent: Record<string, string | undefined> = {}
+  if (active) {
+    const cookieStore = await cookies()
+    const headerList = await headers()
+    const visitorId = cookieStore.get(VISITOR_COOKIE)?.value
+    const userAgent = headerList.get('user-agent')
+    const ipAddress =
+      headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      headerList.get('x-real-ip') ||
+      null
+    const uaCheck = checkUserAgent(userAgent)
+
+    if (visitorId) {
+      const assignment = await ensureAssignment(active, visitorId, {
+        ipAddress,
+        userAgent,
+        isBotUa: uaCheck.isBot,
+      })
+
+      if (assignment) {
+        variantContent = (assignment.variant.page.content || {}) as Record<string, string | undefined>
+
+        // Only record page_view events for real visitors (skip obvious bots).
+        if (!uaCheck.isBot) {
+          await recordEvent(active.test.id, assignment.variant.id, 'page_view', {
+            publicationId,
+            visitorId,
+            ipAddress,
+            userAgent,
+          })
+        }
+      }
+    }
+  }
+
+  const logoUrl = variantContent.logo_url || settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
-  const heading = settings.subscribe_heading || 'Master AI Tools, Prompts & News **in Just 3 Minutes a Day**'
-  const subheading = settings.subscribe_subheading || 'Join 10,000+ accounting professionals staying current as AI reshapes bookkeeping, tax, and advisory work.'
-  const tagline = settings.subscribe_tagline || 'FREE FOREVER'
+  const heading =
+    variantContent.heading ||
+    settings.subscribe_heading ||
+    'Master AI Tools, Prompts & News **in Just 3 Minutes a Day**'
+  const subheading =
+    variantContent.subheading ||
+    settings.subscribe_subheading ||
+    'Join 10,000+ accounting professionals staying current as AI reshapes bookkeeping, tax, and advisory work.'
+  const tagline = variantContent.tagline || settings.subscribe_tagline || 'FREE FOREVER'
 
   return (
     <main className="min-h-[100dvh] bg-white px-4">

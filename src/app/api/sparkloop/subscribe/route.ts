@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
+import { cookies } from 'next/headers'
 import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { PUBLICATION_ID } from '@/lib/config'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
+import {
+  attributeByVisitor,
+  attributeBySubscriberEmail,
+  recordEvent,
+  VISITOR_COOKIE,
+} from '@/lib/ab-tests'
 
 /**
  * POST /api/sparkloop/subscribe
@@ -225,6 +232,36 @@ export const POST = withApiHandler(
     } catch (providerError) {
       console.error('[SparkLoop Subscribe] Email provider update error:', providerError)
       // Don't fail the request for email provider errors
+    }
+
+    // Record A/B sparkloop_signup conversion only on actual SparkLoop success.
+    // Cookie may or may not be present (user can land on /subscribe/recommendations
+    // without going through /subscribe first) — fall back to email-based lookup.
+    if (subscribeResult.success) {
+      try {
+        const cookieStore = await cookies()
+        const visitorId = cookieStore.get(VISITOR_COOKIE)?.value || null
+
+        const attribution = visitorId
+          ? await attributeByVisitor(publicationId, visitorId)
+          : await attributeBySubscriberEmail(publicationId, email)
+
+        if (attribution) {
+          await recordEvent(attribution.testId, attribution.variantId, 'sparkloop_signup', {
+            publicationId,
+            visitorId,
+            subscriberEmail: email,
+            ipAddress: ipAddress || null,
+            userAgent: userAgent || null,
+            metadata: {
+              ref_codes: activeRefCodes,
+              submission_source: submissionSource,
+            },
+          })
+        }
+      } catch (abError) {
+        console.error('[SparkLoop Subscribe] A/B sparkloop_signup event failed:', abError)
+      }
     }
 
     if (subscribeResult.success) {

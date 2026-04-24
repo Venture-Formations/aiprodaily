@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import axios from 'axios'
 import { getPublicationByDomain, getEmailProviderSettings } from '@/lib/publication-settings'
 import { SendGridService } from '@/lib/sendgrid'
+import {
+  attributeByVisitor,
+  attributeBySubscriberEmail,
+  recordEvent,
+  VISITOR_COOKIE,
+} from '@/lib/ab-tests'
 
 // MailerLite API client
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
@@ -218,6 +224,33 @@ export const POST = withApiHandler(
           throw new Error(mlError.response?.data?.message || 'Failed to update subscriber')
         }
       }
+    }
+
+    // Record A/B test completed_info conversion
+    try {
+      const cookieStore = await cookies()
+      const visitorId = cookieStore.get(VISITOR_COOKIE)?.value || null
+
+      const attribution = visitorId
+        ? await attributeByVisitor(publicationId, visitorId)
+        : await attributeBySubscriberEmail(publicationId, email)
+
+      if (attribution) {
+        const userAgent = request.headers.get('user-agent')
+        const ipAddress =
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+          request.headers.get('x-real-ip') ||
+          null
+        await recordEvent(attribution.testId, attribution.variantId, 'completed_info', {
+          publicationId,
+          visitorId,
+          subscriberEmail: email,
+          ipAddress,
+          userAgent,
+        })
+      }
+    } catch (abError) {
+      console.error('[Personalize] A/B completed_info event failed:', abError)
     }
 
     return NextResponse.json({

@@ -120,11 +120,27 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
       requestHeaders.set('x-newsletter-slug', publication.slug)
       requestHeaders.set('x-newsletter-id', publication.id)
 
-      return NextResponse.rewrite(rewriteUrl, {
+      const response = NextResponse.rewrite(rewriteUrl, {
         request: {
           headers: requestHeaders,
         },
       })
+
+      // Ensure every visitor on subscribe-related routes carries a stable
+      // anonymous visitor_id so server-rendered A/B variant assignment is sticky.
+      if (url.pathname === '/subscribe' || url.pathname.startsWith('/subscribe/')) {
+        const existing = request.cookies.get('subv_vid')?.value
+        if (!existing) {
+          response.cookies.set('subv_vid', crypto.randomUUID(), {
+            maxAge: 60 * 60 * 24 * 365, // 1 year
+            sameSite: 'lax',
+            path: '/',
+            secure: process.env.NODE_ENV === 'production',
+          })
+        }
+      }
+
+      return response
     }
   }
 
