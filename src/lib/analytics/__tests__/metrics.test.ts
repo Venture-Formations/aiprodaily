@@ -27,6 +27,16 @@ describe('computeIssueCTR', () => {
     expect(() => computeIssueCTR({ uniqueClickers: 1, deliveredCount: -1 })).toThrow()
   })
 
+  it('throws on NaN inputs', () => {
+    expect(() => computeIssueCTR({ uniqueClickers: Number.NaN, deliveredCount: 100 })).toThrow()
+    expect(() => computeIssueCTR({ uniqueClickers: 100, deliveredCount: Number.NaN })).toThrow()
+  })
+
+  it('throws on Infinity inputs', () => {
+    expect(() => computeIssueCTR({ uniqueClickers: Number.POSITIVE_INFINITY, deliveredCount: 100 })).toThrow()
+    expect(() => computeIssueCTR({ uniqueClickers: 100, deliveredCount: Number.POSITIVE_INFINITY })).toThrow()
+  })
+
   it('clamps to 1.0 if unique clickers exceed delivered (data anomaly)', () => {
     expect(computeIssueCTR({ uniqueClickers: 1500, deliveredCount: 1000 })).toBe(1)
   })

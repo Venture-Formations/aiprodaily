@@ -12,8 +12,15 @@
  */
 
 function clampRate(numerator: number, denominator: number): number {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator)) {
+    throw new RangeError(
+      `Metric inputs must be finite: numerator=${numerator}, denominator=${denominator}`
+    )
+  }
   if (numerator < 0 || denominator < 0) {
-    throw new RangeError(`Metric inputs must be non-negative: ${numerator}/${denominator}`)
+    throw new RangeError(
+      `Metric inputs must be non-negative: numerator=${numerator}, denominator=${denominator}`
+    )
   }
   if (denominator === 0) return 0
   const rate = numerator / denominator
