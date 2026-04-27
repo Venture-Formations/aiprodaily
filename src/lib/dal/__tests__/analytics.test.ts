@@ -182,14 +182,13 @@ describe('getIssueEngagement', () => {
       error: null,
     })
 
-    // Two subsequent fluent-chain resolutions for total + unique queries.
+    // Single fluent-chain resolution for link_clicks query.
     const rows = [
       { id: '1', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'a@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.1', is_bot_ua: false },
       { id: '2', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'a@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.1', is_bot_ua: false },
       { id: '3', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'b@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.2', is_bot_ua: false },
     ]
     ;(mockChain.is as any)
-      .mockReturnValueOnce(Promise.resolve({ data: rows, error: null }))
       .mockReturnValueOnce(Promise.resolve({ data: rows, error: null }))
 
     const result = await getIssueEngagement({

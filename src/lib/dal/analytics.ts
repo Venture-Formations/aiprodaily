@@ -132,6 +132,48 @@ function countUniqueEmails(rows: LinkClickRow[]): number {
 }
 
 /**
+ * Single-query loader returning the bot/IP-filtered link_clicks rows
+ * for an issue. Used by getIssueEngagement to avoid duplicate fetching
+ * when both totals and uniques are needed.
+ *
+ * Standalone callers (getTotalClicks, getUniqueClickers) keep their own
+ * fetch path so each can be called independently from API routes.
+ */
+async function loadCountableLinkClicks(args: {
+  issueId: string
+  publicationId: string
+  excludeBots: boolean
+}): Promise<LinkClickRow[]> {
+  const { issueId, publicationId, excludeBots } = args
+
+  try {
+    let query = supabaseAdmin
+      .from('link_clicks')
+      .select(LINK_CLICK_COLUMNS)
+      .eq('publication_id', publicationId)
+      .eq('issue_id', issueId)
+
+    if (excludeBots) query = query.is('is_bot_ua', false)
+
+    const { data, error } = await query
+    if (error || !data) {
+      if (error) log.error({ err: error, issueId, publicationId }, 'loadCountableLinkClicks failed')
+      return []
+    }
+
+    if (!excludeBots) return data as LinkClickRow[]
+
+    const excludedIps = await loadExcludedIps(publicationId)
+    return (data as LinkClickRow[]).filter((row) =>
+      isClickCountable(row, excludedIps)
+    )
+  } catch (err) {
+    log.error({ err, issueId, publicationId }, 'loadCountableLinkClicks threw')
+    return []
+  }
+}
+
+/**
  * Total raw click count for an issue (pre-dedup). Bot/IP filter applied
  * when excludeBots is true; no uniqueness reduction.
  */
@@ -172,6 +214,10 @@ async function getTotalClicks(args: {
 /**
  * Aggregate engagement for an issue: delivery counts + total clicks + unique clickers.
  * Returns null if delivery counts cannot be loaded (issue/publication mismatch or DB error).
+ *
+ * Uses a single link_clicks fetch to derive both total and unique counts;
+ * standalone getTotalClicks / getUniqueClickers can still be called from
+ * routes that need only one of those counts.
  */
 export async function getIssueEngagement(args: {
   issueId: string
@@ -183,16 +229,13 @@ export async function getIssueEngagement(args: {
   const delivery = await getDeliveryCounts({ issueId, publicationId })
   if (!delivery) return null
 
-  const [totalClicks, uniqueClickers] = await Promise.all([
-    getTotalClicks({ issueId, publicationId, excludeBots }),
-    getUniqueClickers({ issueId, publicationId, excludeBots }),
-  ])
+  const rows = await loadCountableLinkClicks({ issueId, publicationId, excludeBots })
 
   return {
     issueId,
     publicationId,
-    totalClicks,
-    uniqueClickers,
+    totalClicks: rows.length,
+    uniqueClickers: countUniqueEmails(rows),
     delivery,
   }
 }
