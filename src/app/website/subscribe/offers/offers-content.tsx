@@ -81,7 +81,15 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
   // instead of producing a scrollbar inside the iframe.
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (!event.origin.endsWith('afteroffers.com')) return
+      // Validate hostname strictly so a domain like attacker-afteroffers.com
+      // (or attacker.com/afteroffers.com path) can't impersonate the iframe.
+      let hostname: string
+      try {
+        hostname = new URL(event.origin).hostname.toLowerCase()
+      } catch {
+        return
+      }
+      if (hostname !== 'afteroffers.com' && !hostname.endsWith('.afteroffers.com')) return
 
       const data = event.data
       let height: number | undefined

@@ -88,7 +88,8 @@ export const GET = withApiHandler(
       Array.from(screeningGroups.entries()).map(async ([s, refCodes]) => {
         const cutoff = new Date(today)
         cutoff.setDate(cutoff.getDate() - s)
-        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z'
+        // UTC end-of-day — boundary matches subscribed_at (timestamptz, UTC).
+        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z' // bug-check-ignore: date-iso
 
         let offset = 0
         const counts = new Map<string, number>()
@@ -166,7 +167,8 @@ export const GET = withApiHandler(
 
       const baselineDate = new Date(firstSend)
       baselineDate.setDate(baselineDate.getDate() + s)
-      const baselineDateStr = baselineDate.toISOString().split('T')[0]
+      // Compared against snap.snapshot_date (UTC YYYY-MM-DD column), so UTC is intentional.
+      const baselineDateStr = baselineDate.toISOString().split('T')[0] // bug-check-ignore: date-iso
 
       let baselineSnap: SnapRow | null = null
       for (let i = 1; i < snaps.length; i++) {

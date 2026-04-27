@@ -76,7 +76,6 @@ export const GET = withApiHandler(
     // the first one recorded after (first_send_date + S), so we only count confirms/rejects
     // that correspond to subs we actually sent.
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
 
     // 1. Count matured sends per ref_code, grouped by screening_period
     const screeningGroups = new Map<number, string[]>()
@@ -94,8 +93,9 @@ export const GET = withApiHandler(
         cutoff.setDate(cutoff.getDate() - s)
         // Use end-of-day so all sends on the cutoff date are included.
         // Without this, Supabase treats a bare date string as midnight,
-        // excluding sends after 00:00 UTC on that day.
-        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z'
+        // excluding sends after 00:00 UTC on that day. UTC is intentional —
+        // the boundary matches subscribed_at (timestamptz, stored UTC).
+        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z' // bug-check-ignore: date-iso
 
         // Paginate to avoid Supabase's 1000-row limit
         let offset = 0

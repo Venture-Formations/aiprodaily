@@ -40,7 +40,10 @@ export const GET = withApiHandler(
     let todayImpressions = 0
     let todayClaims = 0
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    // UTC date — both sides of the comparison below extract the date in UTC
+    // (event.created_at is timestamptz stored as UTC), so consistency matters
+    // more than user-local "today" here.
+    const todayStr = new Date().toISOString().split('T')[0] // bug-check-ignore: date-iso
 
     for (const event of events) {
       const day = event.created_at.split('T')[0]
