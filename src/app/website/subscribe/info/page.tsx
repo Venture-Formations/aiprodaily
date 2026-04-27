@@ -16,12 +16,18 @@ export default async function SubscribeInfoPage() {
     'newsletter_name',
     'subscribe_info_heading',
     'subscribe_info_subheading',
+    'subscribe_info_job_enabled',
     'subscribe_info_job_label',
     'subscribe_info_job_options',
+    'subscribe_info_clients_enabled',
     'subscribe_info_clients_label',
     'subscribe_info_clients_options',
     'subscribe_info_submit_text',
   ])
+
+  // Default to enabled when the setting is missing (preserves existing behavior).
+  const jobEnabled = settings.subscribe_info_job_enabled !== 'false'
+  const clientsEnabled = settings.subscribe_info_clients_enabled !== 'false'
 
   const logoUrl = settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
@@ -81,8 +87,10 @@ export default async function SubscribeInfoPage() {
             {/* Personalization Form */}
             <div className="mt-6 sm:mt-10">
               <PersonalizationForm
+                jobEnabled={jobEnabled}
                 jobLabel={settings.subscribe_info_job_label || undefined}
                 jobOptions={jobOptions}
+                clientsEnabled={clientsEnabled}
                 clientsLabel={settings.subscribe_info_clients_label || undefined}
                 clientsOptions={clientsOptions}
                 submitText={settings.subscribe_info_submit_text || undefined}
