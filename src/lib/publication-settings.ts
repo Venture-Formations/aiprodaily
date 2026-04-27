@@ -242,10 +242,14 @@ export async function resolvePublicationFromRequest(): Promise<{
 /**
  * Get SparkLoop credentials for a publication.
  *
- * IMPORTANT: Queries publication_settings directly — does NOT fall through
- * to app_settings. This prevents cross-tenant credential leakage where one
- * publication's SparkLoop API key could be returned for another tenant.
- * Falls back to environment variables only.
+ * The API key is a single shared account-level secret and is sourced from env.
+ * The upscribe ID is a per-tenant identifier that scopes API calls to a
+ * specific publication's recommendations and aggregates — it MUST come from
+ * publication_settings with no env fallback. Falling back to a global
+ * SPARKLOOP_UPSCRIBE_ID would silently impersonate whichever tenant owns that
+ * upscribe (e.g. a misconfigured tenant inheriting another tenant's snapshots).
+ * The webhook secret is currently treated like the API key — account-level —
+ * since multiple publications share one webhook endpoint.
  */
 export async function getSparkLoopCredentials(publicationId: string): Promise<{
   apiKey: string
@@ -261,9 +265,8 @@ export async function getSparkLoopCredentials(publicationId: string): Promise<{
   const map = Object.fromEntries((data ?? []).map(r => [r.key, r.value]))
 
   return {
-    // SparkLoop API key is a single shared account-level secret — always sourced from env.
     apiKey: process.env.SPARKLOOP_API_KEY || '',
-    upscribeId: map['sparkloop_upscribe_id'] || process.env.SPARKLOOP_UPSCRIBE_ID || '',
+    upscribeId: map['sparkloop_upscribe_id'] || '',
     webhookSecret: map['sparkloop_webhook_secret'] || process.env.SPARKLOOP_WEBHOOK_SECRET || '',
   }
 }
