@@ -46,7 +46,7 @@ vi.mock('@/lib/analytics/bot-policy', () => ({
 }))
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { getDeliveryCounts, getUniqueClickers } from '../analytics'
+import { getDeliveryCounts, getUniqueClickers, getIssueEngagement } from '../analytics'
 
 const PUB_ID = 'pub-test-123'
 const ISSUE_ID = 'issue-test-456'
@@ -146,5 +146,61 @@ describe('getUniqueClickers', () => {
     })
 
     expect(count).toBe(0)
+  })
+})
+
+describe('getIssueEngagement', () => {
+  it('returns null when delivery counts cannot be loaded', async () => {
+    // First call (delivery): returns no row
+    mockSingle.mockResolvedValueOnce({ data: null, error: null })
+
+    const result = await getIssueEngagement({
+      issueId: ISSUE_ID,
+      publicationId: PUB_ID,
+      excludeBots: true,
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('returns composed engagement with delivery + totals + uniques', async () => {
+    // Delivery counts call
+    mockSingle.mockResolvedValueOnce({
+      data: {
+        issue_id: ISSUE_ID,
+        sent_count: 1000,
+        delivered_count: 980,
+        opened_count: 500,
+        clicked_count: 50,
+        bounced_count: 20,
+        unsubscribed_count: 5,
+        open_rate: 0.51,
+        click_rate: 0.051,
+        imported_at: '2026-04-23T10:00:00Z',
+        publication_issues: { publication_id: PUB_ID },
+      },
+      error: null,
+    })
+
+    // Two subsequent fluent-chain resolutions for total + unique queries.
+    const rows = [
+      { id: '1', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'a@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.1', is_bot_ua: false },
+      { id: '2', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'a@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.1', is_bot_ua: false },
+      { id: '3', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'b@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.2', is_bot_ua: false },
+    ]
+    ;(mockChain.is as any)
+      .mockReturnValueOnce(Promise.resolve({ data: rows, error: null }))
+      .mockReturnValueOnce(Promise.resolve({ data: rows, error: null }))
+
+    const result = await getIssueEngagement({
+      issueId: ISSUE_ID,
+      publicationId: PUB_ID,
+      excludeBots: true,
+    })
+
+    expect(result).not.toBeNull()
+    expect(result!.totalClicks).toBe(3)
+    expect(result!.uniqueClickers).toBe(2)
+    expect(result!.delivery.deliveredCount).toBe(980)
   })
 })

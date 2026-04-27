@@ -130,3 +130,69 @@ function countUniqueEmails(rows: LinkClickRow[]): number {
   for (const row of rows) set.add(row.subscriber_email.toLowerCase())
   return set.size
 }
+
+/**
+ * Total raw click count for an issue (pre-dedup). Bot/IP filter applied
+ * when excludeBots is true; no uniqueness reduction.
+ */
+async function getTotalClicks(args: {
+  issueId: string
+  publicationId: string
+  excludeBots: boolean
+}): Promise<number> {
+  const { issueId, publicationId, excludeBots } = args
+
+  try {
+    let query = supabaseAdmin
+      .from('link_clicks')
+      .select(LINK_CLICK_COLUMNS)
+      .eq('publication_id', publicationId)
+      .eq('issue_id', issueId)
+
+    if (excludeBots) query = query.is('is_bot_ua', false)
+
+    const { data, error } = await query
+    if (error || !data) {
+      if (error) log.error({ err: error, issueId, publicationId }, 'getTotalClicks failed')
+      return 0
+    }
+
+    if (!excludeBots) return data.length
+
+    const excludedIps = await loadExcludedIps(publicationId)
+    return (data as LinkClickRow[]).filter((row) =>
+      isClickCountable(row, excludedIps)
+    ).length
+  } catch (err) {
+    log.error({ err, issueId, publicationId }, 'getTotalClicks threw')
+    return 0
+  }
+}
+
+/**
+ * Aggregate engagement for an issue: delivery counts + total clicks + unique clickers.
+ * Returns null if delivery counts cannot be loaded (issue/publication mismatch or DB error).
+ */
+export async function getIssueEngagement(args: {
+  issueId: string
+  publicationId: string
+  excludeBots?: boolean
+}): Promise<IssueEngagement | null> {
+  const { issueId, publicationId, excludeBots = true } = args
+
+  const delivery = await getDeliveryCounts({ issueId, publicationId })
+  if (!delivery) return null
+
+  const [totalClicks, uniqueClickers] = await Promise.all([
+    getTotalClicks({ issueId, publicationId, excludeBots }),
+    getUniqueClickers({ issueId, publicationId, excludeBots }),
+  ])
+
+  return {
+    issueId,
+    publicationId,
+    totalClicks,
+    uniqueClickers,
+    delivery,
+  }
+}
