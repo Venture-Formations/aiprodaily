@@ -10,6 +10,7 @@ import { useSparkLoopData } from './components/useSparkLoopData'
 
 export default function SparkLoopAdminPage() {
   const {
+    publicationId,
     recommendations, counts, globalStats, defaults,
     loading, syncing, error,
     chartStats, chartLoading, timeframe, setTimeframe,
@@ -72,9 +73,9 @@ export default function SparkLoopAdminPage() {
         </div>
 
         {activeTab === 'offers' ? (
-          <OffersTab />
+          <OffersTab publicationId={publicationId} />
         ) : activeTab === 'publications' ? (
-          <PublicationsTab recommendations={recommendations} />
+          <PublicationsTab recommendations={recommendations} publicationId={publicationId} />
         ) : activeTab === 'overview' ? (
           <OverviewTab
             chartStats={chartStats}
@@ -94,6 +95,7 @@ export default function SparkLoopAdminPage() {
             defaults={defaults}
             loading={loading}
             onRefresh={fetchRecommendations}
+            publicationId={publicationId}
           />
         )}
       </div>

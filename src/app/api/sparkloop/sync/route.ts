@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
-import { PUBLICATION_ID } from '@/lib/config'
 
 /**
  * POST /api/sparkloop/sync
@@ -11,15 +10,13 @@ import { PUBLICATION_ID } from '@/lib/config'
  * Can be called manually or via cron job
  */
 export const POST = withApiHandler(
-  { authTier: 'system', logContext: 'sparkloop/sync' },
-  async ({ request }) => {
-    const { searchParams } = new URL(request.url)
-    const publicationId = searchParams.get('publicationId') || PUBLICATION_ID
-    const service = await createSparkLoopServiceForPublication(publicationId)
+  { authTier: 'system', logContext: 'sparkloop/sync', requirePublicationId: true },
+  async ({ publicationId }) => {
+    const service = await createSparkLoopServiceForPublication(publicationId!)
     if (!service) {
       return NextResponse.json({ error: 'SparkLoop not configured for this publication' }, { status: 400 })
     }
-    const result = await service.syncRecommendationsToDatabase(publicationId)
+    const result = await service.syncRecommendationsToDatabase(publicationId!)
 
     return NextResponse.json({
       success: true,
@@ -35,15 +32,13 @@ export const POST = withApiHandler(
  * Get sync status and last sync time
  */
 export const GET = withApiHandler(
-  { authTier: 'system', logContext: 'sparkloop/sync' },
-  async ({ request }) => {
-    const { searchParams } = new URL(request.url)
-    const publicationId = searchParams.get('publicationId') || PUBLICATION_ID
-    const service = await createSparkLoopServiceForPublication(publicationId)
+  { authTier: 'system', logContext: 'sparkloop/sync', requirePublicationId: true },
+  async ({ publicationId }) => {
+    const service = await createSparkLoopServiceForPublication(publicationId!)
     if (!service) {
       return NextResponse.json({ error: 'SparkLoop not configured for this publication' }, { status: 400 })
     }
-    const stored = await service.getStoredRecommendations(publicationId)
+    const stored = await service.getStoredRecommendations(publicationId!)
 
     // Find oldest sync time
     const lastSyncTimes = stored

@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { PUBLICATION_ID } from '@/lib/config'
 const PAGE_SIZE = 1000
 
 export const GET = withApiHandler(
-  { authTier: 'public', logContext: 'sparkloop-offer-stats' },
-  async ({ request, logger }) => {
-    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
+  { authTier: 'public', logContext: 'sparkloop-offer-stats', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
     const days = parseInt(request.nextUrl.searchParams.get('days') || '30', 10)
 
     const since = new Date()

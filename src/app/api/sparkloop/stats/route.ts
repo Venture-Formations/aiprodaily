@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
-import { PUBLICATION_ID } from '@/lib/config'
 import { toLocalDateStr as toDateStr, buildDateRangeBoundaries, getTodayStr, getDaysAgoStr, type SupportedTz } from '@/lib/date-utils'
 const FALLBACK_DEFAULT_RCR = 25
 
@@ -31,9 +30,9 @@ interface DailyStats {
 export const maxDuration = 60
 
 export const GET = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/stats' },
-  async ({ request, logger }) => {
-    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
+  { authTier: 'admin', logContext: 'sparkloop/stats', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required')
     const { searchParams } = new URL(request.url)
     const days = Math.max(1, Math.min(365, parseInt(searchParams.get('days') || '30') || 30))
     const startDate = searchParams.get('start')

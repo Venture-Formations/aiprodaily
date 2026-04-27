@@ -2,14 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings, updatePublicationSetting } from '@/lib/publication-settings'
-import { SparkLoopService, createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
-import { PUBLICATION_ID } from '@/lib/config'
-
-// Resolve publicationId from query params, falling back to default
-function resolvePublicationId(request: Request): string {
-  const { searchParams } = new URL(request.url)
-  return searchParams.get('publicationId') || PUBLICATION_ID
-}
+import { SparkLoopService } from '@/lib/sparkloop-client'
 
 // Hardcoded fallbacks if no publication_settings exist
 const FALLBACK_DEFAULT_CR = 22
@@ -23,9 +16,9 @@ const FALLBACK_DEFAULT_RCR = 25
 export const maxDuration = 60
 
 export const GET = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin' },
-  async ({ request, logger }) => {
-    const publicationId = resolvePublicationId(request)
+  { authTier: 'admin', logContext: 'sparkloop/admin', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required') // narrowed by withApiHandler
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'all' // all, active, excluded
 
@@ -462,9 +455,9 @@ export const GET = withApiHandler(
  * Update recommendation (exclude/reactivate/pause/unpause)
  */
 export const PATCH = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin' },
-  async ({ request, logger }) => {
-    const publicationId = resolvePublicationId(request)
+  { authTier: 'admin', logContext: 'sparkloop/admin', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required')
     const body = await request.json()
     const { id, excluded, excluded_reason, action } = body
 
@@ -546,6 +539,7 @@ export const PATCH = withApiHandler(
       .from('sparkloop_recommendations')
       .update(updateData)
       .eq('id', id)
+      .eq('publication_id', publicationId)
       .select()
       .single()
 
@@ -569,9 +563,9 @@ export const PATCH = withApiHandler(
  * Bulk update recommendations
  */
 export const POST = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin' },
-  async ({ request, logger }) => {
-    const publicationId = resolvePublicationId(request)
+  { authTier: 'admin', logContext: 'sparkloop/admin', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required')
     const body = await request.json()
     const { action, ids, excluded_reason } = body
 
@@ -615,6 +609,7 @@ export const POST = withApiHandler(
       .from('sparkloop_recommendations')
       .update(updateData)
       .in('id', ids)
+      .eq('publication_id', publicationId)
       .select()
 
     if (error) {

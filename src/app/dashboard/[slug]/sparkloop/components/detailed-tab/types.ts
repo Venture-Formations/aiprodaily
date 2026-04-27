@@ -27,6 +27,7 @@ export interface DetailedTabProps {
   defaults: Defaults
   loading: boolean
   onRefresh: () => void
+  publicationId: string | null
 }
 
 export interface DateRangeMetrics {
