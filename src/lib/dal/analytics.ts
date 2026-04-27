@@ -99,7 +99,8 @@ export async function getUniqueClickers(args: {
 
     if (linkUrl) query = query.eq('link_url', linkUrl)
 
-    // SQL-level: exclude is_bot_ua = true rows when excludeBots is on.
+    // .is('is_bot_ua', false) matches IS FALSE only; NULL rows pass through
+    // intentionally — historical rows pre-dating the bot flag are not bots.
     if (excludeBots) query = query.is('is_bot_ua', false)
 
     const { data, error } = await query
@@ -157,6 +158,8 @@ async function loadCountableLinkClicks(args: {
       .eq('issue_id', issueId)
 
     if (linkSection) query = query.eq('link_section', linkSection)
+    // .is('is_bot_ua', false) matches IS FALSE only; NULL rows pass through
+    // intentionally — historical rows pre-dating the bot flag are not bots.
     if (excludeBots) query = query.is('is_bot_ua', false)
 
     const { data, error } = await query
@@ -195,6 +198,8 @@ async function getTotalClicks(args: {
       .eq('publication_id', publicationId)
       .eq('issue_id', issueId)
 
+    // .is('is_bot_ua', false) matches IS FALSE only; NULL rows pass through
+    // intentionally — historical rows pre-dating the bot flag are not bots.
     if (excludeBots) query = query.is('is_bot_ua', false)
 
     const { data, error } = await query
