@@ -99,7 +99,7 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
         <div className={`border rounded-md p-3 space-y-3 ${settings.subscribe_info_job_enabled ? '' : 'bg-gray-50 opacity-75'}`}>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Question 1 (Job/Role)</span>
+            <span className="text-sm font-medium text-gray-700">Question 1</span>
             <button type="button" onClick={() => setSettings(prev => ({ ...prev, subscribe_info_job_enabled: !prev.subscribe_info_job_enabled }))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.subscribe_info_job_enabled ? 'bg-blue-600' : 'bg-gray-200'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.subscribe_info_job_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -118,7 +118,7 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
 
         <div className={`border rounded-md p-3 space-y-3 ${settings.subscribe_info_clients_enabled ? '' : 'bg-gray-50 opacity-75'}`}>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Question 2 (Clients)</span>
+            <span className="text-sm font-medium text-gray-700">Question 2</span>
             <button type="button" onClick={() => setSettings(prev => ({ ...prev, subscribe_info_clients_enabled: !prev.subscribe_info_clients_enabled }))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.subscribe_info_clients_enabled ? 'bg-blue-600' : 'bg-gray-200'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.subscribe_info_clients_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
