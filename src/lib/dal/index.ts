@@ -19,3 +19,11 @@ export {
   updateWelcomeSection,
   updateSubjectLine,
 } from './issues'
+
+// Analytics DAL
+export {
+  getDeliveryCounts,
+  getUniqueClickers,
+  getIssueEngagement,
+  getModuleEngagement,
+} from './analytics'
