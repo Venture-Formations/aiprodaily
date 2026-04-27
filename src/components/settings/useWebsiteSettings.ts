@@ -29,8 +29,10 @@ export interface WebsiteSettingsState {
   subscribe_tagline: string
   subscribe_info_heading: string
   subscribe_info_subheading: string
+  subscribe_info_job_enabled: boolean
   subscribe_info_job_label: string
   subscribe_info_job_options: { value: string; label: string }[]
+  subscribe_info_clients_enabled: boolean
   subscribe_info_clients_label: string
   subscribe_info_clients_options: { value: string; label: string }[]
   subscribe_info_submit_text: string
@@ -48,8 +50,10 @@ export function useWebsiteSettings(publicationId: string) {
     subscribe_tagline: '',
     subscribe_info_heading: '',
     subscribe_info_subheading: '',
+    subscribe_info_job_enabled: true,
     subscribe_info_job_label: '',
     subscribe_info_job_options: DEFAULT_JOB_OPTIONS,
+    subscribe_info_clients_enabled: true,
     subscribe_info_clients_label: '',
     subscribe_info_clients_options: DEFAULT_CLIENTS_OPTIONS,
     subscribe_info_submit_text: '',

@@ -16,8 +16,10 @@ const WEBSITE_SETTINGS_KEYS = [
   // Subscribe info page
   'subscribe_info_heading',
   'subscribe_info_subheading',
+  'subscribe_info_job_enabled',
   'subscribe_info_job_label',
   'subscribe_info_job_options',
+  'subscribe_info_clients_enabled',
   'subscribe_info_clients_label',
   'subscribe_info_clients_options',
   'subscribe_info_submit_text',

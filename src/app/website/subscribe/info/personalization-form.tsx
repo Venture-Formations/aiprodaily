@@ -20,16 +20,20 @@ const DEFAULT_CLIENTS_OPTIONS = [
 ]
 
 interface PersonalizationFormProps {
+  jobEnabled?: boolean
   jobLabel?: string
   jobOptions?: { value: string; label: string }[]
+  clientsEnabled?: boolean
   clientsLabel?: string
   clientsOptions?: { value: string; label: string }[]
   submitText?: string
 }
 
 export function PersonalizationForm({
+  jobEnabled = true,
   jobLabel = 'What best describes your role?',
   jobOptions = DEFAULT_JOB_OPTIONS,
+  clientsEnabled = true,
   clientsLabel = "How many clients' books/tax returns/financials do you handle yearly?",
   clientsOptions = DEFAULT_CLIENTS_OPTIONS,
   submitText = 'Complete Sign Up',
@@ -84,12 +88,12 @@ export function PersonalizationForm({
       return
     }
 
-    if (!jobType) {
+    if (jobEnabled && !jobType) {
       setError('Please select your job type')
       return
     }
 
-    if (!yearlyClients) {
+    if (clientsEnabled && !yearlyClients) {
       setError('Please select how many clients you handle')
       return
     }
@@ -186,48 +190,52 @@ export function PersonalizationForm({
         </div>
 
         {/* Job Type Dropdown */}
-        <div>
-          <label htmlFor="jobType" className="block text-sm font-medium text-slate-700 text-left mb-1">
-            {jobLabel} <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="jobType"
-            required
-            value={jobType}
-            onChange={(e) => setJobType(e.target.value)}
-            disabled={isSubmitting || !email}
-            className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
-          >
-            <option value="">Select your role...</option>
-            {jobOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {jobEnabled && (
+          <div>
+            <label htmlFor="jobType" className="block text-sm font-medium text-slate-700 text-left mb-1">
+              {jobLabel} <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="jobType"
+              required
+              value={jobType}
+              onChange={(e) => setJobType(e.target.value)}
+              disabled={isSubmitting || !email}
+              className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+            >
+              <option value="">Select your role...</option>
+              {jobOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Yearly Clients Dropdown */}
-        <div>
-          <label htmlFor="yearlyClients" className="block text-sm font-medium text-slate-700 text-left mb-1">
-            {clientsLabel} <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="yearlyClients"
-            required
-            value={yearlyClients}
-            onChange={(e) => setYearlyClients(e.target.value)}
-            disabled={isSubmitting || !email}
-            className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
-          >
-            <option value="">Select an option...</option>
-            {clientsOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {clientsEnabled && (
+          <div>
+            <label htmlFor="yearlyClients" className="block text-sm font-medium text-slate-700 text-left mb-1">
+              {clientsLabel} <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="yearlyClients"
+              required
+              value={yearlyClients}
+              onChange={(e) => setYearlyClients(e.target.value)}
+              disabled={isSubmitting || !email}
+              className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+            >
+              <option value="">Select an option...</option>
+              {clientsOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Submit Button */}
         <button

@@ -96,21 +96,44 @@ export default function WebsiteSettings({ publicationId }: { publicationId: stri
         </div>
         <SettingsTextarea label="Heading" value={settings.subscribe_info_heading} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_info_heading: v }))} placeholder={"One Last Step!\n**Personalize Your Experience**"} rows={2} hint="Use Enter for line breaks. Wrap text in **double asterisks** for gradient underline style." />
         <SettingsTextarea label="Subheadline" value={settings.subscribe_info_subheading} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_info_subheading: v }))} placeholder="Help us tailor your newsletter to your needs. This only takes 30 seconds!" rows={2} />
-        <SettingsInput label="Question 1 Label" value={settings.subscribe_info_job_label} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_info_job_label: v }))} placeholder="What best describes your role?" />
 
-        <OptionsEditor
-          label="Question 1 Options"
-          options={settings.subscribe_info_job_options}
-          onChange={(opts) => setSettings(prev => ({ ...prev, subscribe_info_job_options: opts }))}
-        />
+        <div className={`border rounded-md p-3 space-y-3 ${settings.subscribe_info_job_enabled ? '' : 'bg-gray-50 opacity-75'}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Question 1 (Job/Role)</span>
+            <button type="button" onClick={() => setSettings(prev => ({ ...prev, subscribe_info_job_enabled: !prev.subscribe_info_job_enabled }))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.subscribe_info_job_enabled ? 'bg-blue-600' : 'bg-gray-200'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.subscribe_info_job_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          {settings.subscribe_info_job_enabled && (
+            <>
+              <SettingsInput label="Question 1 Label" value={settings.subscribe_info_job_label} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_info_job_label: v }))} placeholder="What best describes your role?" />
+              <OptionsEditor
+                label="Question 1 Options"
+                options={settings.subscribe_info_job_options}
+                onChange={(opts) => setSettings(prev => ({ ...prev, subscribe_info_job_options: opts }))}
+              />
+            </>
+          )}
+        </div>
 
-        <SettingsInput label="Question 2 Label" value={settings.subscribe_info_clients_label} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_info_clients_label: v }))} placeholder="How many clients' books/tax returns/financials do you handle yearly?" />
-
-        <OptionsEditor
-          label="Question 2 Options"
-          options={settings.subscribe_info_clients_options}
-          onChange={(opts) => setSettings(prev => ({ ...prev, subscribe_info_clients_options: opts }))}
-        />
+        <div className={`border rounded-md p-3 space-y-3 ${settings.subscribe_info_clients_enabled ? '' : 'bg-gray-50 opacity-75'}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Question 2 (Clients)</span>
+            <button type="button" onClick={() => setSettings(prev => ({ ...prev, subscribe_info_clients_enabled: !prev.subscribe_info_clients_enabled }))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.subscribe_info_clients_enabled ? 'bg-blue-600' : 'bg-gray-200'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.subscribe_info_clients_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          {settings.subscribe_info_clients_enabled && (
+            <>
+              <SettingsInput label="Question 2 Label" value={settings.subscribe_info_clients_label} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_info_clients_label: v }))} placeholder="How many clients' books/tax returns/financials do you handle yearly?" />
+              <OptionsEditor
+                label="Question 2 Options"
+                options={settings.subscribe_info_clients_options}
+                onChange={(opts) => setSettings(prev => ({ ...prev, subscribe_info_clients_options: opts }))}
+              />
+            </>
+          )}
+        </div>
 
         <SettingsInput label="Submit Button Text" value={settings.subscribe_info_submit_text} onChange={(v) => setSettings(prev => ({ ...prev, subscribe_info_submit_text: v }))} placeholder="Complete Sign Up" />
       </div>
