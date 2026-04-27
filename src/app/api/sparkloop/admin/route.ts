@@ -2,14 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings, updatePublicationSetting } from '@/lib/publication-settings'
-import { SparkLoopService, createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
-import { PUBLICATION_ID } from '@/lib/config'
-
-// Resolve publicationId from query params, falling back to default
-function resolvePublicationId(request: Request): string {
-  const { searchParams } = new URL(request.url)
-  return searchParams.get('publicationId') || PUBLICATION_ID
-}
+import { SparkLoopService } from '@/lib/sparkloop-client'
 
 // Hardcoded fallbacks if no publication_settings exist
 const FALLBACK_DEFAULT_CR = 22
@@ -23,9 +16,9 @@ const FALLBACK_DEFAULT_RCR = 25
 export const maxDuration = 60
 
 export const GET = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin' },
-  async ({ request, logger }) => {
-    const publicationId = resolvePublicationId(request)
+  { authTier: 'admin', logContext: 'sparkloop/admin', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required') // narrowed by withApiHandler
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'all' // all, active, excluded
 
@@ -83,7 +76,6 @@ export const GET = withApiHandler(
     // the first one recorded after (first_send_date + S), so we only count confirms/rejects
     // that correspond to subs we actually sent.
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
 
     // 1. Count matured sends per ref_code, grouped by screening_period
     const screeningGroups = new Map<number, string[]>()
@@ -101,8 +93,9 @@ export const GET = withApiHandler(
         cutoff.setDate(cutoff.getDate() - s)
         // Use end-of-day so all sends on the cutoff date are included.
         // Without this, Supabase treats a bare date string as midnight,
-        // excluding sends after 00:00 UTC on that day.
-        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z'
+        // excluding sends after 00:00 UTC on that day. UTC is intentional —
+        // the boundary matches subscribed_at (timestamptz, stored UTC).
+        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z' // bug-check-ignore: date-iso
 
         // Paginate to avoid Supabase's 1000-row limit
         let offset = 0
@@ -462,9 +455,9 @@ export const GET = withApiHandler(
  * Update recommendation (exclude/reactivate/pause/unpause)
  */
 export const PATCH = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin' },
-  async ({ request, logger }) => {
-    const publicationId = resolvePublicationId(request)
+  { authTier: 'admin', logContext: 'sparkloop/admin', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required')
     const body = await request.json()
     const { id, excluded, excluded_reason, action } = body
 
@@ -546,6 +539,7 @@ export const PATCH = withApiHandler(
       .from('sparkloop_recommendations')
       .update(updateData)
       .eq('id', id)
+      .eq('publication_id', publicationId)
       .select()
       .single()
 
@@ -569,9 +563,9 @@ export const PATCH = withApiHandler(
  * Bulk update recommendations
  */
 export const POST = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin' },
-  async ({ request, logger }) => {
-    const publicationId = resolvePublicationId(request)
+  { authTier: 'admin', logContext: 'sparkloop/admin', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required')
     const body = await request.json()
     const { action, ids, excluded_reason } = body
 
@@ -615,6 +609,7 @@ export const POST = withApiHandler(
       .from('sparkloop_recommendations')
       .update(updateData)
       .in('id', ids)
+      .eq('publication_id', publicationId)
       .select()
 
     if (error) {

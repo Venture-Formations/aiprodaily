@@ -37,7 +37,11 @@ interface RecentEvent {
   ip: string | null
 }
 
-export default function OffersTab() {
+interface OffersTabProps {
+  publicationId: string | null
+}
+
+export default function OffersTab({ publicationId }: OffersTabProps) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([])
@@ -45,13 +49,21 @@ export default function OffersTab() {
   const [timeframe, setTimeframe] = useState<'7' | '30'>('30')
 
   useEffect(() => {
+    if (!publicationId) {
+      setLoading(false)
+      return
+    }
     fetchStats()
-  }, [timeframe])
+  }, [timeframe, publicationId])
 
   async function fetchStats() {
+    if (!publicationId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      const res = await fetch(`/api/sparkloop/offer-stats?days=${timeframe}`)
+      const res = await fetch(`/api/sparkloop/offer-stats?days=${timeframe}&publication_id=${publicationId}`)
       const data = await res.json()
       if (data.success) {
         setSummary(data.summary)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import type { Recommendation } from '../types'
 
 interface Counts {
@@ -63,6 +64,7 @@ export interface EstimatedValue {
 }
 
 export interface SparkLoopData {
+  publicationId: string | null
   recommendations: Recommendation[]
   counts: Counts
   globalStats: GlobalStats | null
@@ -100,6 +102,10 @@ function filterEligibleRecs(recommendations: Recommendation[]): Recommendation[]
 }
 
 export function useSparkLoopData(): SparkLoopData {
+  const params = useParams()
+  const slug = (params?.slug as string | undefined) ?? null
+
+  const [publicationId, setPublicationId] = useState<string | null>(null)
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0, archived: 0 })
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
@@ -112,11 +118,41 @@ export function useSparkLoopData(): SparkLoopData {
   const [timeframe, setTimeframe] = useState<'7' | '30' | '90'>('30')
   const [error, setError] = useState<string | null>(null)
 
+  // Resolve slug -> publication_id once on mount / slug change
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/newsletters')
+        if (!res.ok) throw new Error('Failed to fetch publications')
+        const data = await res.json()
+        const found = data.newsletters?.find((n: { slug: string; id: string }) => n.slug === slug)
+        if (cancelled) return
+        if (found) {
+          setPublicationId(found.id)
+        } else {
+          setError(`Publication not found for slug: ${slug}`)
+          setLoading(false)
+          setChartLoading(false)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(`Failed to resolve publication: ${err instanceof Error ? err.message : 'Network error'}`)
+          setLoading(false)
+          setChartLoading(false)
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [slug])
+
   const fetchRecommendations = useCallback(async () => {
+    if (!publicationId) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/sparkloop/admin?filter=all')
+      const res = await fetch(`/api/sparkloop/admin?filter=all&publication_id=${publicationId}`)
       const data = await res.json()
       if (data.success) {
         setRecommendations(data.recommendations)
@@ -133,27 +169,29 @@ export function useSparkLoopData(): SparkLoopData {
       console.error('Failed to fetch recommendations:', err)
     }
     setLoading(false)
-  }, [])
+  }, [publicationId])
 
   const fetchChartStats = useCallback(async () => {
+    if (!publicationId) return
     setChartLoading(true)
     try {
-      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}`)
+      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}&publication_id=${publicationId}`)
       const data = await res.json()
       if (data.success) setChartStats(data)
     } catch (err) {
       console.error('Failed to fetch chart stats:', err)
     }
     setChartLoading(false)
-  }, [timeframe])
+  }, [timeframe, publicationId])
 
   useEffect(() => { fetchRecommendations() }, [fetchRecommendations])
   useEffect(() => { fetchChartStats() }, [fetchChartStats])
 
   const syncFromSparkLoop = useCallback(async () => {
+    if (!publicationId) return
     setSyncing(true)
     try {
-      const res = await fetch('/api/sparkloop/sync', { method: 'POST' })
+      const res = await fetch(`/api/sparkloop/sync?publication_id=${publicationId}`, { method: 'POST' })
       const data = await res.json()
       if (data.success) {
         alert(`Synced ${data.synced} recommendations (${data.created} new, ${data.updated} updated)`)
@@ -167,7 +205,7 @@ export function useSparkLoopData(): SparkLoopData {
       alert('Sync failed')
     }
     setSyncing(false)
-  }, [fetchRecommendations, fetchChartStats])
+  }, [publicationId, fetchRecommendations, fetchChartStats])
 
   const popupPreview = useMemo(() => filterEligibleRecs(recommendations).slice(0, 5), [recommendations])
   const recsPagePreview = useMemo(() => filterEligibleRecs(recommendations).slice(5, 8), [recommendations])
@@ -189,6 +227,7 @@ export function useSparkLoopData(): SparkLoopData {
   }, [popupPreview, recsPagePreview])
 
   return {
+    publicationId,
     recommendations, counts, globalStats, defaults,
     loading, syncing, error,
     chartStats, chartLoading, timeframe, setTimeframe,

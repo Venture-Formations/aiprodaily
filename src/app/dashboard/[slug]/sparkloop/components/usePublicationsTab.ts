@@ -23,7 +23,7 @@ export interface Summary {
   page: SourceSummary
 }
 
-export function usePublicationsTab(recommendations: Recommendation[]) {
+export function usePublicationsTab(recommendations: Recommendation[], publicationId: string | null) {
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
   const [searchText, setSearchText] = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -62,13 +62,13 @@ export function usePublicationsTab(recommendations: Recommendation[]) {
   }
 
   useEffect(() => {
-    if (selectedRec && startDate && endDate) {
+    if (selectedRec && startDate && endDate && publicationId) {
       fetchSubmissions()
     }
-  }, [selectedRec, startDate, endDate, timezone])
+  }, [selectedRec, startDate, endDate, timezone, publicationId])
 
   async function fetchSubmissions() {
-    if (!selectedRec || !startDate || !endDate) return
+    if (!selectedRec || !startDate || !endDate || !publicationId) return
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -76,6 +76,7 @@ export function usePublicationsTab(recommendations: Recommendation[]) {
         start: startDate,
         end: endDate,
         tz: timezone,
+        publication_id: publicationId,
       })
       const res = await fetch(`/api/sparkloop/admin/submissions?${params}`)
       const data = await res.json()

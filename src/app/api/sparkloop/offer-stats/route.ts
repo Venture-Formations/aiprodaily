@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { PUBLICATION_ID } from '@/lib/config'
 const PAGE_SIZE = 1000
 
 export const GET = withApiHandler(
-  { authTier: 'public', logContext: 'sparkloop-offer-stats' },
-  async ({ request, logger }) => {
-    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
+  { authTier: 'admin', logContext: 'sparkloop-offer-stats', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
     const days = parseInt(request.nextUrl.searchParams.get('days') || '30', 10)
 
     const since = new Date()
@@ -42,7 +40,10 @@ export const GET = withApiHandler(
     let todayImpressions = 0
     let todayClaims = 0
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    // UTC date — both sides of the comparison below extract the date in UTC
+    // (event.created_at is timestamptz stored as UTC), so consistency matters
+    // more than user-local "today" here.
+    const todayStr = new Date().toISOString().split('T')[0] // bug-check-ignore: date-iso
 
     for (const event of events) {
       const day = event.created_at.split('T')[0]

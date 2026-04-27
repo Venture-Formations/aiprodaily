@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { PUBLICATION_ID } from '@/lib/config'
 import { buildDateRangeBoundaries, type SupportedTz } from '@/lib/date-utils'
 
 /**
@@ -13,9 +12,8 @@ import { buildDateRangeBoundaries, type SupportedTz } from '@/lib/date-utils'
  * Query params: ref_code, start (YYYY-MM-DD), end (YYYY-MM-DD)
  */
 export const GET = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin/submissions' },
-  async ({ request, logger }) => {
-    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
+  { authTier: 'admin', logContext: 'sparkloop/admin/submissions', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
     const { searchParams } = new URL(request.url)
     const refCode = searchParams.get('ref_code')
     const start = searchParams.get('start')

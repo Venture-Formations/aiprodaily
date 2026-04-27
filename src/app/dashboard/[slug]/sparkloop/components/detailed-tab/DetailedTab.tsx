@@ -11,8 +11,8 @@ import { DefaultsEditor } from './DefaultsEditor'
 import { GlobalStatsBar } from './GlobalStatsBar'
 import type { DetailedTabProps } from './types'
 
-export default function DetailedTab({ recommendations, globalStats, defaults, loading, onRefresh }: DetailedTabProps) {
-  const state = useDetailedTabState({ recommendations, onRefresh })
+export default function DetailedTab({ recommendations, globalStats, defaults, loading, onRefresh, publicationId }: DetailedTabProps) {
+  const state = useDetailedTabState({ recommendations, onRefresh, publicationId })
 
   return (
     <div className="py-4">

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
-import { PUBLICATION_ID } from '@/lib/config'
 import { toLocalDateStr as toDateStr, buildDateRangeBoundaries, getTodayStr, getDaysAgoStr, type SupportedTz } from '@/lib/date-utils'
 const FALLBACK_DEFAULT_RCR = 25
 
@@ -31,9 +30,9 @@ interface DailyStats {
 export const maxDuration = 60
 
 export const GET = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/stats' },
-  async ({ request, logger }) => {
-    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
+  { authTier: 'admin', logContext: 'sparkloop/stats', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    if (!publicationId) throw new Error('publication_id required')
     const { searchParams } = new URL(request.url)
     const days = Math.max(1, Math.min(365, parseInt(searchParams.get('days') || '30') || 30))
     const startDate = searchParams.get('start')
@@ -89,7 +88,8 @@ export const GET = withApiHandler(
       Array.from(screeningGroups.entries()).map(async ([s, refCodes]) => {
         const cutoff = new Date(today)
         cutoff.setDate(cutoff.getDate() - s)
-        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z'
+        // UTC end-of-day — boundary matches subscribed_at (timestamptz, UTC).
+        const cutoffStr = cutoff.toISOString().split('T')[0] + 'T23:59:59.999Z' // bug-check-ignore: date-iso
 
         let offset = 0
         const counts = new Map<string, number>()
@@ -167,7 +167,8 @@ export const GET = withApiHandler(
 
       const baselineDate = new Date(firstSend)
       baselineDate.setDate(baselineDate.getDate() + s)
-      const baselineDateStr = baselineDate.toISOString().split('T')[0]
+      // Compared against snap.snapshot_date (UTC YYYY-MM-DD column), so UTC is intentional.
+      const baselineDateStr = baselineDate.toISOString().split('T')[0] // bug-check-ignore: date-iso
 
       let baselineSnap: SnapRow | null = null
       for (let i = 1; i < snaps.length; i++) {

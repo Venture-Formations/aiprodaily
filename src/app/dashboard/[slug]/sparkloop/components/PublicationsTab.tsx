@@ -11,9 +11,10 @@ import {
 
 interface Props {
   recommendations: Recommendation[]
+  publicationId: string | null
 }
 
-export default function PublicationsTab({ recommendations }: Props) {
+export default function PublicationsTab({ recommendations, publicationId }: Props) {
   const {
     selectedRec, searchText, setSearchText, dropdownOpen, setDropdownOpen,
     dropdownRef, startDate, setStartDate, endDate, setEndDate,
@@ -21,7 +22,7 @@ export default function PublicationsTab({ recommendations }: Props) {
     sortAsc, setSortAsc, timezone, setTimezone, tz,
     filteredRecs, filteredReferrals,
     setQuickRange, clearSelection, clearDates, selectRec,
-  } = usePublicationsTab(recommendations)
+  } = usePublicationsTab(recommendations, publicationId)
 
   return (
     <div className="space-y-6">

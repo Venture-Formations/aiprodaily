@@ -25,6 +25,10 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
   const email = searchParams.get('email') || ''
   const urlClickId = searchParams.get('click_id') || ''
   const [clickId, setClickId] = useState('')
+  // Default tall enough that AfterOffers content rarely clips even if the
+  // iframe never reports its real height via postMessage. The listener below
+  // will shrink/expand this once a real height arrives.
+  const [iframeHeight, setIframeHeight] = useState(1800)
 
   // Store email in sessionStorage so info page can retrieve it as fallback
   useEffect(() => {
@@ -73,6 +77,45 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
     setClickId(id)
   }, [urlClickId])
 
+  // Listen for height messages from the AfterOffers iframe so the page scrolls
+  // instead of producing a scrollbar inside the iframe.
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      // Validate hostname strictly so a domain like attacker-afteroffers.com
+      // (or attacker.com/afteroffers.com path) can't impersonate the iframe.
+      let hostname: string
+      try {
+        hostname = new URL(event.origin).hostname.toLowerCase()
+      } catch {
+        return
+      }
+      if (hostname !== 'afteroffers.com' && !hostname.endsWith('.afteroffers.com')) return
+
+      const data = event.data
+      let height: number | undefined
+
+      if (typeof data === 'number') {
+        height = data
+      } else if (typeof data === 'string') {
+        const match = data.match(/(\d+(?:\.\d+)?)/)
+        if (match) height = Number(match[1])
+      } else if (data && typeof data === 'object') {
+        const candidate = data.height ?? data.iframeHeight ?? data.contentHeight ?? data.scrollHeight
+        if (typeof candidate === 'number') height = candidate
+        else if (typeof candidate === 'string' && !Number.isNaN(Number(candidate))) height = Number(candidate)
+      }
+
+      if (height && Number.isFinite(height) && height > 0) {
+        // Cap to a sane upper bound so a misbehaving message can't blow out the layout.
+        const safeHeight = Math.min(Math.ceil(height), 10000)
+        setIframeHeight(safeHeight)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
+
   // Build the AfterOffers URL with email and click_id
   const params = new URLSearchParams()
   if (email) {
@@ -109,11 +152,12 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
             <div className="rounded-xl overflow-hidden shadow-lg border border-slate-200">
               <iframe
                 src={afterOffersUrl}
-                height="600"
                 width="100%"
                 frameBorder="0"
+                scrolling="no"
                 sandbox="allow-forms allow-top-navigation allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-                className="w-full"
+                className="w-full block"
+                style={{ height: `${iframeHeight}px` }}
               />
             </div>
           )}

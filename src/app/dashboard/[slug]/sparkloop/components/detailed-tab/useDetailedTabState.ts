@@ -7,9 +7,10 @@ import type { Column, Recommendation, DateRangeMetrics, RangeStats, StatusFilter
 interface UseDetailedTabStateOptions {
   recommendations: Recommendation[]
   onRefresh: () => void
+  publicationId: string | null
 }
 
-export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedTabStateOptions) {
+export function useDetailedTabState({ recommendations, onRefresh, publicationId }: UseDetailedTabStateOptions) {
   const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS)
   const [sortColumn, setSortColumn] = useState<string | null>('calculated_score')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -57,11 +58,17 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
 
     // Validate: start <= end
     if (dateStart > dateEnd) return
+    if (!publicationId) {
+      // Clear stale metrics if the publication context drops out
+      setDateRangeMetrics(null)
+      setRangeStats(null)
+      return
+    }
 
     const fetchDateRange = async () => {
       setDateRangeLoading(true)
       try {
-        const res = await fetch(`/api/sparkloop/admin/daterange?start=${dateStart}&end=${dateEnd}&tz=${timezone}`)
+        const res = await fetch(`/api/sparkloop/admin/daterange?start=${dateStart}&end=${dateEnd}&tz=${timezone}&publication_id=${publicationId}`)
         const data = await res.json()
         if (data.success) {
           setDateRangeMetrics(data.metrics)
@@ -73,7 +80,7 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
       setDateRangeLoading(false)
     }
     fetchDateRange()
-  }, [dateStart, dateEnd, timezone])
+  }, [dateStart, dateEnd, timezone, publicationId])
 
   const clearDateRange = useCallback(() => {
     setDateStart('')
@@ -216,11 +223,16 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
     return result
   }, [effectiveRecommendations, searchQuery, statusFilter, sortColumn, sortDirection])
 
+  const adminUrl = publicationId
+    ? `/api/sparkloop/admin?publication_id=${publicationId}`
+    : '/api/sparkloop/admin'
+
   // --- Action handlers ---
   async function handlePause(rec: Recommendation) {
+    if (!publicationId) return
     setActionLoading(rec.id)
     try {
-      const res = await fetch('/api/sparkloop/admin', {
+      const res = await fetch(adminUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: rec.id, action: 'pause' }),
@@ -238,9 +250,10 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
   }
 
   async function handleExclude(rec: Recommendation) {
+    if (!publicationId) return
     setActionLoading(rec.id)
     try {
-      const res = await fetch('/api/sparkloop/admin', {
+      const res = await fetch(adminUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: rec.id, excluded: true, excluded_reason: 'manual' }),
@@ -258,13 +271,14 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
   }
 
   async function handleReactivate(rec: Recommendation) {
+    if (!publicationId) return
     setActionLoading(rec.id)
     try {
       // If excluded, un-exclude. If paused, unpause.
       const body = rec.excluded
         ? { id: rec.id, excluded: false }
         : { id: rec.id, action: 'unpause' }
-      const res = await fetch('/api/sparkloop/admin', {
+      const res = await fetch(adminUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -282,14 +296,14 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
   }
 
   async function bulkAction(action: 'exclude' | 'reactivate' | 'pause') {
-    if (selectedIds.size === 0) return
+    if (selectedIds.size === 0 || !publicationId) return
 
     const reason = action === 'exclude' ? prompt('Exclusion reason (e.g., budget_used_up):') : null
     if (action === 'exclude' && reason === null) return
 
     setActionLoading('bulk')
     try {
-      const res = await fetch('/api/sparkloop/admin', {
+      const res = await fetch(adminUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -314,8 +328,9 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
   }
 
   async function handleToggleModuleEligible(rec: Recommendation) {
+    if (!publicationId) return
     try {
-      const res = await fetch('/api/sparkloop/admin', {
+      const res = await fetch(adminUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: rec.id, action: 'toggle_module_eligible', eligible_for_module: !rec.eligible_for_module }),
@@ -356,7 +371,7 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
   }
 
   async function saveOverrides() {
-    if (!overrideRec) return
+    if (!overrideRec || !publicationId) return
     setOverrideSaving(true)
     try {
       const body: Record<string, unknown> = {
@@ -368,7 +383,7 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
       body.override_rcr = overrideRcrValue.trim() === '' ? null : parseFloat(overrideRcrValue)
       body.override_slip = overrideSlipValue.trim() === '' ? null : parseFloat(overrideSlipValue)
 
-      const res = await fetch('/api/sparkloop/admin', {
+      const res = await fetch(adminUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -387,6 +402,7 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
   }
 
   async function saveDefault(field: 'cr' | 'rcr' | 'mcb') {
+    if (!publicationId) return
     const value = field === 'cr' ? defaultCrInput : field === 'rcr' ? defaultRcrInput : defaultMcbInput
     const parsed = field === 'mcb' ? parseInt(value) : parseFloat(value)
     if (field === 'mcb') {
@@ -407,7 +423,7 @@ export function useDetailedTabState({ recommendations, onRefresh }: UseDetailedT
       if (field === 'rcr') body.default_rcr = parsed
       if (field === 'mcb') body.min_conversions_budget = parsed
 
-      const res = await fetch('/api/sparkloop/admin', {
+      const res = await fetch(adminUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

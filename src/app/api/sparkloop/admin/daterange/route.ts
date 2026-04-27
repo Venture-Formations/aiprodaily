@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { PUBLICATION_ID } from '@/lib/config'
 import { buildDateRangeBoundaries, toLocalDateStr, type SupportedTz } from '@/lib/date-utils'
 
 function hashEmail(email: string): string {
@@ -18,9 +17,8 @@ const PAGE_SIZE = 1000
 export const maxDuration = 60
 
 export const GET = withApiHandler(
-  { authTier: 'admin', logContext: 'sparkloop/admin/daterange' },
-  async ({ request, logger }) => {
-    const publicationId = new URL(request.url).searchParams.get('publicationId') || PUBLICATION_ID
+  { authTier: 'admin', logContext: 'sparkloop/admin/daterange', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
     const { searchParams } = new URL(request.url)
     const start = searchParams.get('start')
     const end = searchParams.get('end')
