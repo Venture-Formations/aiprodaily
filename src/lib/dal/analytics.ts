@@ -75,3 +75,58 @@ export async function getDeliveryCounts(args: {
     return null
   }
 }
+
+/**
+ * Count unique clickers for an issue (optionally filtered to a single link).
+ * Applies bot and IP filtering in SQL where possible; CIDR matches applied in-app.
+ *
+ * "Unique clicker" = distinct subscriber_email for rows passing isClickCountable.
+ */
+export async function getUniqueClickers(args: {
+  issueId: string
+  publicationId: string
+  linkUrl?: string
+  excludeBots?: boolean
+}): Promise<number> {
+  const { issueId, publicationId, linkUrl, excludeBots = true } = args
+
+  try {
+    let query = supabaseAdmin
+      .from('link_clicks')
+      .select(LINK_CLICK_COLUMNS)
+      .eq('publication_id', publicationId)
+      .eq('issue_id', issueId)
+
+    if (linkUrl) query = query.eq('link_url', linkUrl)
+
+    // SQL-level: exclude is_bot_ua = true rows when excludeBots is on.
+    if (excludeBots) query = query.is('is_bot_ua', false)
+
+    const { data, error } = await query
+
+    if (error || !data) {
+      if (error) log.error({ err: error, issueId, publicationId }, 'getUniqueClickers failed')
+      return 0
+    }
+
+    if (!excludeBots) {
+      return countUniqueEmails(data as LinkClickRow[])
+    }
+
+    // Apply in-app IP + CIDR filter, then count uniques.
+    const excludedIps = await loadExcludedIps(publicationId)
+    const countable = (data as LinkClickRow[]).filter((row) =>
+      isClickCountable(row, excludedIps)
+    )
+    return countUniqueEmails(countable)
+  } catch (err) {
+    log.error({ err, issueId, publicationId }, 'getUniqueClickers threw')
+    return 0
+  }
+}
+
+function countUniqueEmails(rows: LinkClickRow[]): number {
+  const set = new Set<string>()
+  for (const row of rows) set.add(row.subscriber_email.toLowerCase())
+  return set.size
+}

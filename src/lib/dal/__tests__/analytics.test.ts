@@ -46,7 +46,7 @@ vi.mock('@/lib/analytics/bot-policy', () => ({
 }))
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { getDeliveryCounts } from '../analytics'
+import { getDeliveryCounts, getUniqueClickers } from '../analytics'
 
 const PUB_ID = 'pub-test-123'
 const ISSUE_ID = 'issue-test-456'
@@ -97,5 +97,54 @@ describe('getDeliveryCounts', () => {
     const result = await getDeliveryCounts({ issueId: ISSUE_ID, publicationId: PUB_ID })
 
     expect(result).toBeNull()
+  })
+})
+
+describe('getUniqueClickers', () => {
+  it('counts unique subscriber_email across countable clicks', async () => {
+    const rows = [
+      { id: '1', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'a@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.1', is_bot_ua: false },
+      { id: '2', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'b@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.2', is_bot_ua: false },
+      { id: '3', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'a@x.com', link_url: 'u', link_section: 's', ip_address: '1.1.1.1', is_bot_ua: false },
+    ]
+    ;(mockChain.eq as any).mockImplementation(function () { return mockChain })
+    ;(mockChain.is as any).mockImplementation(function () { return mockChain })
+    ;(mockChain.is as any).mockReturnValueOnce(Promise.resolve({ data: rows, error: null }))
+
+    const count = await getUniqueClickers({
+      issueId: ISSUE_ID,
+      publicationId: PUB_ID,
+      excludeBots: true,
+    })
+
+    expect(count).toBe(2)
+  })
+
+  it('returns 0 on DB error', async () => {
+    ;(mockChain.is as any).mockReturnValueOnce(
+      Promise.resolve({ data: null, error: { message: 'oops' } })
+    )
+
+    const count = await getUniqueClickers({
+      issueId: ISSUE_ID,
+      publicationId: PUB_ID,
+      excludeBots: true,
+    })
+
+    expect(count).toBe(0)
+  })
+
+  it('returns 0 when no rows', async () => {
+    ;(mockChain.is as any).mockReturnValueOnce(
+      Promise.resolve({ data: [], error: null })
+    )
+
+    const count = await getUniqueClickers({
+      issueId: ISSUE_ID,
+      publicationId: PUB_ID,
+      excludeBots: true,
+    })
+
+    expect(count).toBe(0)
   })
 })
