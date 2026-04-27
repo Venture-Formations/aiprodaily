@@ -25,10 +25,11 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
   const email = searchParams.get('email') || ''
   const urlClickId = searchParams.get('click_id') || ''
   const [clickId, setClickId] = useState('')
-  // Default tall enough that AfterOffers content rarely clips even if the
-  // iframe never reports its real height via postMessage. The listener below
-  // will shrink/expand this once a real height arrives.
-  const [iframeHeight, setIframeHeight] = useState(1800)
+  // Sized to fit the typical AfterOffers form (~5 offers + email + button).
+  // The listener below expands this if AfterOffers reports a taller content
+  // height via postMessage. In practice AfterOffers rarely posts a height,
+  // so this default is what most users will see.
+  const [iframeHeight, setIframeHeight] = useState(800)
 
   // Store email in sessionStorage so info page can retrieve it as fallback
   useEffect(() => {
@@ -154,7 +155,7 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
                 src={afterOffersUrl}
                 width="100%"
                 frameBorder="0"
-                scrolling="no"
+                scrolling="auto"
                 sandbox="allow-forms allow-top-navigation allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
                 className="w-full block"
                 style={{ height: `${iframeHeight}px` }}
