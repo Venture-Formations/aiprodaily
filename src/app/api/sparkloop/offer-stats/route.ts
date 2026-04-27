@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 const PAGE_SIZE = 1000
 
 export const GET = withApiHandler(
-  { authTier: 'public', logContext: 'sparkloop-offer-stats', requirePublicationId: true },
+  { authTier: 'admin', logContext: 'sparkloop-offer-stats', requirePublicationId: true },
   async ({ request, publicationId, logger }) => {
     const days = parseInt(request.nextUrl.searchParams.get('days') || '30', 10)
 

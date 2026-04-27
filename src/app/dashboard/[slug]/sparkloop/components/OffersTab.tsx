@@ -49,12 +49,18 @@ export default function OffersTab({ publicationId }: OffersTabProps) {
   const [timeframe, setTimeframe] = useState<'7' | '30'>('30')
 
   useEffect(() => {
-    if (!publicationId) return
+    if (!publicationId) {
+      setLoading(false)
+      return
+    }
     fetchStats()
   }, [timeframe, publicationId])
 
   async function fetchStats() {
-    if (!publicationId) return
+    if (!publicationId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch(`/api/sparkloop/offer-stats?days=${timeframe}&publication_id=${publicationId}`)

@@ -106,7 +106,9 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
       }
 
       if (height && Number.isFinite(height) && height > 0) {
-        setIframeHeight(Math.ceil(height))
+        // Cap to a sane upper bound so a misbehaving message can't blow out the layout.
+        const safeHeight = Math.min(Math.ceil(height), 10000)
+        setIframeHeight(safeHeight)
       }
     }
 

@@ -58,7 +58,12 @@ export function useDetailedTabState({ recommendations, onRefresh, publicationId 
 
     // Validate: start <= end
     if (dateStart > dateEnd) return
-    if (!publicationId) return
+    if (!publicationId) {
+      // Clear stale metrics if the publication context drops out
+      setDateRangeMetrics(null)
+      setRangeStats(null)
+      return
+    }
 
     const fetchDateRange = async () => {
       setDateRangeLoading(true)
