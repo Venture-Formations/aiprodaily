@@ -46,7 +46,12 @@ vi.mock('@/lib/analytics/bot-policy', () => ({
 }))
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { getDeliveryCounts, getUniqueClickers, getIssueEngagement } from '../analytics'
+import {
+  getDeliveryCounts,
+  getUniqueClickers,
+  getIssueEngagement,
+  getModuleEngagement,
+} from '../analytics'
 
 const PUB_ID = 'pub-test-123'
 const ISSUE_ID = 'issue-test-456'
@@ -201,5 +206,92 @@ describe('getIssueEngagement', () => {
     expect(result!.totalClicks).toBe(3)
     expect(result!.uniqueClickers).toBe(2)
     expect(result!.delivery.deliveredCount).toBe(980)
+  })
+})
+
+describe('getModuleEngagement', () => {
+  it('returns module engagement with defaults to deliveredCount when moduleRecipients not provided', async () => {
+    // Delivery counts call
+    mockSingle.mockResolvedValueOnce({
+      data: {
+        issue_id: ISSUE_ID,
+        sent_count: 1000,
+        delivered_count: 980,
+        opened_count: 500,
+        clicked_count: 50,
+        bounced_count: 20,
+        unsubscribed_count: 5,
+        open_rate: 0.51,
+        click_rate: 0.051,
+        imported_at: '2026-04-23T10:00:00Z',
+        publication_issues: { publication_id: PUB_ID },
+      },
+      error: null,
+    })
+
+    const rows = [
+      { id: '1', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'a@x.com', link_url: 'u', link_section: 'Ads', ip_address: '1.1.1.1', is_bot_ua: false },
+      { id: '2', publication_id: PUB_ID, issue_id: ISSUE_ID, subscriber_email: 'b@x.com', link_url: 'u', link_section: 'Ads', ip_address: '1.1.1.2', is_bot_ua: false },
+    ]
+    ;(mockChain.is as any).mockReturnValueOnce(Promise.resolve({ data: rows, error: null }))
+
+    const result = await getModuleEngagement({
+      moduleId: 'module-1',
+      issueId: ISSUE_ID,
+      publicationId: PUB_ID,
+      linkSection: 'Ads',
+      excludeBots: true,
+    })
+
+    expect(result).not.toBeNull()
+    expect(result!.uniqueClickers).toBe(2)
+    expect(result!.totalClicks).toBe(2)
+    expect(result!.moduleRecipients).toBe(980) // default = deliveredCount
+  })
+
+  it('uses explicit moduleRecipients when provided (segmented module)', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: {
+        issue_id: ISSUE_ID,
+        sent_count: 1000,
+        delivered_count: 980,
+        opened_count: 500,
+        clicked_count: 10,
+        bounced_count: 20,
+        unsubscribed_count: 5,
+        open_rate: 0.51,
+        click_rate: 0.01,
+        imported_at: '2026-04-23T10:00:00Z',
+        publication_issues: { publication_id: PUB_ID },
+      },
+      error: null,
+    })
+
+    ;(mockChain.is as any).mockReturnValueOnce(Promise.resolve({ data: [], error: null }))
+
+    const result = await getModuleEngagement({
+      moduleId: 'module-1',
+      issueId: ISSUE_ID,
+      publicationId: PUB_ID,
+      linkSection: 'Ads',
+      moduleRecipients: 500, // segmented: only 500 of 980 saw this module
+      excludeBots: true,
+    })
+
+    expect(result).not.toBeNull()
+    expect(result!.moduleRecipients).toBe(500)
+  })
+
+  it('returns null when delivery cannot be loaded', async () => {
+    mockSingle.mockResolvedValueOnce({ data: null, error: null })
+
+    const result = await getModuleEngagement({
+      moduleId: 'module-1',
+      issueId: ISSUE_ID,
+      publicationId: 'wrong-pub',
+      linkSection: 'Ads',
+    })
+
+    expect(result).toBeNull()
   })
 })

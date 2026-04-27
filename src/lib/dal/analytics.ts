@@ -133,7 +133,9 @@ function countUniqueEmails(rows: LinkClickRow[]): number {
 
 /**
  * Single-query loader returning the bot/IP-filtered link_clicks rows
- * for an issue. Used by getIssueEngagement to avoid duplicate fetching
+ * for an issue (optionally narrowed to a single link_section for module-scoped reads).
+ *
+ * Used by getIssueEngagement / getModuleEngagement to avoid duplicate fetches
  * when both totals and uniques are needed.
  *
  * Standalone callers (getTotalClicks, getUniqueClickers) keep their own
@@ -142,9 +144,10 @@ function countUniqueEmails(rows: LinkClickRow[]): number {
 async function loadCountableLinkClicks(args: {
   issueId: string
   publicationId: string
+  linkSection?: string
   excludeBots: boolean
 }): Promise<LinkClickRow[]> {
-  const { issueId, publicationId, excludeBots } = args
+  const { issueId, publicationId, linkSection, excludeBots } = args
 
   try {
     let query = supabaseAdmin
@@ -153,11 +156,12 @@ async function loadCountableLinkClicks(args: {
       .eq('publication_id', publicationId)
       .eq('issue_id', issueId)
 
+    if (linkSection) query = query.eq('link_section', linkSection)
     if (excludeBots) query = query.is('is_bot_ua', false)
 
     const { data, error } = await query
     if (error || !data) {
-      if (error) log.error({ err: error, issueId, publicationId }, 'loadCountableLinkClicks failed')
+      if (error) log.error({ err: error, issueId, publicationId, linkSection }, 'loadCountableLinkClicks failed')
       return []
     }
 
@@ -168,7 +172,7 @@ async function loadCountableLinkClicks(args: {
       isClickCountable(row, excludedIps)
     )
   } catch (err) {
-    log.error({ err, issueId, publicationId }, 'loadCountableLinkClicks threw')
+    log.error({ err, issueId, publicationId, linkSection }, 'loadCountableLinkClicks threw')
     return []
   }
 }
@@ -237,5 +241,55 @@ export async function getIssueEngagement(args: {
     totalClicks: rows.length,
     uniqueClickers: countUniqueEmails(rows),
     delivery,
+  }
+}
+
+/**
+ * Aggregate engagement for a module within an issue.
+ *
+ * Module scope is defined by linkSection (e.g., 'Ads', 'AI Apps', 'Articles').
+ * Numbers are narrowed to clicks with that link_section.
+ *
+ * moduleRecipients defaults to delivery.deliveredCount for non-segmented modules.
+ * For segmented modules (an ad shown to a subset), callers pass the explicit
+ * recipient count from the per-issue module-assignment table.
+ *
+ * Uses a single link_clicks fetch (via loadCountableLinkClicks) to derive
+ * both total and unique counts for the module.
+ */
+export async function getModuleEngagement(args: {
+  moduleId: string
+  issueId: string
+  publicationId: string
+  linkSection: string
+  moduleRecipients?: number
+  excludeBots?: boolean
+}): Promise<ModuleEngagement | null> {
+  const {
+    moduleId,
+    issueId,
+    publicationId,
+    linkSection,
+    moduleRecipients,
+    excludeBots = true,
+  } = args
+
+  const delivery = await getDeliveryCounts({ issueId, publicationId })
+  if (!delivery) return null
+
+  const rows = await loadCountableLinkClicks({
+    issueId,
+    publicationId,
+    linkSection,
+    excludeBots,
+  })
+
+  return {
+    moduleId,
+    issueId,
+    publicationId,
+    totalClicks: rows.length,
+    uniqueClickers: countUniqueEmails(rows),
+    moduleRecipients: moduleRecipients ?? delivery.deliveredCount,
   }
 }
