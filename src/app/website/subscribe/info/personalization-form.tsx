@@ -114,8 +114,8 @@ export function PersonalizationForm({
           original_email: emailChanged ? storedEmail : undefined,
           name: firstName.trim(),
           last_name: lastName.trim(),
-          job_type: jobType,
-          yearly_clients: yearlyClients,
+          ...(jobEnabled ? { job_type: jobType } : {}),
+          ...(clientsEnabled ? { yearly_clients: yearlyClients } : {}),
         })
       })
 
