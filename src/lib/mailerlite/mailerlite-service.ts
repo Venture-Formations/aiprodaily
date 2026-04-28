@@ -435,6 +435,7 @@ United States
           click_rate: extractRateValue(stats.clicked?.rate || stats.click_rate),
           bounce_rate: extractRateValue(stats.bounced?.rate || stats.bounce_rate || stats.hard_bounce_rate),
           unsubscribe_rate: extractRateValue(stats.unsubscribed?.rate || stats.unsubscribe_rate),
+          last_synced_at: new Date().toISOString(),
         }
 
         const { error: updateError } = await supabaseAdmin

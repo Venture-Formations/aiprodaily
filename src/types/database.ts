@@ -527,6 +527,7 @@ export interface EmailMetrics {
   bounce_rate: number | null
   unsubscribe_rate: number | null
   imported_at: string
+  last_synced_at: string | null
 }
 
 export interface ArticlePerformance {

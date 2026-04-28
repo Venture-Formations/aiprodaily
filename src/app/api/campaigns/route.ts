@@ -106,7 +106,7 @@ export const GET = withApiHandler(
         id, date, status, subject_line, created_at, updated_at, publication_id,
         articles:module_articles(count),
         manual_articles:manual_articles(count),
-        email_metrics(id, sent_count, opened_count, clicked_count, unsubscribed_count, open_rate, click_rate)
+        email_metrics(id, sent_count, opened_count, clicked_count, unsubscribed_count, open_rate, click_rate, last_synced_at)
       `)
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)

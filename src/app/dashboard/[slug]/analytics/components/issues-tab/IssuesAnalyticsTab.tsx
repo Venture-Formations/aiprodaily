@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import type { Props } from './types'
 import { useIssuesAnalytics } from './useIssuesAnalytics'
 import { SummaryStats } from './SummaryStats'
@@ -7,6 +8,7 @@ import { IssuePerformanceTable } from './IssuePerformanceTable'
 import { FeedbackSection } from './FeedbackSection'
 import { LinkClicksSection } from './LinkClicksSection'
 import { PerformanceInsights } from './PerformanceInsights'
+import { FreshnessBadge } from '@/components/analytics/FreshnessBadge'
 
 export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
   const {
@@ -26,12 +28,22 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
     downloadCSV,
   } = useIssuesAnalytics(slug, excludeIps)
 
+  const mostRecentSync = useMemo<string | null>(() => {
+    let max: string | null = null
+    for (const issue of issues) {
+      const ts = issue?.email_metrics?.last_synced_at ?? null
+      if (ts && (!max || ts > max)) max = ts
+    }
+    return max
+  }, [issues])
+
   const averages = calculateAverages()
 
   return (
     <div>
       {/* Timeframe Selector */}
-      <div className="mb-6 flex justify-end">
+      <div className="mb-6 flex items-center justify-between">
+        <FreshnessBadge lastSyncedAt={mostRecentSync} />
         <select
           value={selectedTimeframe}
           onChange={(e) => setSelectedTimeframe(e.target.value)}
