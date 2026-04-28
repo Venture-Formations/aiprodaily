@@ -25,7 +25,7 @@ const EMAIL_METRICS_COLUMNS = `
   sent_count, delivered_count, opened_count, clicked_count,
   bounced_count, unsubscribed_count,
   open_rate, click_rate,
-  imported_at
+  last_synced_at
 ` as const
 
 const LINK_CLICK_COLUMNS = `
@@ -68,7 +68,7 @@ export async function getDeliveryCounts(args: {
       unsubscribedCount: data.unsubscribed_count ?? 0,
       espOpenRate: data.open_rate,
       espClickRate: data.click_rate,
-      lastSyncedAt: data.imported_at ?? null,
+      lastSyncedAt: data.last_synced_at ?? null,
     }
   } catch (err) {
     log.error({ err, issueId, publicationId }, 'getDeliveryCounts threw')

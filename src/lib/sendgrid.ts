@@ -70,6 +70,7 @@ export interface MetricsResult {
   click_rate?: number
   bounce_rate?: number
   unsubscribe_rate?: number
+  last_synced_at?: string
   skipped?: boolean
   reason?: string
 }
@@ -440,7 +441,8 @@ export class SendGridService {
         open_rate: openRate,
         click_rate: clickRate,
         bounce_rate: bounceRate,
-        unsubscribe_rate: unsubscribeRate
+        unsubscribe_rate: unsubscribeRate,
+        last_synced_at: new Date().toISOString(),
       }
 
       // Update database
