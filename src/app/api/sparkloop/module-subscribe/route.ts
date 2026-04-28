@@ -6,6 +6,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { checkUserAgent } from '@/lib/bot-detection'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 import { PUBLICATION_ID } from '@/lib/config'
+import { MailerLiteService } from '@/lib/mailerlite'
+import { getEmailProviderSettings } from '@/lib/publication-settings'
+import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.com'
 
 /**
@@ -225,6 +228,45 @@ export const GET = withApiHandler(
 
     if (sparkloopSuccess) {
       console.log(`[SparkLoop Module Subscribe] ${email} subscribed to ${rec.publication_name} via newsletter module`)
+    }
+
+    // Update email provider subscriber field to mark as SparkLoop participant.
+    // Fires regardless of SparkLoop API success — the user's click is the intent.
+    // Retry once on "Subscriber not found" since the subscriber row may not be live yet.
+    try {
+      const providerSettings = await getEmailProviderSettings(publicationId)
+
+      if (providerSettings.provider === 'beehiiv') {
+        const { beehiivPublicationId, beehiivApiKey } = providerSettings
+        if (beehiivPublicationId && beehiivApiKey) {
+          let result = await updateBeehiivSubscriberField(email, 'sparkloop', 'true', beehiivPublicationId, beehiivApiKey)
+          if (!result.success && result.error === 'Subscriber not found') {
+            console.log(`[SparkLoop Module Subscribe] Subscriber ${email} not found in Beehiiv, waiting 2s and retrying...`)
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            result = await updateBeehiivSubscriberField(email, 'sparkloop', 'true', beehiivPublicationId, beehiivApiKey)
+          }
+          if (result.success) {
+            console.log(`[SparkLoop Module Subscribe] Updated Beehiiv SparkLoop field for ${email}`)
+          } else {
+            console.error('[SparkLoop Module Subscribe] Failed to update Beehiiv field:', result.error)
+          }
+        }
+      } else {
+        const mailerlite = new MailerLiteService()
+        let result = await mailerlite.updateSubscriberField(email, 'sparkloop', 'true')
+        if (!result.success && result.error === 'Subscriber not found') {
+          console.log(`[SparkLoop Module Subscribe] Subscriber ${email} not found, waiting 2s and retrying...`)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          result = await mailerlite.updateSubscriberField(email, 'sparkloop', 'true')
+        }
+        if (result.success) {
+          console.log(`[SparkLoop Module Subscribe] Updated MailerLite SparkLoop field for ${email}`)
+        } else {
+          console.error('[SparkLoop Module Subscribe] Failed to update MailerLite field:', result.error)
+        }
+      }
+    } catch (providerError) {
+      console.error('[SparkLoop Module Subscribe] Email provider update error:', providerError)
     }
 
     // Redirect to confirmation page
