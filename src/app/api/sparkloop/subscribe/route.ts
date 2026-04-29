@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
 import { cookies } from 'next/headers'
-import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication, fireMakeWebhook } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { PUBLICATION_ID } from '@/lib/config'
-import { getEmailProviderSettings } from '@/lib/publication-settings'
+import { getEmailProviderSettings, getPublicationSetting } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 import {
   attributeByVisitor,
@@ -232,6 +232,20 @@ export const POST = withApiHandler(
     } catch (providerError) {
       console.error('[SparkLoop Subscribe] Email provider update error:', providerError)
       // Don't fail the request for email provider errors
+    }
+
+    // Fire direct Make.com webhook (replaces the MailerLite-segment-triggered path).
+    // Fires on the same trigger condition as the field flip — user-action subscribe
+    // intent — and only when we have the SparkLoop subscriber_uuid.
+    if (subscriberUuid) {
+      const webhookUrl = await getPublicationSetting(publicationId, 'sparkloop_webhook_url')
+      await fireMakeWebhook(
+        webhookUrl,
+        { subscriber_email: email, subscriber_id: subscriberUuid },
+        { publicationId }
+      )
+    } else {
+      console.log('[SparkLoop Subscribe] Skipping Make webhook: no subscriber_uuid available')
     }
 
     // Record A/B sparkloop_signup conversion only on actual SparkLoop success.
