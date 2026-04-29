@@ -71,7 +71,7 @@ describe('generateNewsletterHeader', () => {
       'Tomorrow: AI for accountants — what changed this week.'
     )
     expect(html).toContain('Tomorrow: AI for accountants')
-    expect(html).toContain('display:none')
+    expect(html).toContain('display:none;font-size:1px')
   })
 
   it('omits preheader div when preheaderText is empty/undefined', async () => {
@@ -153,12 +153,13 @@ describe('generateNewsletterFooter', () => {
   })
 
   it('includes current year in copyright', async () => {
+    const year = new Date().getFullYear()
     const html = await generateNewsletterFooter(
       '2026-04-29',
       'ml-1',
       'pub-1',
       makeBusinessSettings()
     )
-    expect(html).toContain(`©${new Date().getFullYear()}`)
+    expect(html).toContain(`©${year}`)
   })
 })
