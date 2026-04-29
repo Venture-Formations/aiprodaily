@@ -104,15 +104,20 @@ export function SubscribeForm({
       // Ignore storage errors
     }
 
-    // Fire-and-forget: map click_id to email for postback attribution
+    // Fire-and-forget: map click_id to email for postback attribution.
+    // Pass publicationId so the postback handler can resolve the correct tenant.
     fetch('/api/afteroffers/map-click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: subscribedEmail, click_id: clickId }),
+      body: JSON.stringify({
+        email: subscribedEmail,
+        click_id: clickId,
+        ...(publicationId ? { publication_id: publicationId } : {}),
+      }),
     }).catch(() => { /* non-critical */ })
 
     window.location.href = `/subscribe/offers?email=${encodeURIComponent(subscribedEmail)}&click_id=${encodeURIComponent(clickId)}`
-  }, [subscribedEmail])
+  }, [subscribedEmail, publicationId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

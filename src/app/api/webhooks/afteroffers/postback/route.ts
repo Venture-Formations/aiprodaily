@@ -43,19 +43,35 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
     )
   }
 
-  // If email missing, look up from click mapping table
-  if (!email && clickId) {
-    const { data: mapping } = await supabaseAdmin
-      .from('afteroffers_click_mappings')
-      .select('email')
-      .eq('publication_id', PUBLICATION_ID)
-      .eq('click_id', clickId)
-      .maybeSingle()
+  // Resolve the click mapping by click_id alone — the row carries the correct
+  // publication_id, which is the trust anchor for downstream tenant-scoped writes.
+  // If two rows match (theoretical UUID collision across publications), take the
+  // most recent one and warn.
+  let mappingPublicationId: string | undefined
+  const { data: mappings } = await supabaseAdmin
+    .from('afteroffers_click_mappings')
+    .select('publication_id, email, created_at')
+    .eq('click_id', clickId)
+    .order('created_at', { ascending: false })
+    .limit(2)
 
-    if (mapping?.email) {
-      email = mapping.email
+  if (mappings && mappings.length > 0) {
+    mappingPublicationId = mappings[0].publication_id as string
+    if (!email && mappings[0].email) {
+      email = mappings[0].email as string
       logger.info({ clickId }, 'Resolved email from click mapping')
     }
+    if (mappings.length > 1) {
+      logger.warn({ clickId }, 'Multiple click mappings matched — using most recent')
+    }
+  }
+
+  const effectivePublicationId = mappingPublicationId || PUBLICATION_ID
+  if (!mappingPublicationId) {
+    logger.warn(
+      { clickId, fallbackPublicationId: PUBLICATION_ID },
+      'No click mapping found — falling back to env default publication_id'
+    )
   }
 
   const eventType = eventParam && eventParam.trim() !== '' ? eventParam.trim().toLowerCase() : 'conversion'
@@ -92,7 +108,7 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
     .from('afteroffers_events')
     .upsert(
       {
-        publication_id: PUBLICATION_ID,
+        publication_id: effectivePublicationId,
         click_id: clickId,
         email,
         revenue,
@@ -122,7 +138,7 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
   if (email && eventType === 'conversion') {
     try {
       const { getEmailProviderSettings } = await import('@/lib/publication-settings')
-      const providerSettings = await getEmailProviderSettings(PUBLICATION_ID)
+      const providerSettings = await getEmailProviderSettings(effectivePublicationId)
 
       if (providerSettings.provider === 'beehiiv') {
         const { updateBeehiivSubscriberField } = await import('@/lib/beehiiv')
@@ -166,11 +182,11 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
     try {
       const { getPublicationSetting } = await import('@/lib/publication-settings')
       const { fireMakeWebhook } = await import('@/lib/sparkloop-client')
-      const webhookUrl = await getPublicationSetting(PUBLICATION_ID, 'sparkloop_webhook_url')
+      const webhookUrl = await getPublicationSetting(effectivePublicationId, 'sparkloop_webhook_url')
       await fireMakeWebhook(
         webhookUrl,
         { subscriber_email: email, subscriber_id: clickId },
-        { publicationId: PUBLICATION_ID }
+        { publicationId: effectivePublicationId }
       )
     } catch (whErr: unknown) {
       const errMsg = whErr instanceof Error ? whErr.message : 'Unknown error'
