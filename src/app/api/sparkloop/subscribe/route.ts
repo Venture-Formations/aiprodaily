@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
 import { cookies } from 'next/headers'
-import { createSparkLoopServiceForPublication, fireMakeWebhook } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication, fireMakeWebhook, claimMakeWebhookFire } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { PUBLICATION_ID } from '@/lib/config'
@@ -236,14 +236,25 @@ export const POST = withApiHandler(
 
     // Fire direct Make.com webhook (replaces the MailerLite-segment-triggered path).
     // Fires on the same trigger condition as the field flip — user-action subscribe
-    // intent — and only when we have the SparkLoop subscriber_uuid.
+    // intent — and only when we have the SparkLoop subscriber_uuid. Dedup'd so the
+    // same subscriber doesn't trigger Make twice across SparkLoop/AfterOffers.
     if (subscriberUuid) {
       const webhookUrl = await getPublicationSetting(publicationId, 'sparkloop_webhook_url')
-      await fireMakeWebhook(
-        webhookUrl,
-        { subscriber_email: email, subscriber_id: subscriberUuid },
-        { publicationId }
-      )
+      if (webhookUrl) {
+        const claimed = await claimMakeWebhookFire({
+          publicationId,
+          subscriberEmail: email,
+          source: 'sparkloop',
+          subscriberId: subscriberUuid,
+        })
+        if (claimed) {
+          await fireMakeWebhook(
+            webhookUrl,
+            { subscriber_email: email, subscriber_id: subscriberUuid },
+            { publicationId }
+          )
+        }
+      }
     } else {
       console.log('[SparkLoop Subscribe] Skipping Make webhook: no subscriber_uuid available')
     }

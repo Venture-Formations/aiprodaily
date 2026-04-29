@@ -181,13 +181,23 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
     // produce a SparkLoop UUID.
     try {
       const { getPublicationSetting } = await import('@/lib/publication-settings')
-      const { fireMakeWebhook } = await import('@/lib/sparkloop-client')
+      const { fireMakeWebhook, claimMakeWebhookFire } = await import('@/lib/sparkloop-client')
       const webhookUrl = await getPublicationSetting(effectivePublicationId, 'sparkloop_webhook_url')
-      await fireMakeWebhook(
-        webhookUrl,
-        { subscriber_email: email, subscriber_id: clickId },
-        { publicationId: effectivePublicationId }
-      )
+      if (webhookUrl) {
+        const claimed = await claimMakeWebhookFire({
+          publicationId: effectivePublicationId,
+          subscriberEmail: email,
+          source: 'afteroffers',
+          subscriberId: clickId,
+        })
+        if (claimed) {
+          await fireMakeWebhook(
+            webhookUrl,
+            { subscriber_email: email, subscriber_id: clickId },
+            { publicationId: effectivePublicationId }
+          )
+        }
+      }
     } catch (whErr: unknown) {
       const errMsg = whErr instanceof Error ? whErr.message : 'Unknown error'
       logger.error({ error: errMsg, clickId, maskedEmail: maskEmail(email) }, 'Make webhook error (non-fatal)')
