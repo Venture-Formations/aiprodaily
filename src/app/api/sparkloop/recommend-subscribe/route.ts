@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
-import { createSparkLoopServiceForPublication } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication, fireMakeWebhook } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { checkUserAgent } from '@/lib/bot-detection'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 import { PUBLICATION_ID } from '@/lib/config'
 import { MailerLiteService } from '@/lib/mailerlite'
-import { getEmailProviderSettings } from '@/lib/publication-settings'
+import { getEmailProviderSettings, getPublicationSetting } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 
 const inputSchema = z.object({
@@ -253,6 +253,18 @@ export const POST = withApiHandler(
       }
     } catch (providerError) {
       console.error('[SparkLoop Recommend Subscribe] Email provider update error:', providerError)
+    }
+
+    // Fire direct Make.com webhook (replaces the MailerLite-segment-triggered path).
+    if (subscriberUuid) {
+      const webhookUrl = await getPublicationSetting(publicationId, 'sparkloop_webhook_url')
+      await fireMakeWebhook(
+        webhookUrl,
+        { subscriber_email: email, subscriber_id: subscriberUuid },
+        { publicationId }
+      )
+    } else {
+      console.log('[SparkLoop Recommend Subscribe] Skipping Make webhook: no subscriber_uuid available')
     }
 
     return NextResponse.json({

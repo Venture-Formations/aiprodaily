@@ -7,6 +7,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
     upscribeId: '',
     webhookSecret: '',
     afteroffersFormId: '',
+    makeWebhookUrl: '',
   })
   const [hasApiKey, setHasApiKey] = useState(false)
   const [hasWebhookSecret, setHasWebhookSecret] = useState(false)
@@ -28,6 +29,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
           upscribeId: data.upscribeId || '',
           webhookSecret: '', // Never pre-fill secrets
           afteroffersFormId: data.afteroffersFormId || '',
+          makeWebhookUrl: data.makeWebhookUrl || '',
         })
         setHasApiKey(data.hasApiKey || false)
         setHasWebhookSecret(data.hasWebhookSecret || false)
@@ -158,10 +160,27 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
           </p>
         </div>
 
-        {/* Webhook URL (read-only) */}
+        {/* Make.com outbound webhook URL */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Webhook URL <span className="font-normal text-gray-400">(configure in SparkLoop)</span>
+            Make.com Subscribe Webhook URL <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="url"
+            value={settings.makeWebhookUrl}
+            onChange={(e) => setSettings({ ...settings, makeWebhookUrl: e.target.value })}
+            placeholder="https://hook.eu2.make.com/..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Fires on every SparkLoop subscribe with <code className="font-mono">{'{ subscriber_email, subscriber_id }'}</code>. Leave blank to disable. Replaces the MailerLite-segment-triggered Make scenario.
+          </p>
+        </div>
+
+        {/* Inbound Webhook URL from SparkLoop (read-only) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            SparkLoop Inbound Webhook URL <span className="font-normal text-gray-400">(configure in SparkLoop)</span>
           </label>
           <div className="flex items-center gap-2">
             <input
