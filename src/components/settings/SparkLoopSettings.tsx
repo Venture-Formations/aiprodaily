@@ -173,7 +173,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Fires on every SparkLoop subscribe with <code className="font-mono">{'{ subscriber_email, subscriber_id }'}</code>. Leave blank to disable. Replaces the MailerLite-segment-triggered Make scenario.
+            Fires on every SparkLoop subscribe and every AfterOffers conversion with <code className="font-mono">{'{ subscriber_email, subscriber_id }'}</code>. <code className="font-mono">subscriber_id</code> is the SparkLoop UUID (<code className="font-mono">sub_…</code>) for SparkLoop events and the AfterOffers <code className="font-mono">click_id</code> for AfterOffers events. Leave blank to disable. Replaces the MailerLite-segment-triggered Make scenario.
           </p>
         </div>
 

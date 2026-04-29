@@ -159,6 +159,23 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
       const errMsg = mlError instanceof Error ? mlError.message : 'Unknown error'
       logger.error({ error: errMsg, clickId, maskedEmail: maskEmail(email) }, 'Email provider afteroffers_conversion update error (non-fatal)')
     }
+
+    // Fire direct Make.com webhook (same setting as SparkLoop subscribes).
+    // Uses the AfterOffers click_id as subscriber_id since AfterOffers does not
+    // produce a SparkLoop UUID.
+    try {
+      const { getPublicationSetting } = await import('@/lib/publication-settings')
+      const { fireMakeWebhook } = await import('@/lib/sparkloop-client')
+      const webhookUrl = await getPublicationSetting(PUBLICATION_ID, 'sparkloop_webhook_url')
+      await fireMakeWebhook(
+        webhookUrl,
+        { subscriber_email: email, subscriber_id: clickId },
+        { publicationId: PUBLICATION_ID }
+      )
+    } catch (whErr: unknown) {
+      const errMsg = whErr instanceof Error ? whErr.message : 'Unknown error'
+      logger.error({ error: errMsg, clickId, maskedEmail: maskEmail(email) }, 'Make webhook error (non-fatal)')
+    }
   }
 
   return NextResponse.json({ success: true })
