@@ -7,9 +7,66 @@
  * flip still happens for other downstream consumers.
  */
 
+import { supabaseAdmin } from '@/lib/supabase'
+
 export interface MakeWebhookPayload {
   subscriber_email: string
   subscriber_id: string
+}
+
+export interface ClaimMakeWebhookFireArgs {
+  publicationId: string
+  subscriberEmail: string
+  source: 'sparkloop' | 'afteroffers'
+  subscriberId: string
+}
+
+/**
+ * Atomically claim the right to fire the Make webhook for this subscriber.
+ *
+ * Inserts a row into `make_webhook_fires` keyed on (publication_id, subscriber_email).
+ * Returns true on a fresh insert (caller should fire), false if a row already
+ * exists (caller should skip). Email is lowercased before insert/check so
+ * case variants don't bypass the dedup.
+ *
+ * Cross-source, per-publication: a subscriber who triggered via SparkLoop will
+ * not re-trigger via AfterOffers (and vice-versa) for the same publication.
+ *
+ * Returns false on DB error too — failing closed (skip the fire) is safer than
+ * failing open (potential duplicate). The error is logged.
+ */
+export async function claimMakeWebhookFire(
+  args: ClaimMakeWebhookFireArgs
+): Promise<boolean> {
+  const email = args.subscriberEmail.trim().toLowerCase()
+  if (!email) return false
+
+  const { data, error } = await supabaseAdmin
+    .from('make_webhook_fires')
+    .insert({
+      publication_id: args.publicationId,
+      subscriber_email: email,
+      source: args.source,
+      subscriber_id: args.subscriberId,
+    })
+    .select('id')
+    .maybeSingle()
+
+  if (error) {
+    // 23505 = unique violation: already fired for this (publication, email).
+    if ((error as { code?: string }).code === '23505') {
+      console.log(
+        `[MakeWebhook] Skipped: already fired for ${email} pub=${args.publicationId} (existing claim)`
+      )
+      return false
+    }
+    console.error(
+      `[MakeWebhook] Claim insert failed (failing closed): ${error.message} pub=${args.publicationId}`
+    )
+    return false
+  }
+
+  return !!data
 }
 
 export interface FireMakeWebhookOptions {
