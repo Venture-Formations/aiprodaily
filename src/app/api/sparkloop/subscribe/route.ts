@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
 import { cookies } from 'next/headers'
-import { createSparkLoopServiceForPublication, fireMakeWebhook, claimMakeWebhookFire } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication, triggerMakeWebhook } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { PUBLICATION_ID } from '@/lib/config'
-import { getEmailProviderSettings, getPublicationSetting } from '@/lib/publication-settings'
+import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 import {
   attributeByVisitor,
@@ -239,22 +239,12 @@ export const POST = withApiHandler(
     // intent — and only when we have the SparkLoop subscriber_uuid. Dedup'd so the
     // same subscriber doesn't trigger Make twice across SparkLoop/AfterOffers.
     if (subscriberUuid) {
-      const webhookUrl = await getPublicationSetting(publicationId, 'sparkloop_webhook_url')
-      if (webhookUrl) {
-        const claimed = await claimMakeWebhookFire({
-          publicationId,
-          subscriberEmail: email,
-          source: 'sparkloop',
-          subscriberId: subscriberUuid,
-        })
-        if (claimed) {
-          await fireMakeWebhook(
-            webhookUrl,
-            { subscriber_email: email, subscriber_id: subscriberUuid },
-            { publicationId }
-          )
-        }
-      }
+      await triggerMakeWebhook({
+        publicationId,
+        subscriberEmail: email,
+        source: 'sparkloop',
+        subscriberId: subscriberUuid,
+      })
     } else {
       console.log('[SparkLoop Subscribe] Skipping Make webhook: no subscriber_uuid available')
     }
