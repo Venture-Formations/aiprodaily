@@ -84,7 +84,7 @@ describe('generateWelcomeSection', () => {
   // NOTE: sections.ts:27-34 computes a `fullIntro` variable but never uses it —
   // the `intro` argument is silently dropped from rendered output. This test
   // characterizes that current (buggy) behavior so we'd notice if it changed.
-  // TODO: file follow-up issue to fix the dead code in generateWelcomeSection.
+  // TODO(#222): fix the dead code in generateWelcomeSection.
   it('renders greeting, tagline, and summary (intro arg currently unused — see source bug)', async () => {
     const html = await generateWelcomeSection(
       'Hello there',
