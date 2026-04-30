@@ -192,7 +192,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
             />
             <span className="text-sm">
               <span className="font-medium text-gray-700">
-                Only fire webhook after subscriber's first open
+                Only fire webhook after subscriber&apos;s first open
               </span>
               <span className="block text-xs text-gray-400 mt-0.5">
                 Beehiiv-provider publications only. When enabled, the Make webhook is delayed
