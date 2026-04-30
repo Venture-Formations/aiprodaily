@@ -194,6 +194,7 @@ async function processRow(args: {
     }
   }
 
+  // Active subscriber with no opens yet, or any unknown future Beehiiv status: keep polling.
   await recordPollAttempt(row.id, row.poll_attempts)
   return 'pending'
 }

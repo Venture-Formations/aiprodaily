@@ -3,6 +3,13 @@ import axios from 'axios'
 
 const BEEHIIV_API_BASE = 'https://api.beehiiv.com/v2'
 
+function beehiivHeaders(apiKey: string): Record<string, string> {
+  return {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  }
+}
+
 /**
  * Update a subscriber's custom field in Beehiiv.
  * Looks up subscriber by email, then updates via subscription ID.
@@ -15,10 +22,7 @@ export async function updateBeehiivSubscriberField(
   beehiivPublicationId: string,
   beehiivApiKey: string
 ): Promise<{ success: boolean; error?: string; rateLimited?: boolean }> {
-  const headers = {
-    'Authorization': `Bearer ${beehiivApiKey}`,
-    'Content-Type': 'application/json',
-  }
+  const headers = beehiivHeaders(beehiivApiKey)
 
   try {
     // Step 1: Look up subscriber by email
@@ -77,10 +81,7 @@ export async function getBeehiivSubscriberStats(
   beehiivApiKey: string
 ): Promise<BeehiivSubscriberStats> {
   const url = `${BEEHIIV_API_BASE}/publications/${beehiivPublicationId}/subscriptions/by_email/${encodeURIComponent(email)}?expand=stats`
-  const headers = {
-    'Authorization': `Bearer ${beehiivApiKey}`,
-    'Content-Type': 'application/json',
-  }
+  const headers = beehiivHeaders(beehiivApiKey)
 
   try {
     const resp = await axios.get(url, { headers })

@@ -34,11 +34,10 @@ export async function triggerMakeWebhook(
     return { claimed: false, fired: false, gated: false }
   }
 
-  const requireFirstOpen = await getPublicationSetting(
-    args.publicationId,
-    'make_webhook_require_first_open'
-  )
-  const providerSettings = await getEmailProviderSettings(args.publicationId)
+  const [requireFirstOpen, providerSettings] = await Promise.all([
+    getPublicationSetting(args.publicationId, 'make_webhook_require_first_open'),
+    getEmailProviderSettings(args.publicationId),
+  ])
   const settingOn = requireFirstOpen === 'true'
   const isBeehiiv = providerSettings.provider === 'beehiiv'
 
