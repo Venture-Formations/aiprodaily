@@ -4,19 +4,21 @@ const insertMock = vi.fn()
 const selectMock = vi.fn()
 const maybeSingleMock = vi.fn()
 
+const fromMock = vi.fn((_table: string) => ({
+  insert: (payload: unknown) => {
+    insertMock(payload)
+    return {
+      select: () => {
+        selectMock()
+        return { maybeSingle: maybeSingleMock }
+      },
+    }
+  },
+}))
+
 vi.mock('@/lib/supabase', () => ({
   supabaseAdmin: {
-    from: vi.fn(() => ({
-      insert: (payload: unknown) => {
-        insertMock(payload)
-        return {
-          select: () => {
-            selectMock()
-            return { maybeSingle: maybeSingleMock }
-          },
-        }
-      },
-    })),
+    from: (table: string) => fromMock(table),
   },
 }))
 
@@ -42,6 +44,7 @@ describe('claimMakeWebhookFire', () => {
     expect(inserted.status).toBe('fired')
     expect(typeof inserted.fired_at).toBe('string')
     expect(inserted.subscriber_email).toBe('user@example.com') // lowercased
+    expect(fromMock).toHaveBeenCalledWith('make_webhook_fires')
   })
 
   it('inserts row with status="pending" and fired_at=null when status="pending"', async () => {

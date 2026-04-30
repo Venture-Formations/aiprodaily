@@ -68,7 +68,7 @@ export async function claimMakeWebhookFire(
       return false
     }
     console.error(
-      `[MakeWebhook] Claim insert failed (failing closed): ${error.message} pub=${args.publicationId}`
+      `[MakeWebhook] Claim insert failed for ${email} (failing closed): ${error.message} pub=${args.publicationId}`
     )
     return false
   }
