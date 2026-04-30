@@ -19,6 +19,8 @@ vi.mock('@/lib/supabase', () => {
       limit: vi.fn(() => chain),
       single: vi.fn(() => Promise.resolve(result)),
       maybeSingle: vi.fn(() => Promise.resolve(result)),
+      // Make the chain itself awaitable for queries that don't end with .order()/.single().
+      // This is intentionally resolve-only — we don't need rejection paths in these tests.
       then: (resolve: any) => Promise.resolve(result).then(resolve),
     }
     return chain
@@ -65,6 +67,8 @@ import { buildIssueSnapshot } from '../build-snapshot'
 beforeEach(() => {
   // Reset all per-table data
   for (const k of Object.keys(tableData)) delete tableData[k]
+  // Reset selector mock call history (does NOT reset mock implementations)
+  vi.clearAllMocks()
 })
 
 describe('buildIssueSnapshot', () => {
