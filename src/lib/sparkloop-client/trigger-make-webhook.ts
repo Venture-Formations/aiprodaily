@@ -45,7 +45,7 @@ export async function triggerMakeWebhook(
   let gated = settingOn && isBeehiiv
   if (settingOn && !isBeehiiv) {
     console.warn(
-      `[MakeWebhook] make_webhook_require_first_open=true but provider=${providerSettings.provider} for pub=${args.publicationId}; gate is Beehiiv-only. Falling back to immediate fire.`
+      `[MakeWebhook] Misconfiguration: first-open gate enabled (make_webhook_require_first_open=true) but email_provider=${providerSettings.provider} for pub=${args.publicationId}; gate is Beehiiv-only. Falling back to immediate fire.`
     )
     gated = false
   }
