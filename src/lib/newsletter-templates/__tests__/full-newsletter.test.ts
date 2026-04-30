@@ -1,6 +1,6 @@
 // src/lib/newsletter-templates/__tests__/full-newsletter.test.ts
 import { describe, it, expect, vi } from 'vitest'
-import { makeSnapshot, makeBusinessSettings, makeIssue } from './_fixtures'
+import { makeSnapshot } from './_fixtures'
 
 vi.mock('@/lib/supabase', () => ({
   supabaseAdmin: {
@@ -21,11 +21,12 @@ import { renderNewsletterFromSnapshot } from '../full-newsletter'
 
 describe('renderNewsletterFromSnapshot', () => {
   it('composes a non-empty HTML document for an empty snapshot', async () => {
-    const html = await renderNewsletterFromSnapshot(makeSnapshot())
+    const snapshot = makeSnapshot()
+    const html = await renderNewsletterFromSnapshot(snapshot)
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('</html>')
-    // Header date must appear
-    expect(html).toContain('Wednesday, April 29, 2026')
+    // Header date must appear — derive from fixture, not a hardcoded string
+    expect(html).toContain(snapshot.formattedDate)
   })
 
   it('omits the review banner when isReview is false', async () => {
@@ -41,10 +42,12 @@ describe('renderNewsletterFromSnapshot', () => {
 
   it('returns header + footer only when sortedSections is empty', async () => {
     const html = await renderNewsletterFromSnapshot(makeSnapshot())
-    // No section content between header and footer — just whitespace/structure.
-    // Both must exist.
+    // Both header and footer must exist.
     expect(html).toContain('View Online')   // header
     expect(html).toContain('Unsubscribe')   // footer
+    // And no module/section content in between (the empty fixture has no articles, ads, etc.)
+    expect(html).not.toContain('Top Stories')      // default article module name from fixture
+    expect(html).not.toContain('Sponsor Title')    // default ad title from fixture
   })
 
   it('rejects with prefixed error when an internal generator throws', async () => {
