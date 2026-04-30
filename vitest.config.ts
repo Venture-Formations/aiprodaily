@@ -13,6 +13,9 @@ export default defineConfig({
       SUPABASE_ANON_KEY: 'test-anon-key',
       SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
       OPENAI_API_KEY: 'test-openai-key',
+      // Pin timezone and locale so date/time tests are reproducible across CI environments.
+      TZ: 'UTC',
+      LANG: 'en_US.UTF-8',
     },
   },
 })
