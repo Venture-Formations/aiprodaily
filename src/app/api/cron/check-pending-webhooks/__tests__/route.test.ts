@@ -116,7 +116,10 @@ describe('check-pending-webhooks cron', () => {
   })
 
   it('fires for opener, expires for unsubscribed, polls again for no-open', async () => {
-    const response = await GET(new Request('http://localhost/api/cron/check-pending-webhooks') as any)
+    const response = await GET(
+      new Request('http://localhost/api/cron/check-pending-webhooks') as any,
+      { params: Promise.resolve({}) }
+    )
     const body = await response.json()
 
     expect(body.success).toBe(true)
