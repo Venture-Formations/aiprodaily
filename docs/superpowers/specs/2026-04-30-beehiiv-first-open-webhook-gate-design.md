@@ -1,7 +1,7 @@
 # Beehiiv First-Open Make Webhook Gate — Design
 
 **Date:** 2026-04-30
-**Status:** Draft — pending implementation plan
+**Status:** Implemented (2026-04-30) — pending staging verification + production rollout
 **Scope:** Beehiiv-provider publications only (MailerLite/SendGrid deferred)
 
 ---
