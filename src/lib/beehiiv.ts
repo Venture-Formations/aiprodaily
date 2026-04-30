@@ -78,7 +78,7 @@ export async function getBeehiivSubscriberStats(
 ): Promise<BeehiivSubscriberStats> {
   const url = `${BEEHIIV_API_BASE}/publications/${beehiivPublicationId}/subscriptions/by_email/${encodeURIComponent(email)}?expand=stats`
   const headers = {
-    Authorization: `Bearer ${beehiivApiKey}`,
+    'Authorization': `Bearer ${beehiivApiKey}`,
     'Content-Type': 'application/json',
   }
 
