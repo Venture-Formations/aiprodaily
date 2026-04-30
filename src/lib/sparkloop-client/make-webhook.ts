@@ -156,3 +156,43 @@ export async function fireMakeWebhook(
     clearTimeout(timer)
   }
 }
+
+/**
+ * Transition a pending row to 'fired' and timestamp it. Idempotent — safe to
+ * call again if the prior call partially succeeded.
+ */
+export async function markMakeWebhookFired(rowId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('make_webhook_fires')
+    .update({ status: 'fired', fired_at: new Date().toISOString() })
+    .eq('id', rowId)
+  if (error) {
+    console.error(`[MakeWebhook] markFired failed id=${rowId}: ${error.message}`)
+  }
+}
+
+/**
+ * Transition a pending row to 'expired' with a reason tag.
+ */
+export async function markMakeWebhookExpired(rowId: string, reason: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('make_webhook_fires')
+    .update({ status: 'expired', expired_reason: reason })
+    .eq('id', rowId)
+  if (error) {
+    console.error(`[MakeWebhook] markExpired failed id=${rowId} reason=${reason}: ${error.message}`)
+  }
+}
+
+/**
+ * Bump last_polled_at + poll_attempts on a pending row that didn't change state.
+ */
+export async function recordPollAttempt(rowId: string, currentAttempts: number): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('make_webhook_fires')
+    .update({ last_polled_at: new Date().toISOString(), poll_attempts: currentAttempts + 1 })
+    .eq('id', rowId)
+  if (error) {
+    console.error(`[MakeWebhook] recordPollAttempt failed id=${rowId}: ${error.message}`)
+  }
+}

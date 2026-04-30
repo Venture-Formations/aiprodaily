@@ -6,7 +6,13 @@
  */
 
 export { SparkLoopService, createSparkLoopService, createSparkLoopServiceForPublication } from './sparkloop-client'
-export { fireMakeWebhook, claimMakeWebhookFire } from './make-webhook'
+export {
+  fireMakeWebhook,
+  claimMakeWebhookFire,
+  markMakeWebhookFired,
+  markMakeWebhookExpired,
+  recordPollAttempt,
+} from './make-webhook'
 export type { MakeWebhookPayload, FireMakeWebhookOptions, ClaimMakeWebhookFireArgs } from './make-webhook'
 export { triggerMakeWebhook } from './trigger-make-webhook'
 export type { TriggerMakeWebhookArgs, TriggerMakeWebhookResult } from './trigger-make-webhook'
