@@ -158,17 +158,21 @@ export async function fireMakeWebhook(
 }
 
 /**
- * Transition a pending row to 'fired' and timestamp it. Idempotent — safe to
- * call again if the prior call partially succeeded.
+ * Transition a pending row to 'fired' and timestamp it. Returns true on
+ * successful DB update, false on error (caller should NOT fire the webhook
+ * if false — the row remains 'pending' and will be retried by the next cron
+ * cycle, preserving at-most-once delivery semantics).
  */
-export async function markMakeWebhookFired(rowId: string): Promise<void> {
+export async function markMakeWebhookFired(rowId: string): Promise<boolean> {
   const { error } = await supabaseAdmin
     .from('make_webhook_fires')
     .update({ status: 'fired', fired_at: new Date().toISOString() })
     .eq('id', rowId)
   if (error) {
     console.error(`[MakeWebhook] markFired failed id=${rowId}: ${error.message}`)
+    return false
   }
+  return true
 }
 
 /**

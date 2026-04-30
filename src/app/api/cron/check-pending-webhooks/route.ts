@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
+import type { Logger } from '@/lib/logger'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 import { getBeehiivSubscriberStats } from '@/lib/beehiiv'
@@ -59,7 +60,7 @@ const handler = withApiHandler(
   }
 )
 
-async function processPublication(pubId: string, logger: any): Promise<PerPubSummary | null> {
+async function processPublication(pubId: string, logger: Logger): Promise<PerPubSummary | null> {
   const requireFirstOpen = await getPublicationSetting(pubId, 'make_webhook_require_first_open')
   if (requireFirstOpen !== 'true') return null
 
@@ -167,7 +168,12 @@ async function processRow(args: {
 
   const opens = stats.uniqueOpens || 0
   if (opens > 0) {
-    await markMakeWebhookFired(row.id)
+    const marked = await markMakeWebhookFired(row.id)
+    if (!marked) {
+      // DB update failed; do NOT fire — row stays pending and will be
+      // retried next hour. Preserves at-most-once delivery.
+      return 'skipped'
+    }
     await fireMakeWebhook(
       webhookUrl,
       { subscriber_email: row.subscriber_email, subscriber_id: row.subscriber_id },
