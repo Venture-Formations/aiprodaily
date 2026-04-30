@@ -90,17 +90,30 @@ export async function getBeehiivSubscriberStats(
       return { found: false }
     }
     const stats = data.stats || {}
+    // Beehiiv's per-subscriber stats endpoint uses total_unique_opened / total_received.
+    // Older field names (unique_opens, opens, emails_received) are kept as fallbacks for
+    // resilience to API variation, but production responses use the total_* names.
     const uniqueOpens =
-      typeof stats.unique_opens === 'number'
+      typeof stats.total_unique_opened === 'number'
+        ? stats.total_unique_opened
+        : typeof stats.unique_opens === 'number'
         ? stats.unique_opens
         : typeof stats.opens === 'number'
         ? stats.opens
+        : 0
+    const emailsReceived =
+      typeof stats.total_received === 'number'
+        ? stats.total_received
+        : typeof stats.total_sent === 'number'
+        ? stats.total_sent
+        : typeof stats.emails_received === 'number'
+        ? stats.emails_received
         : 0
     return {
       found: true,
       status: typeof data.status === 'string' ? data.status : undefined,
       uniqueOpens,
-      emailsReceived: typeof stats.emails_received === 'number' ? stats.emails_received : 0,
+      emailsReceived,
       subscriptionId: typeof data.id === 'string' ? data.id : undefined,
     }
   } catch (error: any) {
