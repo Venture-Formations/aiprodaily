@@ -19,27 +19,33 @@ export interface ClaimMakeWebhookFireArgs {
   subscriberEmail: string
   source: 'sparkloop' | 'afteroffers'
   subscriberId: string
+  /** Initial lifecycle state. Defaults to 'fired' (legacy immediate-fire flow). */
+  status?: 'pending' | 'fired'
 }
 
 /**
  * Atomically claim the right to fire the Make webhook for this subscriber.
  *
+ * When status === 'fired' (default), this matches the legacy semantics: the
+ * caller intends to fire the webhook immediately after a successful claim.
+ * When status === 'pending', the row is reserved for the check-pending-webhooks
+ * cron to transition once a first open is detected.
+ *
  * Inserts a row into `make_webhook_fires` keyed on (publication_id, subscriber_email).
- * Returns true on a fresh insert (caller should fire), false if a row already
- * exists (caller should skip). Email is lowercased before insert/check so
- * case variants don't bypass the dedup.
+ * Returns true on a fresh insert (caller should fire / wait for cron). Returns
+ * false if a row already exists for this subscriber (existing claim) or on any
+ * other DB error (failing closed — safer to skip than risk a duplicate).
  *
- * Cross-source, per-publication: a subscriber who triggered via SparkLoop will
- * not re-trigger via AfterOffers (and vice-versa) for the same publication.
- *
- * Returns false on DB error too — failing closed (skip the fire) is safer than
- * failing open (potential duplicate). The error is logged.
+ * Email is lowercased before insert/check so case variants don't bypass dedup.
  */
 export async function claimMakeWebhookFire(
   args: ClaimMakeWebhookFireArgs
 ): Promise<boolean> {
   const email = args.subscriberEmail.trim().toLowerCase()
   if (!email) return false
+
+  const status = args.status ?? 'fired'
+  const now = new Date().toISOString()
 
   const { data, error } = await supabaseAdmin
     .from('make_webhook_fires')
@@ -48,15 +54,16 @@ export async function claimMakeWebhookFire(
       subscriber_email: email,
       source: args.source,
       subscriber_id: args.subscriberId,
+      status,
+      fired_at: status === 'fired' ? now : null,
     })
     .select('id')
     .maybeSingle()
 
   if (error) {
-    // 23505 = unique violation: already fired for this (publication, email).
     if ((error as { code?: string }).code === '23505') {
       console.log(
-        `[MakeWebhook] Skipped: already fired for ${email} pub=${args.publicationId} (existing claim)`
+        `[MakeWebhook] Skipped: already claimed for ${email} pub=${args.publicationId} (existing row)`
       )
       return false
     }
