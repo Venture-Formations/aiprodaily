@@ -84,7 +84,7 @@ export async function getBeehiivSubscriberStats(
   const headers = beehiivHeaders(beehiivApiKey)
 
   try {
-    const resp = await axios.get(url, { headers })
+    const resp = await axios.get(url, { headers, timeout: 5000 })
     const data = resp.data?.data
     if (!data) {
       return { found: false }

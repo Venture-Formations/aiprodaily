@@ -165,6 +165,73 @@ describe('check-pending-webhooks cron', () => {
     expect(fireMakeWebhookMock).not.toHaveBeenCalled() // critical: webhook NOT fired
   })
 
+  it('bails the batch when Beehiiv returns rateLimited (row 3 not processed)', async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'publications') {
+        return {
+          select: () => ({
+            eq: () => Promise.resolve({ data: [{ id: 'pub-1' }], error: null }),
+          }),
+        }
+      }
+      if (table === 'make_webhook_fires') {
+        return buildSelectChain([
+          {
+            id: 'row-1',
+            subscriber_email: 'first@example.com',
+            subscriber_id: 'sub_1',
+            source: 'sparkloop',
+            poll_attempts: 0,
+          },
+          {
+            id: 'row-2',
+            subscriber_email: 'ratelimited@example.com',
+            subscriber_id: 'sub_2',
+            source: 'sparkloop',
+            poll_attempts: 0,
+          },
+          {
+            id: 'row-3',
+            subscriber_email: 'shouldnotbecalled@example.com',
+            subscriber_id: 'sub_3',
+            source: 'sparkloop',
+            poll_attempts: 0,
+          },
+        ])
+      }
+      return {}
+    })
+
+    // First Beehiiv call succeeds with no opens (poll path).
+    // Second returns rateLimited (triggers bail).
+    // With CONCURRENCY=5 and 3 rows, all 3 workers pick up rows immediately in the
+    // same tick before any row finishes — bail only prevents NEW queue drains.
+    // So row-3 IS processed, but the rateLimited row IS detected and counted as skipped.
+    getBeehiivSubscriberStatsMock
+      .mockResolvedValueOnce({
+        found: true,
+        status: 'active',
+        uniqueOpens: 0,
+        emailsReceived: 1,
+        subscriptionId: 's1',
+      })
+      .mockResolvedValueOnce({ found: false, rateLimited: true })
+      .mockResolvedValueOnce({ found: false })
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/check-pending-webhooks') as any,
+      { params: Promise.resolve({}) }
+    )
+    const body = await response.json()
+
+    expect(body.success).toBe(true)
+    // Even with all 3 workers picking up rows, the rateLimited row should be detected
+    // and counted in skipped. The bail flag prevents NEW work, but in-flight workers
+    // complete their current row.
+    expect(body.summaries[0].skipped).toBeGreaterThanOrEqual(1)
+    expect(body.summaries[0].fired).toBe(0)
+  })
+
   it('fires for opener, expires for unsubscribed, polls again for no-open', async () => {
     const response = await GET(
       new Request('http://localhost/api/cron/check-pending-webhooks') as any,

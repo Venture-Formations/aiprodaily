@@ -272,12 +272,17 @@ export const GET = withApiHandler(
     // Fire direct Make.com webhook (replaces the MailerLite-segment-triggered path).
     // Dedup'd so the same subscriber doesn't trigger Make twice.
     if (subscriberUuid) {
-      await triggerMakeWebhook({
-        publicationId,
-        subscriberEmail: email,
-        source: 'sparkloop',
-        subscriberId: subscriberUuid,
-      })
+      try {
+        await triggerMakeWebhook({
+          publicationId,
+          subscriberEmail: email,
+          source: 'sparkloop',
+          subscriberId: subscriberUuid,
+        })
+      } catch (whErr: unknown) {
+        const errMsg = whErr instanceof Error ? whErr.message : 'Unknown error'
+        console.error(`[SparkLoop Module Subscribe] Make webhook error (non-fatal): ${errMsg}`)
+      }
     } else {
       console.log('[SparkLoop Module Subscribe] Skipping Make webhook: no subscriber_uuid available')
     }

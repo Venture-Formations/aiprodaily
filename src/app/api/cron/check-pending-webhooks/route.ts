@@ -130,6 +130,7 @@ async function processPublication(pubId: string, logger: Logger): Promise<PerPub
       fired: summary.fired,
       expired: summary.expired,
       skipped: summary.skipped,
+      rateLimited: bail,
       durationMs: summary.durationMs,
     },
     '[CheckPendingWebhooks] Per-publication summary'
@@ -150,12 +151,12 @@ async function processRow(args: {
   const stats = await getBeehiivSubscriberStats(row.subscriber_email, beehiivPubId, beehiivApiKey)
 
   if (stats.rateLimited) {
-    await recordPollAttempt(row.id, row.poll_attempts)
+    // Don't increment poll_attempts — rate limit is transient, not the subscriber's fault.
     return 'rate_limited'
   }
   if (!stats.found) {
     if (stats.error) {
-      await recordPollAttempt(row.id, row.poll_attempts)
+      // Transient API error (5xx, network). Skip without consuming a poll attempt.
       return 'skipped'
     }
     if (row.poll_attempts + 1 >= POLL_ATTEMPTS_EXPIRE_THRESHOLD) {

@@ -239,12 +239,17 @@ export const POST = withApiHandler(
     // intent — and only when we have the SparkLoop subscriber_uuid. Dedup'd so the
     // same subscriber doesn't trigger Make twice across SparkLoop/AfterOffers.
     if (subscriberUuid) {
-      await triggerMakeWebhook({
-        publicationId,
-        subscriberEmail: email,
-        source: 'sparkloop',
-        subscriberId: subscriberUuid,
-      })
+      try {
+        await triggerMakeWebhook({
+          publicationId,
+          subscriberEmail: email,
+          source: 'sparkloop',
+          subscriberId: subscriberUuid,
+        })
+      } catch (whErr: unknown) {
+        const errMsg = whErr instanceof Error ? whErr.message : 'Unknown error'
+        console.error(`[SparkLoop Subscribe] Make webhook error (non-fatal): ${errMsg}`)
+      }
     } else {
       console.log('[SparkLoop Subscribe] Skipping Make webhook: no subscriber_uuid available')
     }
