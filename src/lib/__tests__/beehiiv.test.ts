@@ -10,7 +10,42 @@ describe('getBeehiivSubscriberStats', () => {
     vi.clearAllMocks()
   })
 
-  it('returns parsed stats for an active subscriber with opens', async () => {
+  it('returns parsed stats using actual Beehiiv field names (total_unique_opened, total_received)', async () => {
+    // Mirrors a real production response shape (verified against Beehiiv API 2026-04-30).
+    mockedAxios.get = vi.fn().mockResolvedValue({
+      status: 200,
+      data: {
+        data: {
+          id: 'sub_abc123',
+          status: 'active',
+          stats: {
+            total_sent: 6,
+            total_received: 6,
+            total_unique_opened: 5,
+            total_clicked: 3,
+            total_unique_clicked: 2,
+            open_rate: 83.33,
+            click_rate: 40.0,
+          },
+        },
+      },
+    })
+
+    const result = await getBeehiivSubscriberStats('user@example.com', 'pub_xyz', 'key123')
+
+    expect(result.found).toBe(true)
+    expect(result.status).toBe('active')
+    expect(result.uniqueOpens).toBe(5)
+    expect(result.emailsReceived).toBe(6)
+    expect(result.subscriptionId).toBe('sub_abc123')
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      'https://api.beehiiv.com/v2/publications/pub_xyz/subscriptions/by_email/user%40example.com?expand=stats',
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer key123' }) }),
+    )
+  })
+
+  it('falls back to legacy unique_opens / emails_received field names', async () => {
+    // Defensive: if Beehiiv ever returns the older field names we used to assume.
     mockedAxios.get = vi.fn().mockResolvedValue({
       status: 200,
       data: {
@@ -27,15 +62,8 @@ describe('getBeehiivSubscriberStats', () => {
 
     const result = await getBeehiivSubscriberStats('user@example.com', 'pub_xyz', 'key123')
 
-    expect(result.found).toBe(true)
-    expect(result.status).toBe('active')
     expect(result.uniqueOpens).toBe(4)
     expect(result.emailsReceived).toBe(10)
-    expect(result.subscriptionId).toBe('sub_abc123')
-    expect(mockedAxios.get).toHaveBeenCalledWith(
-      'https://api.beehiiv.com/v2/publications/pub_xyz/subscriptions/by_email/user%40example.com?expand=stats',
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer key123' }) }),
-    )
   })
 
   it('returns found=false on 404', async () => {
