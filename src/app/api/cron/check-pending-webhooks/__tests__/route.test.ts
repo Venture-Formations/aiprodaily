@@ -115,6 +115,56 @@ describe('check-pending-webhooks cron', () => {
     fireMakeWebhookMock.mockResolvedValue(true)
   })
 
+  it('skips webhook fire when markFired returns false (at-most-once safety)', async () => {
+    // Reconfigure: only one row to process, an opener
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'publications') {
+        return {
+          select: () => ({
+            eq: () => Promise.resolve({ data: [{ id: 'pub-1' }], error: null }),
+          }),
+        }
+      }
+      if (table === 'make_webhook_fires') {
+        return buildSelectChain([
+          {
+            id: 'row-opener',
+            subscriber_email: 'opener@example.com',
+            subscriber_id: 'sub_1',
+            source: 'sparkloop',
+            poll_attempts: 0,
+          },
+        ])
+      }
+      return {}
+    })
+
+    // Beehiiv reports opens, so without the safety check we'd fire
+    getBeehiivSubscriberStatsMock.mockResolvedValueOnce({
+      found: true,
+      status: 'active',
+      uniqueOpens: 1,
+      emailsReceived: 1,
+      subscriptionId: 's1',
+    })
+
+    // Simulate the DB mark failing (row already taken / deleted / DB error)
+    markFiredMock.mockResolvedValueOnce(false)
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/check-pending-webhooks') as any,
+      { params: Promise.resolve({}) }
+    )
+    const body = await response.json()
+
+    expect(body.success).toBe(true)
+    expect(body.summaries[0].fired).toBe(0) // NOT counted as fired
+    expect(body.summaries[0].skipped).toBe(1) // counted as skipped instead
+
+    expect(markFiredMock).toHaveBeenCalledWith('row-opener')
+    expect(fireMakeWebhookMock).not.toHaveBeenCalled() // critical: webhook NOT fired
+  })
+
   it('fires for opener, expires for unsubscribed, polls again for no-open', async () => {
     const response = await GET(
       new Request('http://localhost/api/cron/check-pending-webhooks') as any,

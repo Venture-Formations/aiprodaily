@@ -164,12 +164,22 @@ export async function fireMakeWebhook(
  * cycle, preserving at-most-once delivery semantics).
  */
 export async function markMakeWebhookFired(rowId: string): Promise<boolean> {
-  const { error } = await supabaseAdmin
+  // Guarded update: only transitions if the row is still 'pending'. Combined
+  // with .select('id'), this lets us detect the row-was-already-claimed case
+  // (concurrent processor, manual mutation, deletion) so the caller knows
+  // not to fire the webhook. Preserves at-most-once delivery.
+  const { data, error } = await supabaseAdmin
     .from('make_webhook_fires')
     .update({ status: 'fired', fired_at: new Date().toISOString() })
     .eq('id', rowId)
+    .eq('status', 'pending')
+    .select('id')
   if (error) {
     console.error(`[MakeWebhook] markFired failed id=${rowId}: ${error.message}`)
+    return false
+  }
+  if (!data || data.length === 0) {
+    console.warn(`[MakeWebhook] markFired affected 0 rows id=${rowId} (already fired/expired/deleted)`)
     return false
   }
   return true
