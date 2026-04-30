@@ -18,11 +18,12 @@ export const GET = withApiHandler(
       return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
     }
 
-    const [upscribeId, webhookSecret, afteroffersFormId, makeWebhookUrl] = await Promise.all([
+    const [upscribeId, webhookSecret, afteroffersFormId, makeWebhookUrl, requireFirstOpen] = await Promise.all([
       getPublicationSetting(publicationId, 'sparkloop_upscribe_id'),
       getPublicationSetting(publicationId, 'sparkloop_webhook_secret'),
       getPublicationSetting(publicationId, 'afteroffers_form_id'),
       getPublicationSetting(publicationId, 'sparkloop_webhook_url'),
+      getPublicationSetting(publicationId, 'make_webhook_require_first_open'),
     ])
 
     return NextResponse.json({
@@ -32,6 +33,7 @@ export const GET = withApiHandler(
       hasWebhookSecret: !!webhookSecret,
       afteroffersFormId: afteroffersFormId || '',
       makeWebhookUrl: makeWebhookUrl || '',
+      makeWebhookRequireFirstOpen: requireFirstOpen === 'true',
     })
   }
 )
@@ -84,6 +86,17 @@ export const POST = withApiHandler(
       const { error } = await updatePublicationSetting(publicationId, 'sparkloop_webhook_url', trimmed)
       if (error) throw new Error(`Failed to save Make webhook URL: ${error}`)
       results.push('Make webhook URL updated')
+    }
+
+    if (body.makeWebhookRequireFirstOpen !== undefined) {
+      const value = body.makeWebhookRequireFirstOpen ? 'true' : 'false'
+      const { error } = await updatePublicationSetting(
+        publicationId,
+        'make_webhook_require_first_open',
+        value
+      )
+      if (error) throw new Error(`Failed to save first-open gate: ${error}`)
+      results.push('First-open gate updated')
     }
 
     return NextResponse.json({

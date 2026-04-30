@@ -8,6 +8,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
     webhookSecret: '',
     afteroffersFormId: '',
     makeWebhookUrl: '',
+    makeWebhookRequireFirstOpen: false,
   })
   const [hasApiKey, setHasApiKey] = useState(false)
   const [hasWebhookSecret, setHasWebhookSecret] = useState(false)
@@ -30,6 +31,7 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
           webhookSecret: '', // Never pre-fill secrets
           afteroffersFormId: data.afteroffersFormId || '',
           makeWebhookUrl: data.makeWebhookUrl || '',
+          makeWebhookRequireFirstOpen: !!data.makeWebhookRequireFirstOpen,
         })
         setHasApiKey(data.hasApiKey || false)
         setHasWebhookSecret(data.hasWebhookSecret || false)
@@ -175,6 +177,31 @@ export default function SparkLoopSettings({ publicationId }: { publicationId: st
           <p className="text-xs text-gray-400 mt-1">
             Fires on every SparkLoop subscribe and every AfterOffers conversion with <code className="font-mono">{'{ subscriber_email, subscriber_id }'}</code>. <code className="font-mono">subscriber_id</code> is the SparkLoop UUID (<code className="font-mono">sub_…</code>) for SparkLoop events and the AfterOffers <code className="font-mono">click_id</code> for AfterOffers events. Leave blank to disable. Replaces the MailerLite-segment-triggered Make scenario.
           </p>
+        </div>
+
+        {/* First-open gate toggle (Beehiiv only) */}
+        <div>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.makeWebhookRequireFirstOpen}
+              onChange={(e) =>
+                setSettings({ ...settings, makeWebhookRequireFirstOpen: e.target.checked })
+              }
+              className="mt-1"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-gray-700">
+                Only fire webhook after subscriber&apos;s first open
+              </span>
+              <span className="block text-xs text-gray-400 mt-0.5">
+                Beehiiv-provider publications only. When enabled, the Make webhook is delayed
+                until the subscriber has opened at least one email. An hourly cron polls Beehiiv
+                and fires the webhook once a first open is observed. Has no effect on
+                MailerLite/SendGrid publications.
+              </span>
+            </span>
+          </label>
         </div>
 
         {/* Inbound Webhook URL from SparkLoop (read-only) */}

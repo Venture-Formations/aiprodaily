@@ -19,27 +19,33 @@ export interface ClaimMakeWebhookFireArgs {
   subscriberEmail: string
   source: 'sparkloop' | 'afteroffers'
   subscriberId: string
+  /** Initial lifecycle state. Defaults to 'fired' (legacy immediate-fire flow). */
+  status?: 'pending' | 'fired'
 }
 
 /**
  * Atomically claim the right to fire the Make webhook for this subscriber.
  *
+ * When status === 'fired' (default), this matches the legacy semantics: the
+ * caller intends to fire the webhook immediately after a successful claim.
+ * When status === 'pending', the row is reserved for the check-pending-webhooks
+ * cron to transition once a first open is detected.
+ *
  * Inserts a row into `make_webhook_fires` keyed on (publication_id, subscriber_email).
- * Returns true on a fresh insert (caller should fire), false if a row already
- * exists (caller should skip). Email is lowercased before insert/check so
- * case variants don't bypass the dedup.
+ * Returns true on a fresh insert (caller should fire / wait for cron). Returns
+ * false if a row already exists for this subscriber (existing claim) or on any
+ * other DB error (failing closed — safer to skip than risk a duplicate).
  *
- * Cross-source, per-publication: a subscriber who triggered via SparkLoop will
- * not re-trigger via AfterOffers (and vice-versa) for the same publication.
- *
- * Returns false on DB error too — failing closed (skip the fire) is safer than
- * failing open (potential duplicate). The error is logged.
+ * Email is lowercased before insert/check so case variants don't bypass dedup.
  */
 export async function claimMakeWebhookFire(
   args: ClaimMakeWebhookFireArgs
 ): Promise<boolean> {
   const email = args.subscriberEmail.trim().toLowerCase()
   if (!email) return false
+
+  const status = args.status ?? 'fired'
+  const now = new Date().toISOString()
 
   const { data, error } = await supabaseAdmin
     .from('make_webhook_fires')
@@ -48,20 +54,21 @@ export async function claimMakeWebhookFire(
       subscriber_email: email,
       source: args.source,
       subscriber_id: args.subscriberId,
+      status,
+      fired_at: status === 'fired' ? now : null,
     })
     .select('id')
     .maybeSingle()
 
   if (error) {
-    // 23505 = unique violation: already fired for this (publication, email).
     if ((error as { code?: string }).code === '23505') {
       console.log(
-        `[MakeWebhook] Skipped: already fired for ${email} pub=${args.publicationId} (existing claim)`
+        `[MakeWebhook] Skipped: already claimed for ${email} pub=${args.publicationId} (existing row)`
       )
       return false
     }
     console.error(
-      `[MakeWebhook] Claim insert failed (failing closed): ${error.message} pub=${args.publicationId}`
+      `[MakeWebhook] Claim insert failed for ${email} (failing closed): ${error.message} pub=${args.publicationId}`
     )
     return false
   }
@@ -147,5 +154,59 @@ export async function fireMakeWebhook(
     return false
   } finally {
     clearTimeout(timer)
+  }
+}
+
+/**
+ * Transition a pending row to 'fired' and timestamp it. Returns true on
+ * successful DB update, false on error (caller should NOT fire the webhook
+ * if false — the row remains 'pending' and will be retried by the next cron
+ * cycle, preserving at-most-once delivery semantics).
+ */
+export async function markMakeWebhookFired(rowId: string): Promise<boolean> {
+  // Guarded update: only transitions if the row is still 'pending'. Combined
+  // with .select('id'), this lets us detect the row-was-already-claimed case
+  // (concurrent processor, manual mutation, deletion) so the caller knows
+  // not to fire the webhook. Preserves at-most-once delivery.
+  const { data, error } = await supabaseAdmin
+    .from('make_webhook_fires')
+    .update({ status: 'fired', fired_at: new Date().toISOString() })
+    .eq('id', rowId)
+    .eq('status', 'pending')
+    .select('id')
+  if (error) {
+    console.error(`[MakeWebhook] markFired failed id=${rowId}: ${error.message}`)
+    return false
+  }
+  if (!data || data.length === 0) {
+    console.warn(`[MakeWebhook] markFired affected 0 rows id=${rowId} (already fired/expired/deleted)`)
+    return false
+  }
+  return true
+}
+
+/**
+ * Transition a pending row to 'expired' with a reason tag.
+ */
+export async function markMakeWebhookExpired(rowId: string, reason: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('make_webhook_fires')
+    .update({ status: 'expired', expired_reason: reason })
+    .eq('id', rowId)
+  if (error) {
+    console.error(`[MakeWebhook] markExpired failed id=${rowId} reason=${reason}: ${error.message}`)
+  }
+}
+
+/**
+ * Bump last_polled_at + poll_attempts on a pending row that didn't change state.
+ */
+export async function recordPollAttempt(rowId: string, currentAttempts: number): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('make_webhook_fires')
+    .update({ last_polled_at: new Date().toISOString(), poll_attempts: currentAttempts + 1 })
+    .eq('id', rowId)
+  if (error) {
+    console.error(`[MakeWebhook] recordPollAttempt failed id=${rowId}: ${error.message}`)
   }
 }

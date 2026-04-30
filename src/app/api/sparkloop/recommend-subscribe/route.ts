@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
-import { createSparkLoopServiceForPublication, fireMakeWebhook, claimMakeWebhookFire } from '@/lib/sparkloop-client'
+import { createSparkLoopServiceForPublication, triggerMakeWebhook } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { checkUserAgent } from '@/lib/bot-detection'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 import { PUBLICATION_ID } from '@/lib/config'
 import { MailerLiteService } from '@/lib/mailerlite'
-import { getEmailProviderSettings, getPublicationSetting } from '@/lib/publication-settings'
+import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 
 const inputSchema = z.object({
@@ -258,21 +258,16 @@ export const POST = withApiHandler(
     // Fire direct Make.com webhook (replaces the MailerLite-segment-triggered path).
     // Dedup'd so the same subscriber doesn't trigger Make twice.
     if (subscriberUuid) {
-      const webhookUrl = await getPublicationSetting(publicationId, 'sparkloop_webhook_url')
-      if (webhookUrl) {
-        const claimed = await claimMakeWebhookFire({
+      try {
+        await triggerMakeWebhook({
           publicationId,
           subscriberEmail: email,
           source: 'sparkloop',
           subscriberId: subscriberUuid,
         })
-        if (claimed) {
-          await fireMakeWebhook(
-            webhookUrl,
-            { subscriber_email: email, subscriber_id: subscriberUuid },
-            { publicationId }
-          )
-        }
+      } catch (whErr: unknown) {
+        const errMsg = whErr instanceof Error ? whErr.message : 'Unknown error'
+        console.error(`[SparkLoop Recommend Subscribe] Make webhook error (non-fatal): ${errMsg}`)
       }
     } else {
       console.log('[SparkLoop Recommend Subscribe] Skipping Make webhook: no subscriber_uuid available')
