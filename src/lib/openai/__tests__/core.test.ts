@@ -3,21 +3,29 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 type SupaResponse = { data: any; error: any }
 const supabase = vi.hoisted(() => ({
   responseQueue: [] as SupaResponse[],
+  // Records every (table, [eq calls]) pair in the order from() was invoked.
+  // Tests assert against this for tenant-filter and fallback-order regressions.
+  fromCalls: [] as Array<{ table: string; eqCalls: Array<[string, any]> }>,
 }))
 
-function makeSupaChain(response: SupaResponse): any {
+function makeSupaChain(response: SupaResponse, eqCalls: Array<[string, any]>): any {
   const chain: any = {}
   chain.select = vi.fn(() => chain)
-  chain.eq = vi.fn(() => chain)
+  chain.eq = vi.fn((col: string, val: any) => {
+    eqCalls.push([col, val])
+    return chain
+  })
   chain.single = vi.fn(() => Promise.resolve(response))
   return chain
 }
 
 vi.mock('@/lib/supabase', () => ({
   supabaseAdmin: {
-    from: vi.fn(() => {
+    from: vi.fn((table: string) => {
       const response = supabase.responseQueue.shift() ?? { data: null, error: null }
-      return makeSupaChain(response)
+      const eqCalls: Array<[string, any]> = []
+      supabase.fromCalls.push({ table, eqCalls })
+      return makeSupaChain(response, eqCalls)
     }),
   },
 }))
@@ -57,11 +65,16 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
 
   supabase.responseQueue.length = 0
+  supabase.fromCalls.length = 0
   mockOpenAI.responses.create.mockReset()
   mockAnthropic.messages.create.mockReset()
 })
 
 afterEach(() => {
+  // If queue still has entries, the SUT made fewer from() calls than the test
+  // queued — likely a future SUT change that needs updated mock setup. Catches
+  // silent drift early instead of hiding it behind the null/null fallback.
+  expect(supabase.responseQueue).toHaveLength(0)
   vi.restoreAllMocks()
 })
 
@@ -72,6 +85,9 @@ describe('getPrompt', () => {
     const result = await getPrompt('my_key', 'fallback', 'pub-1')
 
     expect(result).toBe('pub-specific-prompt')
+    // Tenant-filter regression guard: query must be scoped to publication_id.
+    expect(supabase.fromCalls[0]?.table).toBe('publication_settings')
+    expect(supabase.fromCalls[0]?.eqCalls).toContainEqual(['publication_id', 'pub-1'])
   })
 
   it('falls back to app_settings when publication_settings has no row', async () => {
@@ -81,6 +97,8 @@ describe('getPrompt', () => {
     const result = await getPrompt('my_key', 'fallback', 'pub-1')
 
     expect(result).toBe('app-default-prompt')
+    // Fallback-order regression guard: publication_settings tried FIRST, then app_settings.
+    expect(supabase.fromCalls.map(c => c.table)).toEqual(['publication_settings', 'app_settings'])
   })
 
   it('returns the provided fallback when both publication_settings and app_settings miss', async () => {
@@ -106,6 +124,9 @@ describe('getPromptJSON', () => {
     expect(result.model).toBe('gpt-4o')
     expect(result.messages).toEqual([{ role: 'user', content: 'hi' }])
     expect(result._provider).toBe('openai')
+    // Tenant-filter regression guard.
+    expect(supabase.fromCalls[0]?.table).toBe('publication_settings')
+    expect(supabase.fromCalls[0]?.eqCalls).toContainEqual(['publication_id', 'pub-1'])
   })
 
   it('falls back to app_settings when publication_settings is empty', async () => {
@@ -138,11 +159,13 @@ describe('getPromptJSON', () => {
     )
   })
 
-  it('auto-detects Claude provider from a Claude model name', async () => {
-    const stored = {
+  it('auto-detects Claude provider from a Claude model name (string-stored prompt)', async () => {
+    // Stored as a JSON string to exercise the string-parsing branch
+    // (object-stored hits the JSONB-already-parsed branch in core.ts:124).
+    const stored = JSON.stringify({
       model: 'claude-3-5-sonnet-20241022',
       messages: [{ role: 'user', content: 'hi' }],
-    }
+    })
     supabase.responseQueue.push({ data: { value: stored }, error: null })
 
     const result = await getPromptJSON('my_key', 'pub-1')
