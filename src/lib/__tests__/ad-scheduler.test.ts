@@ -204,7 +204,7 @@ describe('AdScheduler.assignAdToIssue', () => {
 
     await expect(
       AdScheduler.assignAdToIssue('issue-1', 'ad-1', '2026-01-01')
-    ).rejects.toBeTruthy()
+    ).rejects.toMatchObject({ message: 'insert failed' })
   })
 })
 
@@ -214,7 +214,7 @@ describe('AdScheduler.recordAdUsage', () => {
 
     await expect(
       AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
-    ).rejects.toBeTruthy()
+    ).rejects.toMatchObject({ message: 'not found' })
   })
 
   it('updates an existing assignment with used_at timestamp', async () => {
@@ -227,9 +227,8 @@ describe('AdScheduler.recordAdUsage', () => {
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
 
-    // updateCalls[0] is the assignment update.
-    expect(updateCalls[0]).toHaveProperty('used_at')
-    expect(typeof updateCalls[0].used_at).toBe('string')
+    // updateCalls[0] is the assignment update; used_at must be an ISO timestamp.
+    expect(updateCalls[0].used_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
   })
 
   it('inserts a new assignment when none exists', async () => {
@@ -248,7 +247,7 @@ describe('AdScheduler.recordAdUsage', () => {
       advertisement_id: 'ad-1',
       issue_date: '2026-01-01',
     })
-    expect(insertCalls[0]).toHaveProperty('used_at')
+    expect(insertCalls[0].used_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
   })
 
   it('increments times_used by 1', async () => {
