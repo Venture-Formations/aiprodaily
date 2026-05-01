@@ -87,6 +87,11 @@ function pushRecordAdUsageMocks(opts: {
 }
 
 beforeEach(() => {
+  // Suppress production code's console.log/error so CI logs aren't drowned
+  // in [AdScheduler] noise — production emits 23 log lines per happy path.
+  vi.spyOn(console, 'log').mockImplementation(() => {})
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+
   responseQueue.length = 0
   fromCalls.length = 0
   insertCalls.length = 0
@@ -182,6 +187,17 @@ describe('AdScheduler.assignAdToIssue', () => {
     expect(insertCalls).toHaveLength(0)
   })
 
+  it('locks behavior: existence check filters on issue_id only, so a different adId is silently skipped', async () => {
+    // Documents the current invariant: one ad per issue. If the production
+    // code ever starts filtering on (issue_id, advertisement_id), this test
+    // will fail and force a deliberate decision.
+    responseQueue.push({ data: { id: 'existing-1' }, error: null })
+
+    await AdScheduler.assignAdToIssue('issue-1', 'ad-2', '2026-01-01')
+
+    expect(insertCalls).toHaveLength(0)
+  })
+
   it('inserts assignment without used_at when not yet assigned', async () => {
     responseQueue.push({ data: null, error: null })
     responseQueue.push({ data: null, error: null })
@@ -227,8 +243,8 @@ describe('AdScheduler.recordAdUsage', () => {
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
 
-    // updateCalls[0] is the assignment update; used_at must be an ISO timestamp.
-    expect(updateCalls[0].used_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+    const assignmentUpdate = updateCalls.find(c => 'used_at' in c)
+    expect(assignmentUpdate?.used_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
   })
 
   it('inserts a new assignment when none exists', async () => {
@@ -260,8 +276,8 @@ describe('AdScheduler.recordAdUsage', () => {
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
 
-    // updateCalls[1] is the advertisement update.
-    expect(updateCalls[1].times_used).toBe(6)
+    const adUpdate = updateCalls.find(c => 'times_used' in c)
+    expect(adUpdate?.times_used).toBe(6)
   })
 
   it('treats null times_used as 0 when incrementing', async () => {
@@ -274,7 +290,8 @@ describe('AdScheduler.recordAdUsage', () => {
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
 
-    expect(updateCalls[1].times_used).toBe(1)
+    const adUpdate = updateCalls.find(c => 'times_used' in c)
+    expect(adUpdate?.times_used).toBe(1)
   })
 
   it('sets last_used_date to the issue date', async () => {
@@ -287,7 +304,8 @@ describe('AdScheduler.recordAdUsage', () => {
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-03-15', 'pub-1')
 
-    expect(updateCalls[1].last_used_date).toBe('2026-03-15')
+    const adUpdate = updateCalls.find(c => 'last_used_date' in c)
+    expect(adUpdate?.last_used_date).toBe('2026-03-15')
   })
 
   it('advances next position to currentPosition + 1', async () => {
