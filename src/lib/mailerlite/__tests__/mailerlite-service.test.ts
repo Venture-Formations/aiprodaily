@@ -305,7 +305,7 @@ describe('429 retry response interceptor', () => {
     expect(mockClient.request).toHaveBeenCalledTimes(1)
   })
 
-  it('caps Retry-After wait at 120 seconds even if the header asks for more', async () => {
+  it('caps Retry-After wait at exactly 120 seconds even when the header asks for more', async () => {
     vi.useFakeTimers()
     mockClient.request.mockResolvedValueOnce({ status: 200, data: { ok: true } })
 
@@ -314,9 +314,42 @@ describe('429 retry response interceptor', () => {
       config: {},
     }
     const promise = captured.responseErrorHandler!(err)
-    await vi.advanceTimersByTimeAsync(120_000)
+    // Just under 120s — must NOT have fired yet (proves cap isn't, say, 60s).
+    await vi.advanceTimersByTimeAsync(119_999)
+    expect(mockClient.request).not.toHaveBeenCalled()
+    // Advance past 120s — must fire (proves cap isn't, say, 300s).
+    await vi.advanceTimersByTimeAsync(2)
     await promise
     expect(mockClient.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('honors x-ratelimit-retry-after as an alias for Retry-After', async () => {
+    vi.useFakeTimers()
+    mockClient.request.mockResolvedValueOnce({ status: 200, data: { ok: true } })
+
+    const err = {
+      response: { status: 429, headers: { 'x-ratelimit-retry-after': '3' } },
+      config: {},
+    }
+    const promise = captured.responseErrorHandler!(err)
+    await vi.advanceTimersByTimeAsync(3_000)
+    await promise
+    expect(mockClient.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('still retries on attempt=1 (boundary check — cap is 2, not 1)', async () => {
+    vi.useFakeTimers()
+    mockClient.request.mockResolvedValueOnce({ status: 200, data: {} })
+
+    const err = {
+      response: { status: 429, headers: { 'retry-after': '1' } },
+      config: { _rateLimitAttempt: 1 },
+    }
+    const promise = captured.responseErrorHandler!(err)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await promise
+    expect(mockClient.request).toHaveBeenCalledTimes(1)
+    expect(mockClient.request.mock.calls[0]?.[0]?._rateLimitAttempt).toBe(2)
   })
 
   it('stops retrying after 2 attempts (MAILERLITE_RATE_LIMIT_RETRY_ATTEMPTS)', async () => {
