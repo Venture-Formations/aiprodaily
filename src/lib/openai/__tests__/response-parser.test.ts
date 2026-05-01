@@ -11,10 +11,6 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-// ===========================================================================
-// parseAIResponseJSON — historically buggy, 29 fix commits in git history.
-// Pure function, no mocks needed.
-// ===========================================================================
 describe('parseAIResponseJSON', () => {
   it('parses a plain JSON object string', () => {
     expect(parseAIResponseJSON('{"a":1,"b":"x"}')).toEqual({ a: 1, b: 'x' })
@@ -77,10 +73,6 @@ describe('parseAIResponseJSON', () => {
   })
 })
 
-// ===========================================================================
-// extractResponseContent — handles OpenAI Responses API shape variants.
-// Throws when no content is found.
-// ===========================================================================
 describe('extractResponseContent', () => {
   it('returns parsed object from json_schema item directly', () => {
     const response = {

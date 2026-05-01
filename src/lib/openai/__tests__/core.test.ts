@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// ---------------------------------------------------------------------------
-// Supabase chainable response queue (same pattern as ad-scheduler.test.ts).
-// ---------------------------------------------------------------------------
 type SupaResponse = { data: any; error: any }
 const supabase = vi.hoisted(() => ({
   responseQueue: [] as SupaResponse[],
@@ -13,8 +10,6 @@ function makeSupaChain(response: SupaResponse): any {
   chain.select = vi.fn(() => chain)
   chain.eq = vi.fn(() => chain)
   chain.single = vi.fn(() => Promise.resolve(response))
-  chain.then = (resolve: any, reject: any) =>
-    Promise.resolve(response).then(resolve, reject)
   return chain
 }
 
@@ -27,9 +22,6 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-// ---------------------------------------------------------------------------
-// OpenAI / Anthropic SDK clients — stub the calls used by callWithStructuredPrompt.
-// ---------------------------------------------------------------------------
 const mockOpenAI = vi.hoisted(() => ({
   responses: { create: vi.fn() },
 }))
@@ -42,9 +34,8 @@ vi.mock('../clients', () => ({
   anthropic: mockAnthropic,
 }))
 
-// ---------------------------------------------------------------------------
-// MetricsRecorder — dynamic-imported inside callAIWithPrompt; stub the class.
-// ---------------------------------------------------------------------------
+// MetricsRecorder is dynamically imported inside callAIWithPrompt, so the
+// mock must expose a class shim with the recordTiming method.
 vi.mock('@/lib/monitoring/metrics-recorder', () => ({
   MetricsRecorder: class {
     constructor(_publicationId: string) {}
@@ -74,9 +65,6 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-// ===========================================================================
-// getPrompt
-// ===========================================================================
 describe('getPrompt', () => {
   it('returns publication_settings value when publicationId provided and key exists', async () => {
     supabase.responseQueue.push({ data: { value: 'pub-specific-prompt' }, error: null })
@@ -105,9 +93,6 @@ describe('getPrompt', () => {
   })
 })
 
-// ===========================================================================
-// getPromptJSON
-// ===========================================================================
 describe('getPromptJSON', () => {
   it('returns parsed JSON when stored as a string in publication_settings', async () => {
     const stored = JSON.stringify({
@@ -178,9 +163,6 @@ describe('getPromptJSON', () => {
   })
 })
 
-// ===========================================================================
-// callWithStructuredPrompt
-// ===========================================================================
 describe('callWithStructuredPrompt', () => {
   it('throws when promptConfig is null', async () => {
     await expect(callWithStructuredPrompt(null as any)).rejects.toThrow(
@@ -264,10 +246,7 @@ describe('callWithStructuredPrompt', () => {
   })
 })
 
-// ===========================================================================
-// callAIWithPrompt — integration of getPromptJSON + callWithStructuredPrompt
-// ===========================================================================
-describe('callAIWithPrompt', () => {
+describe('callAIWithPrompt (integration: getPromptJSON + callWithStructuredPrompt)', () => {
   it('end-to-end: loads prompt, dispatches via correct provider, returns parsed JSON', async () => {
     const stored = {
       model: 'gpt-4o',
