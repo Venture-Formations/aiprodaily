@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Captured interceptor handlers, populated when the SUT module is loaded.
@@ -158,17 +158,17 @@ function setupCampaignHappyPath(opts: { reviewGroupId?: string } = {}) {
   supabase.responseQueue.push({ data: { slug: 'aiprodaily' }, error: null })
 
   mockedGetEmailSettings.mockResolvedValue({
-    sender_name: 'AI Pros Daily',
-    from_email: 'hi@aiprodaily.com',
+    sender_name: 'Test Newsletter',
+    from_email: 'test@example.com',
     review_group_id: opts.reviewGroupId ?? 'review-group-1',
     subject_line_emoji: '🧮',
     mailerlite_group_id: 'main-group-1',
   })
 
   mockedGetPublicationSettings.mockResolvedValue({
-    newsletter_name: 'AI Pros Daily',
-    business_name: 'Venture Formations',
-    business_address: '123 Main St, Austin, TX 78701',
+    newsletter_name: 'Test Newsletter',
+    business_name: 'Test Business LLC',
+    business_address: '1 Test Plaza, Testville, TX 00000',
   })
 
   mockedGetScheduleSettings.mockResolvedValue({
@@ -221,8 +221,13 @@ beforeEach(() => {
   mockedRecordRateLimitHit.mockResolvedValue({ tripped: false })
 })
 
+// Two separate afterEach hooks so timer restoration runs unconditionally even
+// if console-spy restoration throws.
 afterEach(() => {
   vi.useRealTimers()
+})
+
+afterEach(() => {
   // Restore vi.spyOn-created console spies; module-level vi.mock factories
   // are unaffected.
   vi.restoreAllMocks()
@@ -255,6 +260,12 @@ describe('MailerLite module setup', () => {
 // Circuit breaker request interceptor
 // ===========================================================================
 describe('Circuit breaker request interceptor', () => {
+  beforeAll(() => {
+    if (!captured.requestInterceptor) {
+      throw new Error('requestInterceptor was not captured — SUT interceptor wiring may have changed')
+    }
+  })
+
   it('rejects with axios.Cancel when isCircuitOpen returns true', async () => {
     mockedIsCircuitOpen.mockResolvedValueOnce(true)
     await expect(captured.requestInterceptor!({})).rejects.toMatchObject({
@@ -273,6 +284,12 @@ describe('Circuit breaker request interceptor', () => {
 // 429 retry response interceptor
 // ===========================================================================
 describe('429 retry response interceptor', () => {
+  beforeAll(() => {
+    if (!captured.responseErrorHandler) {
+      throw new Error('responseErrorHandler was not captured — SUT interceptor wiring may have changed')
+    }
+  })
+
   it('retries once on 429 using Retry-After header (in seconds, capped at 120s)', async () => {
     vi.useFakeTimers()
     mockClient.request.mockResolvedValueOnce({ status: 200, data: { ok: true } })
@@ -382,6 +399,9 @@ describe('429 retry response interceptor', () => {
     const promise = captured.responseErrorHandler!(err)
     await vi.advanceTimersByTimeAsync(1000)
     await promise
+    // Drain remaining microtasks since recordRateLimitHit() is fired
+    // .catch()-and-forget without await in the SUT.
+    await Promise.resolve()
 
     expect(mockedRecordRateLimitHit).toHaveBeenCalledTimes(1)
   })
