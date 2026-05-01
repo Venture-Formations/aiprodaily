@@ -85,6 +85,39 @@ describe('extractResponseContent', () => {
     expect(extractResponseContent(response)).toEqual({ a: 1, b: 'x' })
   })
 
+  it('falls back to json_schema item.input_json when .json is absent', () => {
+    const response = {
+      output: [{
+        content: [
+          { type: 'json_schema', input_json: { a: 1 } },
+        ],
+      }],
+    }
+    expect(extractResponseContent(response)).toEqual({ a: 1 })
+  })
+
+  it('falls back to positional content[0].json when no item type-tag matches', () => {
+    const response = {
+      output: [{
+        content: [
+          { json: { a: 1 } }, // no type field — positional fallback
+        ],
+      }],
+    }
+    expect(extractResponseContent(response)).toEqual({ a: 1 })
+  })
+
+  it('unwraps a response wrapper that has text but not output_text', () => {
+    const response = {
+      output: [{
+        content: [
+          { type: 'json_schema', json: { id: 'wrapper-1', text: 'inner via text' } },
+        ],
+      }],
+    }
+    expect(extractResponseContent(response)).toBe('inner via text')
+  })
+
   it('returns text item content as a string for downstream parsing', () => {
     const response = {
       output: [{

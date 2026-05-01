@@ -227,6 +227,40 @@ describe('callWithStructuredPrompt', () => {
     expect(sent.input[0].content).toBe('Hello Jake, your topic is AI.')
   })
 
+  it('replaces {{random_X-Y}} placeholders with an integer in the inclusive range', async () => {
+    mockOpenAI.responses.create.mockResolvedValue({
+      output: [{ content: [{ type: 'text', text: '{"ok":true}' }] }],
+    })
+
+    const config: any = {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'Pick a number: {{random_5-10}}' }],
+    }
+    await callWithStructuredPrompt(config, {}, 'openai')
+
+    const sent = mockOpenAI.responses.create.mock.calls[0]?.[0]
+    const match = (sent.input[0].content as string).match(/Pick a number: (\d+)/)
+    expect(match).not.toBeNull()
+    const n = parseInt(match![1], 10)
+    expect(n).toBeGreaterThanOrEqual(5)
+    expect(n).toBeLessThanOrEqual(10)
+  })
+
+  it('leaves invalid {{random_X-Y}} placeholders unchanged when min > max', async () => {
+    mockOpenAI.responses.create.mockResolvedValue({
+      output: [{ content: [{ type: 'text', text: '{"ok":true}' }] }],
+    })
+
+    const config: any = {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'Bad range: {{random_10-5}}' }],
+    }
+    await callWithStructuredPrompt(config, {}, 'openai')
+
+    const sent = mockOpenAI.responses.create.mock.calls[0]?.[0]
+    expect(sent.input[0].content).toBe('Bad range: {{random_10-5}}')
+  })
+
   it('strips custom application fields (provider, response_field) before calling the API', async () => {
     mockOpenAI.responses.create.mockResolvedValue({
       output: [{ content: [{ type: 'text', text: '{}' }] }],
