@@ -69,11 +69,10 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-// Convenience helpers to make queue setup readable.
 function makeArticle(overrides: Record<string, any> = {}) {
   return {
-    id: overrides.id ?? `art-${Math.random()}`,
-    post_id: overrides.post_id ?? `post-${Math.random()}`,
+    id: 'art-default',
+    post_id: 'post-default',
     headline: 'A headline',
     content: 'Article content',
     fact_check_score: 5,
@@ -93,25 +92,39 @@ function makeRating(post_id: string, total_score: number, criteriaScores: Partia
   }
 }
 
-// Pushes the supabase responses for a happy-path activateTopArticles run.
-// Sequence: criteria SELECT, articles SELECT, ratings SELECT,
-// (no-minimums-skip OR insufficient-skip branch handled separately by callers
-// pushing extra responses), deactivate-all UPDATE, activate UPDATE × N,
-// upsert selections.
+// Sequence: criteria SELECT, articles SELECT, ratings SELECT, deactivate-all
+// UPDATE, activate UPDATE × N, upsert issue_article_modules.
 function pushActivateHappyPath(opts: {
   criteria?: Array<{ criteria_number: number; minimum_score: number; enforce_minimum: boolean; name: string }>
   articles: Array<ReturnType<typeof makeArticle>>
   ratings: Array<ReturnType<typeof makeRating>>
   activatedCount: number
 }) {
-  supabase.responseQueue.push({ data: opts.criteria ?? [], error: null })       // criteria
-  supabase.responseQueue.push({ data: opts.articles, error: null })              // module_articles
-  supabase.responseQueue.push({ data: opts.ratings, error: null })               // post_ratings
-  supabase.responseQueue.push({ data: null, error: null })                       // deactivate-all UPDATE
+  supabase.responseQueue.push({ data: opts.criteria ?? [], error: null })
+  supabase.responseQueue.push({ data: opts.articles, error: null })
+  supabase.responseQueue.push({ data: opts.ratings, error: null })
+  supabase.responseQueue.push({ data: null, error: null })
   for (let i = 0; i < opts.activatedCount; i++) {
-    supabase.responseQueue.push({ data: null, error: null })                     // activate-each UPDATE
+    supabase.responseQueue.push({ data: null, error: null })
   }
-  supabase.responseQueue.push({ data: null, error: null })                       // upsert issue_article_modules
+  supabase.responseQueue.push({ data: null, error: null })
+}
+
+// Sequence: criteria SELECT, articles SELECT, ratings SELECT, getModule
+// SELECT, publication_issues metrics SELECT, publication_issues metrics UPDATE.
+function pushInsufficientCandidatesPath(opts: {
+  criteria: Array<{ criteria_number: number; minimum_score: number; enforce_minimum: boolean; name: string }>
+  articles: Array<ReturnType<typeof makeArticle>>
+  ratings: Array<ReturnType<typeof makeRating>>
+  moduleName?: string
+  existingMetrics?: Record<string, any>
+}) {
+  supabase.responseQueue.push({ data: opts.criteria, error: null })
+  supabase.responseQueue.push({ data: opts.articles, error: null })
+  supabase.responseQueue.push({ data: opts.ratings, error: null })
+  supabase.responseQueue.push({ data: { id: 'mod-1', name: opts.moduleName ?? 'Top Stories' }, error: null })
+  supabase.responseQueue.push({ data: { metrics: opts.existingMetrics ?? {} }, error: null })
+  supabase.responseQueue.push({ data: null, error: null })
 }
 
 // ---------------------------------------------------------------------------
@@ -129,11 +142,8 @@ describe('ArticleModuleSelector.activateTopArticles', () => {
     const result = await ArticleModuleSelector.activateTopArticles('issue-1', 'mod-1', 3)
 
     expect(result).toEqual({ success: true, activated: 3 })
-    // Activation order = sorted by total_score desc: p2(30), p3(20), p1(10).
-    // Activation UPDATEs happen at index 1..3 of updateCalls (index 0 is deactivate-all).
     const activations = supabase.updateCalls.filter(c => c.payload.is_active === true)
     expect(activations.map(c => c.payload.rank)).toEqual([1, 2, 3])
-    // Upsert was called with the top-3 ids in score order.
     const upsert = supabase.upsertCalls.find(c => c.table === 'issue_article_modules')
     expect(upsert?.payload.article_ids).toEqual(['a2', 'a3', 'a1'])
   })
@@ -203,32 +213,17 @@ describe('ArticleModuleSelector.activateTopArticles', () => {
   })
 
   it('insufficient candidates: returns success with skipped_reason and writes warning to issue.metrics', async () => {
-    // All articles fail; SUT then fetches module name + issue.metrics, then UPDATEs metrics.
-    supabase.responseQueue.push({
-      data: [{ criteria_number: 1, minimum_score: 5, enforce_minimum: true, name: 'Relevance' }],
-      error: null,
+    pushInsufficientCandidatesPath({
+      criteria: [{ criteria_number: 1, minimum_score: 5, enforce_minimum: true, name: 'Relevance' }],
+      articles: [makeArticle({ id: 'a1', post_id: 'p1' })],
+      ratings: [makeRating('p1', 10, { criteria_1_score: 1 })], // score < min 5
     })
-    supabase.responseQueue.push({
-      data: [makeArticle({ id: 'a1', post_id: 'p1' })],
-      error: null,
-    })
-    supabase.responseQueue.push({
-      data: [makeRating('p1', 10, { criteria_1_score: 1 })], // score < min 5
-      error: null,
-    })
-    // getModule lookup
-    supabase.responseQueue.push({ data: { id: 'mod-1', name: 'Top Stories' }, error: null })
-    // publication_issues SELECT metrics
-    supabase.responseQueue.push({ data: { metrics: {} }, error: null })
-    // publication_issues UPDATE metrics
-    supabase.responseQueue.push({ data: null, error: null })
 
     const result = await ArticleModuleSelector.activateTopArticles('issue-1', 'mod-1', 3)
 
     expect(result.success).toBe(true)
     expect(result.activated).toBe(0)
     expect(result.skipped_reason).toMatch(/Relevance/)
-    // Metrics UPDATE happened with a warning entry.
     const metricsUpdate = supabase.updateCalls.find(
       c => c.table === 'publication_issues' && c.payload.metrics?.minimum_score_warnings,
     )
@@ -242,24 +237,12 @@ describe('ArticleModuleSelector.activateTopArticles', () => {
 
   it('insufficient candidates: preserves existing metrics warnings when appending', async () => {
     const existingWarning = { module_id: 'mod-other', module_name: 'Other', timestamp: 'earlier' }
-    supabase.responseQueue.push({
-      data: [{ criteria_number: 1, minimum_score: 5, enforce_minimum: true, name: 'Quality' }],
-      error: null,
+    pushInsufficientCandidatesPath({
+      criteria: [{ criteria_number: 1, minimum_score: 5, enforce_minimum: true, name: 'Quality' }],
+      articles: [makeArticle({ id: 'a1', post_id: 'p1' })],
+      ratings: [makeRating('p1', 10, { criteria_1_score: 1 })],
+      existingMetrics: { minimum_score_warnings: [existingWarning] },
     })
-    supabase.responseQueue.push({
-      data: [makeArticle({ id: 'a1', post_id: 'p1' })],
-      error: null,
-    })
-    supabase.responseQueue.push({
-      data: [makeRating('p1', 10, { criteria_1_score: 1 })],
-      error: null,
-    })
-    supabase.responseQueue.push({ data: { id: 'mod-1', name: 'Top Stories' }, error: null })
-    supabase.responseQueue.push({
-      data: { metrics: { minimum_score_warnings: [existingWarning] } },
-      error: null,
-    })
-    supabase.responseQueue.push({ data: null, error: null })
 
     await ArticleModuleSelector.activateTopArticles('issue-1', 'mod-1', 3)
 

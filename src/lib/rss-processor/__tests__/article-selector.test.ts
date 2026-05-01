@@ -3,17 +3,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 type SupaResponse = { data: any; error: any }
 const supabase = vi.hoisted(() => ({
   responseQueue: [] as SupaResponse[],
-  fromCalls: [] as Array<{ table: string; eqCalls: Array<[string, any]> }>,
   updateCalls: [] as Array<{ table: string; payload: any }>,
 }))
 
-function makeSupaChain(table: string, response: SupaResponse, eqCalls: Array<[string, any]>): any {
+function makeSupaChain(table: string, response: SupaResponse): any {
   const chain: any = {}
   chain.select = vi.fn(() => chain)
-  chain.eq = vi.fn((col: string, val: any) => {
-    eqCalls.push([col, val])
-    return chain
-  })
+  chain.eq = vi.fn(() => chain)
   chain.single = vi.fn(() => Promise.resolve(response))
   chain.update = vi.fn((payload: any) => {
     supabase.updateCalls.push({ table, payload })
@@ -28,9 +24,7 @@ vi.mock('../../supabase', () => ({
   supabaseAdmin: {
     from: vi.fn((table: string) => {
       const response = supabase.responseQueue.shift() ?? { data: null, error: null }
-      const eqCalls: Array<[string, any]> = []
-      supabase.fromCalls.push({ table, eqCalls })
-      return makeSupaChain(table, response, eqCalls)
+      return makeSupaChain(table, response)
     }),
   },
 }))
@@ -55,7 +49,6 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
 
   supabase.responseQueue.length = 0
-  supabase.fromCalls.length = 0
   supabase.updateCalls.length = 0
   mockSubjectLineGenerator.mockReset()
 })
