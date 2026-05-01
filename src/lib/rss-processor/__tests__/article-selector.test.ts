@@ -23,7 +23,12 @@ function makeSupaChain(table: string, response: SupaResponse): any {
 vi.mock('../../supabase', () => ({
   supabaseAdmin: {
     from: vi.fn((table: string) => {
-      const response = supabase.responseQueue.shift() ?? { data: null, error: null }
+      // Strict: throw on unexpected from() calls so silent extra DB calls
+      // surface as immediate test failures (gate-review feedback W1).
+      const response = supabase.responseQueue.shift()
+      if (!response) {
+        throw new Error(`[test] Unexpected supabaseAdmin.from('${table}') — add a response to the queue`)
+      }
       return makeSupaChain(table, response)
     }),
   },

@@ -41,7 +41,13 @@ function makeSupaChain(table: string, response: SupaResponse, eqCalls: Array<[st
 vi.mock('../../supabase', () => ({
   supabaseAdmin: {
     from: vi.fn((table: string) => {
-      const response = supabase.responseQueue.shift() ?? { data: null, error: null }
+      // Strict: throw on unexpected from() calls instead of silently returning
+      // a null/null fallback. Converts queue-underrun into a diagnosable error
+      // (gate-review feedback W1).
+      const response = supabase.responseQueue.shift()
+      if (!response) {
+        throw new Error(`[test] Unexpected supabaseAdmin.from('${table}') — add a response to the queue`)
+      }
       const eqCalls: Array<[string, any]> = []
       supabase.fromCalls.push({ table, eqCalls })
       return makeSupaChain(table, response, eqCalls)
@@ -94,6 +100,9 @@ function makeRating(post_id: string, total_score: number, criteriaScores: Partia
 
 // Sequence: criteria SELECT, articles SELECT, ratings SELECT, deactivate-all
 // UPDATE, activate UPDATE × N, upsert issue_article_modules.
+// `activatedCount` is the number of activate calls the SUT will make —
+// equals min(eligibleArticles.length, limit). All activate responses are
+// success; tests exercising partial-activate failure must queue manually.
 function pushActivateHappyPath(opts: {
   criteria?: Array<{ criteria_number: number; minimum_score: number; enforce_minimum: boolean; name: string }>
   articles: Array<ReturnType<typeof makeArticle>>
