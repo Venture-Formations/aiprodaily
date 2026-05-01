@@ -24,6 +24,7 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
   const urlClickId = searchParams.get('click_id') || ''
+  const urlPhone = searchParams.get('phone') || ''
   const [clickId, setClickId] = useState('')
   // Sized to fit the typical AfterOffers form (~5 offers + email + button).
   // The listener below expands this if AfterOffers reports a taller content
@@ -45,6 +46,17 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
       console.log('[SparkLoop] User subscribed to recommendations:', subscribed === 'true')
     }
   }, [email])
+
+  // Forward phone to sessionStorage when present in the URL — keeps the
+  // downstream info page in sync with the subscribe-form's earlier write.
+  useEffect(() => {
+    if (!urlPhone) return
+    try {
+      sessionStorage.setItem('subscribe_phone', urlPhone)
+    } catch {
+      // Ignore storage errors (private mode, disabled storage, etc.)
+    }
+  }, [urlPhone])
 
   // Derive click_id from URL, sessionStorage, or generate a new one.
   // Always call setClickId even if sessionStorage fails.
@@ -157,6 +169,7 @@ export function OffersContent({ logoUrl, newsletterName, afteroffersFormId }: Of
                 frameBorder="0"
                 scrolling="auto"
                 sandbox="allow-forms allow-top-navigation allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                referrerPolicy="strict-origin"
                 className="w-full block"
                 style={{ height: `${iframeHeight}px` }}
               />

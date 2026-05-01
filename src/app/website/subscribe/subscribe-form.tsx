@@ -84,6 +84,7 @@ export function SubscribeForm({
   const [didYouMean, setDidYouMean] = useState('')
   const [showSparkLoopModal, setShowSparkLoopModal] = useState(false)
   const [subscribedEmail, setSubscribedEmail] = useState('')
+  const [subscribedPhone, setSubscribedPhone] = useState('')
 
   // Handle modal close
   const handleModalClose = useCallback(() => {
@@ -97,6 +98,9 @@ export function SubscribeForm({
     try {
       if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
         window.sessionStorage.setItem('afteroffers_click_id', clickId)
+        if (subscribedPhone) {
+          window.sessionStorage.setItem('subscribe_phone', subscribedPhone)
+        }
         // eslint-disable-next-line no-console
         console.log('[AfterOffers] Generated click_id for subscribe flow', clickId)
       }
@@ -116,8 +120,9 @@ export function SubscribeForm({
       }),
     }).catch(() => { /* non-critical */ })
 
-    window.location.href = `/subscribe/offers?email=${encodeURIComponent(subscribedEmail)}&click_id=${encodeURIComponent(clickId)}`
-  }, [subscribedEmail, publicationId])
+    const phoneParam = subscribedPhone ? `&phone=${encodeURIComponent(subscribedPhone)}` : ''
+    window.location.href = `/subscribe/offers?email=${encodeURIComponent(subscribedEmail)}&click_id=${encodeURIComponent(clickId)}${phoneParam}`
+  }, [subscribedEmail, subscribedPhone, publicationId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -160,8 +165,11 @@ export function SubscribeForm({
           window.fbq('track', 'Lead')
         }
 
-        // Store email and show custom SparkLoop modal
+        // Store email + phone snapshot for the post-modal redirect, then
+        // show the custom SparkLoop modal. Phone falls back to '' if the
+        // form didn't collect one.
         setSubscribedEmail(email)
+        setSubscribedPhone(trimmedPhone)
         setShowSparkLoopModal(true)
       } else {
         setError(data.error || 'Subscription failed. Please try again.')
