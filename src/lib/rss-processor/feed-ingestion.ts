@@ -415,11 +415,11 @@ export class FeedIngestion {
       local_relevance: evaluation.local_relevance,
       community_impact: evaluation.community_impact,
       ai_reasoning: evaluation.reasoning,
-      total_score: (evaluation as any).total_score ||
+      total_score: evaluation.total_score ??
         ((evaluation.interest_level + evaluation.local_relevance + evaluation.community_impact) / 30 * 100)
     }
 
-    const criteriaScores = (evaluation as any).criteria_scores
+    const criteriaScores = evaluation.criteria_scores
     if (criteriaScores && Array.isArray(criteriaScores)) {
       for (let k = 0; k < criteriaScores.length && k < 5; k++) {
         const criterionNum = k + 1

@@ -959,6 +959,8 @@ export interface ContentEvaluation {
   local_relevance: number
   community_impact: number
   reasoning: string
+  criteria_scores?: Array<{ score: number; reason: string; weight: number; criteria_number: number }>
+  total_score?: number
 }
 
 export interface NewsletterContent {

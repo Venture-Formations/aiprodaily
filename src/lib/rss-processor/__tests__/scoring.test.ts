@@ -137,7 +137,7 @@ describe('Scoring.evaluatePost', () => {
     })
     mockCallWithStructuredPrompt.mockResolvedValueOnce({ score: 8, reason: 'good' })
 
-    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1') as any
+    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1')
 
     expect(mockCallWithStructuredPrompt).toHaveBeenCalledTimes(1)
     expect(result.total_score).toBe(40) // 8 * 5
@@ -175,7 +175,7 @@ describe('Scoring.evaluatePost', () => {
       .mockResolvedValueOnce({ score: 6, reason: 'r2' })
       .mockResolvedValueOnce({ score: 7, reason: 'r3' })
 
-    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1') as any
+    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1')
 
     expect(mockCallWithStructuredPrompt).toHaveBeenCalledTimes(3)
     expect(result.total_score).toBe(5 * 1 + 6 * 2 + 7 * 3) // 38
@@ -271,7 +271,7 @@ describe('Scoring.evaluatePost', () => {
     mockCallWithStructuredPrompt.mockResolvedValueOnce({ score: 4, reason: 'below min' })
     // Criteria 2 & 3 must NOT be called — no further mockResolvedValueOnce queued.
 
-    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1') as any
+    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1')
 
     expect(mockCallWithStructuredPrompt).toHaveBeenCalledTimes(1)
     expect(result.criteria_scores).toHaveLength(1)
@@ -293,7 +293,7 @@ describe('Scoring.evaluatePost', () => {
       .mockResolvedValueOnce({ score: 1, reason: '' })
       .mockResolvedValueOnce({ score: 2, reason: '' })
 
-    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1') as any
+    const result = await new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1')
 
     expect(mockCallWithStructuredPrompt).toHaveBeenCalledTimes(2)
     expect(result.criteria_scores).toHaveLength(2)
@@ -340,23 +340,16 @@ describe('Scoring.evaluatePost', () => {
   })
 
   it.each([
-    { score: -1, label: 'below 0', shouldThrow: true },
-    { score: 11, label: 'above 10', shouldThrow: true },
-    { score: '5' as any, label: 'non-number string', shouldThrow: true },
-    // NaN gap (junior-dev gate W1): typeof NaN === 'number' and NaN < 0 / > 10
-    // are both false, so the guard at scoring.ts:203 lets NaN through. This row
-    // locks the bypass; a future SUT fix should add `Number.isNaN(score)` to
-    // the guard and flip this row to shouldThrow: true.
-    { score: NaN, label: 'NaN (bypasses guard — bug-lock)', shouldThrow: false },
-  ])('AI score $label: shouldThrow=$shouldThrow', async ({ score, shouldThrow }) => {
+    { score: -1, label: 'below 0' },
+    { score: 11, label: 'above 10' },
+    { score: '5' as any, label: 'non-number string' },
+    { score: NaN, label: 'NaN' },
+  ])('throws when AI score is $label ($score)', async ({ score }) => {
     supabase.responseQueue.push({ data: [makeCriterion()], error: null })
     mockCallWithStructuredPrompt.mockResolvedValueOnce({ score, reason: '' })
-    const promise = new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1')
-    if (shouldThrow) {
-      await expect(promise).rejects.toThrow(/score must be between 0-10/)
-    } else {
-      await expect(promise).resolves.toBeDefined()
-    }
+    await expect(
+      new Scoring().evaluatePost(makePost(), 'pub-1', 'primary', 'mod-1'),
+    ).rejects.toThrow(/score must be between 0-10/)
   })
 })
 
@@ -410,7 +403,7 @@ describe('Scoring.scorePostsForSection', () => {
         { score: 8, reason: 'b', weight: 2, criteria_number: 2 },
       ],
       total_score: 99,
-    } as any)
+    })
 
     const result = await scoring.scorePostsForSection('issue-1', 'primary')
 
@@ -446,7 +439,7 @@ describe('Scoring.scorePostsForSection', () => {
       reasoning: 'r',
       criteria_scores: [],
       // total_score intentionally absent
-    } as any)
+    })
 
     await scoring.scorePostsForSection('issue-1', 'primary')
 
@@ -455,24 +448,58 @@ describe('Scoring.scorePostsForSection', () => {
     expect(payload.total_score).toBe(60)
   })
 
-  it('locks current bug-shape: scorePostsForSection does not pass moduleId, so every post errors out', async () => {
-    // Locks bug from issue #62: scorePostsForSection at scoring.ts:61 calls
-    // evaluatePost(post, newsletterId, section) with no moduleId, but
-    // evaluatePost throws on missing moduleId at scoring.ts:121 BEFORE any DB
-    // call. Every post lands in the catch branch and increments errorCount.
-    //
-    // When a fix threads moduleId through scorePostsForSection, this test will
-    // break — update it to verify successful scoring instead of the error path.
+  it('passes post.article_module_id through to evaluatePost', async () => {
     supabase.responseQueue.push({ data: [{ id: 'feed-1' }], error: null }) // feeds
     supabase.responseQueue.push({
-      data: [makePost({ id: 'p-1' }), makePost({ id: 'p-2' }), makePost({ id: 'p-3' })],
+      data: [
+        makePost({ id: 'p-1', article_module_id: 'mod-1' }),
+        makePost({ id: 'p-2', article_module_id: 'mod-1' }),
+      ],
       error: null,
     })
-    // No further DB responses — evaluatePost throws before any from() call.
+
+    const scoring = new Scoring()
+    const evalSpy = vi.spyOn(scoring, 'evaluatePost').mockResolvedValue({
+      interest_level: 5,
+      local_relevance: 5,
+      community_impact: 5,
+      reasoning: 'r',
+      criteria_scores: [{ score: 5, reason: 'r', weight: 1, criteria_number: 1 }],
+      total_score: 50,
+    })
+
+    // Each successful evaluation triggers a post_ratings insert.
+    supabase.responseQueue.push({ data: null, error: null })
+    supabase.responseQueue.push({ data: null, error: null })
+
+    const result = await scoring.scorePostsForSection('issue-1', 'primary')
+
+    expect(result).toEqual({ scored: 2, errors: 0 })
+    expect(evalSpy).toHaveBeenCalledTimes(2)
+    // Fourth arg is moduleId — verify it came from the post.
+    expect(evalSpy.mock.calls[0][3]).toBe('mod-1')
+    expect(evalSpy.mock.calls[1][3]).toBe('mod-1')
+  })
+
+  it('errors out gracefully when post.article_module_id is null', async () => {
+    // The existing guard at scoring.ts:121 throws when moduleId is missing.
+    // scorePostsForSection catches this, increments errorCount, and continues.
+    // Locks the no-module fallback shape — posts without module assignment
+    // are surfaced as errors rather than crashing the whole batch.
+    supabase.responseQueue.push({ data: [{ id: 'feed-1' }], error: null })
+    supabase.responseQueue.push({
+      data: [
+        makePost({ id: 'p-1', article_module_id: null }),
+        makePost({ id: 'p-2', article_module_id: null }),
+      ],
+      error: null,
+    })
+    // No further DB responses — evaluatePost throws on missing moduleId
+    // before any from() call.
 
     const result = await new Scoring().scorePostsForSection('issue-1', 'primary')
 
-    expect(result).toEqual({ scored: 0, errors: 3 })
+    expect(result).toEqual({ scored: 0, errors: 2 })
     expect(supabase.insertCalls).toHaveLength(0)
   })
 })

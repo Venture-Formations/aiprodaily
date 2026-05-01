@@ -58,7 +58,7 @@ export class Scoring {
       for (let j = 0; j < batch.length; j++) {
         const post = batch[j]
         try {
-          const evaluation = await this.evaluatePost(post, newsletterId, section)
+          const evaluation = await this.evaluatePost(post, newsletterId, section, post.article_module_id)
 
           if (typeof evaluation.interest_level !== 'number' ||
               typeof evaluation.local_relevance !== 'number' ||
@@ -72,10 +72,10 @@ export class Scoring {
             local_relevance: evaluation.local_relevance,
             community_impact: evaluation.community_impact,
             ai_reasoning: evaluation.reasoning,
-            total_score: (evaluation as any).total_score || ((evaluation.interest_level + evaluation.local_relevance + evaluation.community_impact) / 30 * 100)
+            total_score: evaluation.total_score ?? ((evaluation.interest_level + evaluation.local_relevance + evaluation.community_impact) / 30 * 100)
           }
 
-          const criteriaScores = (evaluation as any).criteria_scores
+          const criteriaScores = evaluation.criteria_scores
           if (criteriaScores && Array.isArray(criteriaScores)) {
             for (let k = 0; k < criteriaScores.length && k < 5; k++) {
               const criterionNum = criteriaScores[k].criteria_number || (k + 1)
@@ -97,6 +97,7 @@ export class Scoring {
           batchSuccess++
 
         } catch (error) {
+          console.error(`[Score] evaluatePost failed for post ${post.id}:`, error instanceof Error ? error.message : error)
           errorCount++
           batchErrors++
         }
@@ -200,7 +201,7 @@ export class Scoring {
         const score = result.score
         const reason = result.reason || ''
 
-        if (typeof score !== 'number' || score < 0 || score > 10) {
+        if (typeof score !== 'number' || Number.isNaN(score) || score < 0 || score > 10) {
           throw new Error(`Criterion ${criterion.number} score must be between 0-10, got ${score} (type: ${typeof score})`)
         }
 
@@ -234,12 +235,12 @@ export class Scoring {
 
     // Return evaluation in legacy format for backward compatibility
     return {
-      interest_level: criteriaScores[0]?.score || 0,
-      local_relevance: criteriaScores[1]?.score || 0,
-      community_impact: criteriaScores[2]?.score || 0,
+      interest_level: criteriaScores[0]?.score ?? 0,
+      local_relevance: criteriaScores[1]?.score ?? 0,
+      community_impact: criteriaScores[2]?.score ?? 0,
       reasoning: criteriaScores.map((c, i) => `${criteria[i]?.name}: ${c.reason}`).join('\n\n'),
       criteria_scores: criteriaScores,
       total_score: totalWeightedScore
-    } as any
+    }
   }
 }
