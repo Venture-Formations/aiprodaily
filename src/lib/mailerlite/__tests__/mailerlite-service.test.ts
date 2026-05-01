@@ -37,23 +37,17 @@ vi.mock('axios', () => {
   }
 })
 
-// Supabase chainable response queue (same pattern as ad-scheduler.test.ts).
 type SupaResponse = { data: any; error: any }
 const supabase = vi.hoisted(() => ({
   responseQueue: [] as SupaResponse[],
-  fromCalls: [] as string[],
   insertCalls: [] as any[],
   updateCalls: [] as any[],
-  eqCalls: [] as Array<[string, any]>,
 }))
 
 function makeSupaChain(response: SupaResponse): any {
   const chain: any = {}
   chain.select = vi.fn(() => chain)
-  chain.eq = vi.fn((col: string, val: any) => {
-    supabase.eqCalls.push([col, val])
-    return chain
-  })
+  chain.eq = vi.fn(() => chain)
   chain.not = vi.fn(() => chain)
   chain.order = vi.fn(() => chain)
   chain.maybeSingle = vi.fn(() => Promise.resolve(response))
@@ -77,8 +71,7 @@ function makeSupaChain(response: SupaResponse): any {
 
 vi.mock('../../supabase', () => ({
   supabaseAdmin: {
-    from: vi.fn((table: string) => {
-      supabase.fromCalls.push(table)
+    from: vi.fn(() => {
       const response = supabase.responseQueue.shift() ?? { data: null, error: null }
       return makeSupaChain(response)
     }),
@@ -116,7 +109,6 @@ vi.mock('../../remediation/circuit-breaker', () => ({
   recordRateLimitHit: vi.fn().mockResolvedValue({ tripped: false }),
 }))
 
-// Now import the SUT — module-load wires up the interceptors.
 import { MailerLiteService } from '../mailerlite-service'
 import {
   getEmailSettings,
@@ -126,7 +118,6 @@ import {
 } from '../../publication-settings'
 import { isCircuitOpen, recordRateLimitHit } from '../../remediation/circuit-breaker'
 
-// Capture interceptor handlers right after the module loads.
 ;(() => {
   const requestUseCalls = (mockClient.interceptors.request.use as any).mock.calls
   const responseUseCalls = (mockClient.interceptors.response.use as any).mock.calls
@@ -211,10 +202,8 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
 
   supabase.responseQueue.length = 0
-  supabase.fromCalls.length = 0
   supabase.insertCalls.length = 0
   supabase.updateCalls.length = 0
-  supabase.eqCalls.length = 0
 
   mockClient.post.mockReset()
   mockClient.get.mockReset()
@@ -234,6 +223,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  // Restore vi.spyOn-created console spies; module-level vi.mock factories
+  // are unaffected.
+  vi.restoreAllMocks()
 })
 
 // ===========================================================================
@@ -374,10 +366,8 @@ describe('MailerLiteService.createReviewissue', () => {
     const result = await new MailerLiteService().createReviewissue(makeIssue())
 
     expect(result).toEqual({ success: true, issueId: 'ml-campaign-99' })
-    // /campaigns POST happened
     const campaignPost = mockClient.post.mock.calls.find(c => c[0] === '/campaigns')
     expect(campaignPost).toBeDefined()
-    // publication_issues update fired with review_sent_at
     const issueUpdate = supabase.updateCalls.find(c => 'review_sent_at' in c)
     expect(issueUpdate).toBeDefined()
     expect(issueUpdate?.status).toBe('in_review')
@@ -474,7 +464,6 @@ describe('MailerLiteService.createFinalissue', () => {
     const result = await new MailerLiteService().createFinalissue(makeIssue(), 'main-group-1', false)
 
     expect(result).toEqual({ success: true, issueId: 'ml-campaign-99' })
-    // email_metrics insert happened with mailerlite_issue_id
     const metricsInsert = supabase.insertCalls.find(c => 'mailerlite_issue_id' in c)
     expect(metricsInsert?.mailerlite_issue_id).toBe('ml-campaign-99')
     expect(metricsInsert?.issue_id).toBe('issue-uuid-1')
@@ -489,10 +478,9 @@ describe('MailerLiteService.createFinalissue', () => {
 
     await new MailerLiteService().createFinalissue(makeIssue(), 'main-group-1', false)
 
-    // The metrics update should have included mailerlite_issue_id.
     const metricsUpdate = supabase.updateCalls.find(c => c.mailerlite_issue_id === 'ml-campaign-99')
     expect(metricsUpdate).toBeDefined()
-    // No insert with mailerlite_issue_id since the row already existed.
+    // Existing-row branch should NOT insert a duplicate.
     const metricsInsert = supabase.insertCalls.find(c => 'mailerlite_issue_id' in c)
     expect(metricsInsert).toBeUndefined()
   })
