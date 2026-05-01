@@ -127,7 +127,7 @@ describe('ArticleSelector.generateSubjectLineForIssue', () => {
     expect(supabase.updateCalls).toHaveLength(0)
   })
 
-  it('does NOT update publication_issues when AI returns an empty string (error is swallowed)', async () => {
+  it('does NOT update publication_issues when AI returns whitespace-only string (error is swallowed)', async () => {
     supabase.responseQueue.push({ data: makeIssueWithArticles(), error: null })
     mockSubjectLineGenerator.mockResolvedValue('   ')
 
@@ -136,5 +136,31 @@ describe('ArticleSelector.generateSubjectLineForIssue', () => {
 
     expect(mockSubjectLineGenerator).toHaveBeenCalledTimes(1)
     expect(supabase.updateCalls).toHaveLength(0)
+  })
+
+  it('extracts subject from {raw} wrapper when AI returns parser-failure shape', async () => {
+    // AI/parseAIResponseJSON returns {raw: <string>} when JSON parsing fails.
+    // The SUT MUST unwrap .raw — see project memory on raw-JSON-leak bug class
+    // (Fixed 2026-02-06). A regression that drops this branch would let
+    // stringified JSON leak into subject lines.
+    supabase.responseQueue.push({ data: makeIssueWithArticles(), error: null })
+    supabase.responseQueue.push({ data: null, error: null })
+    mockSubjectLineGenerator.mockResolvedValue({ raw: 'Subject from raw field' })
+
+    await new ArticleSelector().generateSubjectLineForIssue('issue-1')
+
+    const update = supabase.updateCalls.find(c => c.table === 'publication_issues')
+    expect(update?.payload.subject_line).toBe('Subject from raw field')
+  })
+
+  it('extracts subject from object.subject_line field when AI returns structured response', async () => {
+    supabase.responseQueue.push({ data: makeIssueWithArticles(), error: null })
+    supabase.responseQueue.push({ data: null, error: null })
+    mockSubjectLineGenerator.mockResolvedValue({ subject_line: 'Structured subject' })
+
+    await new ArticleSelector().generateSubjectLineForIssue('issue-1')
+
+    const update = supabase.updateCalls.find(c => c.table === 'publication_issues')
+    expect(update?.payload.subject_line).toBe('Structured subject')
   })
 })

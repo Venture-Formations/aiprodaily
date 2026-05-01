@@ -314,6 +314,31 @@ describe('ArticleModuleSelector.activateTopArticles', () => {
     expect(criteriaQuery?.eqCalls).toContainEqual(['enforce_minimum', true])
   })
 
+  it('locks current behavior: criteria-fetch error silently disables minimum-score enforcement (fails open)', async () => {
+    // SUT logs the error and proceeds with minimumFilters = [], so all
+    // articles are eligible regardless of score. If a future change flips
+    // this to fail-closed (e.g. throws or returns activated=0), this test
+    // forces a deliberate decision.
+    supabase.responseQueue.push({ data: null, error: { message: 'criteria fetch boom' } })
+    supabase.responseQueue.push({
+      data: [makeArticle({ id: 'a1', post_id: 'p1' })],
+      error: null,
+    })
+    supabase.responseQueue.push({
+      data: [makeRating('p1', 10, { criteria_1_score: 0 })], // score 0 — would fail any minimum
+      error: null,
+    })
+    supabase.responseQueue.push({ data: null, error: null }) // deactivate
+    supabase.responseQueue.push({ data: null, error: null }) // activate
+    supabase.responseQueue.push({ data: null, error: null }) // upsert
+
+    const result = await ArticleModuleSelector.activateTopArticles('issue-1', 'mod-1', 3)
+
+    expect(result).toEqual({ success: true, activated: 1 })
+    const upsert = supabase.upsertCalls.find(c => c.table === 'issue_article_modules')
+    expect(upsert?.payload.article_ids).toEqual(['a1'])
+  })
+
   it('locks current behavior: equal total_score preserves DB order', async () => {
     // a1, a2, a3 all have score 10. With stable sort, the DB order is preserved.
     pushActivateHappyPath({
