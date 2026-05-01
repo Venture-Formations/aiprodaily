@@ -1,20 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ---------------------------------------------------------------------------
-// Mocks - declared before importing the module under test so vi.mock hoisting
+// Mocks declared before importing the module under test so vi.mock hoisting
 // resolves them correctly.
-// ---------------------------------------------------------------------------
 
 type SupaResponse = { data: any; error: any }
 
-// Queue of responses; each call to supabaseAdmin.from() shifts one off the queue.
 const responseQueue: SupaResponse[] = []
-// Tracks every from(table) call so tests can assert against query shape.
 const fromCalls: string[] = []
-// Tracks payloads passed to .insert() and .update() in call order.
 const insertCalls: any[] = []
 const updateCalls: any[] = []
-// Tracks values passed to .eq() chains so tests can verify filters.
 const eqCalls: Array<[string, any]> = []
 
 function makeChain(response: SupaResponse): any {
@@ -36,7 +30,7 @@ function makeChain(response: SupaResponse): any {
   })
   chain.maybeSingle = vi.fn(() => Promise.resolve(response))
   chain.single = vi.fn(() => Promise.resolve(response))
-  // Make chain awaitable for queries that resolve directly (e.g. .order(),
+  // Make chain awaitable for queries that resolve directly (.order(),
   // .insert(), .update().eq()).
   chain.then = (resolve: any, reject: any) =>
     Promise.resolve(response).then(resolve, reject)
@@ -77,6 +71,21 @@ function makeAd(overrides: Record<string, any> = {}) {
   }
 }
 
+// Pushes the 5 supabase responses recordAdUsage's happy path consumes, in order:
+// fetch used ad → lookup existing assignment → write assignment → update ad
+// → fetch active ads for next-position calc.
+function pushRecordAdUsageMocks(opts: {
+  usedAd: { display_order: number; times_used: number | null }
+  existingAssignment?: { id: string } | null
+  activeAds: Array<{ display_order: number }>
+}) {
+  responseQueue.push({ data: opts.usedAd, error: null })
+  responseQueue.push({ data: opts.existingAssignment ?? null, error: null })
+  responseQueue.push({ data: null, error: null })
+  responseQueue.push({ data: null, error: null })
+  responseQueue.push({ data: opts.activeAds, error: null })
+}
+
 beforeEach(() => {
   responseQueue.length = 0
   fromCalls.length = 0
@@ -86,9 +95,6 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-// ---------------------------------------------------------------------------
-// selectAdForissue
-// ---------------------------------------------------------------------------
 describe('AdScheduler.selectAdForissue', () => {
   const ctx = { issueDate: '2026-01-01', issueId: 'issue-1', newsletterId: 'pub-1' }
 
@@ -123,7 +129,7 @@ describe('AdScheduler.selectAdForissue', () => {
   })
 
   it('skips gaps and returns the next available position', async () => {
-    // Queue is positions [1, 3, 5]; next_ad_position points to missing 2.
+    // Positions [1, 3, 5]; next_ad_position points to missing 2.
     const ad1 = makeAd({ id: 'ad-1', display_order: 1 })
     const ad3 = makeAd({ id: 'ad-3', display_order: 3 })
     const ad5 = makeAd({ id: 'ad-5', display_order: 5 })
@@ -167,12 +173,8 @@ describe('AdScheduler.selectAdForissue', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// assignAdToIssue
-// ---------------------------------------------------------------------------
 describe('AdScheduler.assignAdToIssue', () => {
   it('skips insert when ad is already assigned to the issue', async () => {
-    // Existing assignment lookup returns a row.
     responseQueue.push({ data: { id: 'existing-1' }, error: null })
 
     await AdScheduler.assignAdToIssue('issue-1', 'ad-1', '2026-01-01')
@@ -181,7 +183,6 @@ describe('AdScheduler.assignAdToIssue', () => {
   })
 
   it('inserts assignment without used_at when not yet assigned', async () => {
-    // Existing lookup returns null, then insert succeeds.
     responseQueue.push({ data: null, error: null })
     responseQueue.push({ data: null, error: null })
 
@@ -193,7 +194,7 @@ describe('AdScheduler.assignAdToIssue', () => {
       advertisement_id: 'ad-1',
       issue_date: '2026-01-01',
     })
-    // Critical: used_at must NOT be set here — that happens at send-final.
+    // used_at must NOT be set here — it's set later at send-final.
     expect(insertCalls[0]).not.toHaveProperty('used_at')
   })
 
@@ -207,9 +208,6 @@ describe('AdScheduler.assignAdToIssue', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// recordAdUsage
-// ---------------------------------------------------------------------------
 describe('AdScheduler.recordAdUsage', () => {
   it('throws when fetching the used ad fails', async () => {
     responseQueue.push({ data: null, error: { message: 'not found' } })
@@ -220,45 +218,26 @@ describe('AdScheduler.recordAdUsage', () => {
   })
 
   it('updates an existing assignment with used_at timestamp', async () => {
-    // 1. Fetch used ad
-    responseQueue.push({
-      data: { display_order: 1, times_used: 0 },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 1, times_used: 0 },
+      existingAssignment: { id: 'asgn-1' },
+      activeAds: [{ display_order: 1 }, { display_order: 2 }],
     })
-    // 2. Existing assignment exists
-    responseQueue.push({ data: { id: 'asgn-1' }, error: null })
-    // 3. Update assignment with used_at
-    responseQueue.push({ data: null, error: null })
-    // 4. Update advertisement times_used
-    responseQueue.push({ data: null, error: null })
-    // 5. Fetch active ads for next-position calc
-    responseQueue.push({
-      data: [{ display_order: 1 }, { display_order: 2 }],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({ success: true })
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
 
-    // First update call is the assignment update — must include used_at.
+    // updateCalls[0] is the assignment update.
     expect(updateCalls[0]).toHaveProperty('used_at')
     expect(typeof updateCalls[0].used_at).toBe('string')
   })
 
   it('inserts a new assignment when none exists', async () => {
-    responseQueue.push({
-      data: { display_order: 1, times_used: 0 },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 1, times_used: 0 },
+      existingAssignment: null,
+      activeAds: [{ display_order: 1 }, { display_order: 2 }],
     })
-    responseQueue.push({ data: null, error: null }) // no existing assignment
-    responseQueue.push({ data: null, error: null }) // insert succeeds
-    responseQueue.push({ data: null, error: null }) // ad update succeeds
-    responseQueue.push({
-      data: [{ display_order: 1 }, { display_order: 2 }],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({ success: true })
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
@@ -273,39 +252,25 @@ describe('AdScheduler.recordAdUsage', () => {
   })
 
   it('increments times_used by 1', async () => {
-    responseQueue.push({
-      data: { display_order: 2, times_used: 5 },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 2, times_used: 5 },
+      existingAssignment: { id: 'asgn-1' },
+      activeAds: [{ display_order: 1 }, { display_order: 2 }, { display_order: 3 }],
     })
-    responseQueue.push({ data: { id: 'asgn-1' }, error: null })
-    responseQueue.push({ data: null, error: null }) // assignment update
-    responseQueue.push({ data: null, error: null }) // ad update
-    responseQueue.push({
-      data: [{ display_order: 1 }, { display_order: 2 }, { display_order: 3 }],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({ success: true })
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
 
-    // Second update call is the advertisement update.
+    // updateCalls[1] is the advertisement update.
     expect(updateCalls[1].times_used).toBe(6)
   })
 
   it('treats null times_used as 0 when incrementing', async () => {
-    responseQueue.push({
-      data: { display_order: 1, times_used: null },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 1, times_used: null },
+      existingAssignment: { id: 'asgn-1' },
+      activeAds: [{ display_order: 1 }, { display_order: 2 }],
     })
-    responseQueue.push({ data: { id: 'asgn-1' }, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({
-      data: [{ display_order: 1 }, { display_order: 2 }],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({ success: true })
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
@@ -314,18 +279,11 @@ describe('AdScheduler.recordAdUsage', () => {
   })
 
   it('sets last_used_date to the issue date', async () => {
-    responseQueue.push({
-      data: { display_order: 1, times_used: 0 },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 1, times_used: 0 },
+      existingAssignment: { id: 'asgn-1' },
+      activeAds: [{ display_order: 1 }, { display_order: 2 }],
     })
-    responseQueue.push({ data: { id: 'asgn-1' }, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({
-      data: [{ display_order: 1 }, { display_order: 2 }],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({ success: true })
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-03-15', 'pub-1')
@@ -334,22 +292,11 @@ describe('AdScheduler.recordAdUsage', () => {
   })
 
   it('advances next position to currentPosition + 1', async () => {
-    responseQueue.push({
-      data: { display_order: 2, times_used: 0 },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 2, times_used: 0 },
+      existingAssignment: { id: 'asgn-1' },
+      activeAds: [{ display_order: 1 }, { display_order: 2 }, { display_order: 3 }],
     })
-    responseQueue.push({ data: { id: 'asgn-1' }, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({
-      data: [
-        { display_order: 1 },
-        { display_order: 2 },
-        { display_order: 3 },
-      ],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({ success: true })
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
@@ -359,22 +306,11 @@ describe('AdScheduler.recordAdUsage', () => {
 
   it('loops next position back to 1 when past the max position', async () => {
     // Used ad is at the last position (3); next should wrap to 1.
-    responseQueue.push({
-      data: { display_order: 3, times_used: 0 },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 3, times_used: 0 },
+      existingAssignment: { id: 'asgn-1' },
+      activeAds: [{ display_order: 1 }, { display_order: 2 }, { display_order: 3 }],
     })
-    responseQueue.push({ data: { id: 'asgn-1' }, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({
-      data: [
-        { display_order: 1 },
-        { display_order: 2 },
-        { display_order: 3 },
-      ],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({ success: true })
 
     await AdScheduler.recordAdUsage('issue-1', 'ad-1', '2026-01-01', 'pub-1')
@@ -383,18 +319,11 @@ describe('AdScheduler.recordAdUsage', () => {
   })
 
   it('throws when updateNextAdPosition reports failure', async () => {
-    responseQueue.push({
-      data: { display_order: 1, times_used: 0 },
-      error: null,
+    pushRecordAdUsageMocks({
+      usedAd: { display_order: 1, times_used: 0 },
+      existingAssignment: { id: 'asgn-1' },
+      activeAds: [{ display_order: 1 }, { display_order: 2 }],
     })
-    responseQueue.push({ data: { id: 'asgn-1' }, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({ data: null, error: null })
-    responseQueue.push({
-      data: [{ display_order: 1 }, { display_order: 2 }],
-      error: null,
-    })
-
     mockedUpdateNextAdPosition.mockResolvedValue({
       success: false,
       error: 'settings write failed',
