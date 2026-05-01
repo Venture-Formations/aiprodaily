@@ -33,12 +33,16 @@ export const POST = withApiHandler(
   { authTier: 'public', logContext: 'subscribe-personalize' },
   async ({ request, logger }) => {
     const body = await request.json()
-    const { email, original_email, name, last_name, job_type, yearly_clients } = body
+    const { email, original_email, name, last_name, phone, job_type, yearly_clients } = body
+
+    // Phone is optional — only persist when present and non-empty after trim.
+    const trimmedPhone = typeof phone === 'string' ? phone.trim() : ''
 
     console.log(`[Personalize] Received request for ${email}`, {
       original_email,
       name,
       last_name,
+      has_phone: Boolean(trimmedPhone),
       job_type,
       yearly_clients
     })
@@ -69,6 +73,7 @@ export const POST = withApiHandler(
 
       if (name) fields.first_name = name
       if (last_name) fields.last_name = last_name
+      if (trimmedPhone) fields.phone = trimmedPhone
       if (job_type) fields.job_type = job_type
       if (yearly_clients) fields.yearly_clients = yearly_clients
 
@@ -86,7 +91,11 @@ export const POST = withApiHandler(
           const upsertResult = await sendgrid.upsertContact(email, {
             firstName: name,
             lastName: last_name,
-            customFields: { job_type, yearly_clients }
+            customFields: {
+              ...(trimmedPhone ? { phone: trimmedPhone } : {}),
+              job_type,
+              yearly_clients,
+            }
           })
 
           if (!upsertResult.success) {
@@ -106,7 +115,11 @@ export const POST = withApiHandler(
           const upsertResult = await sendgrid.upsertContact(email, {
             firstName: name,
             lastName: last_name,
-            customFields: { job_type, yearly_clients }
+            customFields: {
+              ...(trimmedPhone ? { phone: trimmedPhone } : {}),
+              job_type,
+              yearly_clients,
+            }
           })
 
           if (!upsertResult.success) {
@@ -134,6 +147,7 @@ export const POST = withApiHandler(
       const beehiivCustomFields: Array<{ name: string; value: string }> = []
       if (name) beehiivCustomFields.push({ name: 'first_name', value: name })
       if (last_name) beehiivCustomFields.push({ name: 'last_name', value: last_name })
+      if (trimmedPhone) beehiivCustomFields.push({ name: 'phone', value: trimmedPhone })
       if (job_type) beehiivCustomFields.push({ name: 'job_type', value: job_type })
       if (yearly_clients) beehiivCustomFields.push({ name: 'yearly_clients', value: yearly_clients })
 
@@ -184,6 +198,7 @@ export const POST = withApiHandler(
 
       if (name) fields.name = name
       if (last_name) fields.last_name = last_name
+      if (trimmedPhone) fields.phone = trimmedPhone
       if (job_type) fields.job_type = job_type
       if (yearly_clients) fields.yearly_clients = yearly_clients
 

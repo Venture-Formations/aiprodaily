@@ -40,6 +40,7 @@ export function PersonalizationForm({
 }: PersonalizationFormProps) {
   const searchParams = useSearchParams()
   const urlEmail = searchParams.get('email') || ''
+  const urlPhone = searchParams.get('phone') || ''
 
   // Check if URL email is valid, otherwise try sessionStorage
   const getInitialEmail = () => {
@@ -57,7 +58,20 @@ export function PersonalizationForm({
     return ''
   }
 
+  // Same dual-source pattern as email — URL first, sessionStorage fallback.
+  // Phone is optional; empty string is acceptable. Guard against
+  // unrendered Liquid/handlebars placeholders (e.g. `{{phone}}`) that an
+  // upstream template might have leaked, mirroring the email-side guard.
+  const getInitialPhone = () => {
+    if (urlPhone && !urlPhone.includes('{{')) return urlPhone
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('subscribe_phone') || ''
+    }
+    return ''
+  }
+
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [jobType, setJobType] = useState('')
@@ -73,7 +87,13 @@ export function PersonalizationForm({
     } else {
       setError('No email found. Please go back and subscribe first.')
     }
-  }, [urlEmail])
+
+    // Phone is optional — silently absent is fine, no error message needed.
+    const initialPhone = getInitialPhone()
+    if (initialPhone) {
+      setPhone(initialPhone)
+    }
+  }, [urlEmail, urlPhone])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,6 +126,7 @@ export function PersonalizationForm({
       const storedEmail = sessionStorage.getItem('subscribe_email') || ''
       const emailChanged = email !== storedEmail && storedEmail !== ''
 
+      const trimmedPhone = phone.trim()
       const response = await fetch('/api/subscribe/personalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,6 +135,7 @@ export function PersonalizationForm({
           original_email: emailChanged ? storedEmail : undefined,
           name: firstName.trim(),
           last_name: lastName.trim(),
+          ...(trimmedPhone ? { phone: trimmedPhone } : {}),
           ...(jobEnabled ? { job_type: jobType } : {}),
           ...(clientsEnabled ? { yearly_clients: yearlyClients } : {}),
         })
