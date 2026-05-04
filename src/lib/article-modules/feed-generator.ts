@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'crypto'
 import { Feed } from 'feed'
 import { htmlToText } from 'html-to-text'
 import { supabaseAdmin } from '../supabase'
+import { getPublicationSetting } from '../publication-settings'
 import { normalizeTransactionType } from '../transaction-type'
 import { wrapTrackingUrl } from '../url-tracking'
 import type { IssueStatus } from '@/types/database'
@@ -82,7 +83,7 @@ export class ModuleFeedGenerator {
     // maybeSingle() on the issue query returns null (not an error) when no
     // matching issue exists — a normal state for the 'sent' variant on a
     // publication that hasn't sent anything yet.
-    const [pubResult, issueResult] = await Promise.all([
+    const [pubResult, issueResult, pubBaseUrl] = await Promise.all([
       supabaseAdmin
         .from('publications')
         .select('name, slug')
@@ -92,6 +93,7 @@ export class ModuleFeedGenerator {
         .order('date', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      getPublicationSetting(publicationId, 'website_url'),
     ])
 
     const { data: pub, error: pubError } = pubResult
@@ -153,7 +155,7 @@ export class ModuleFeedGenerator {
 
       // Wrap source URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, mod.name, recentIssue.date, undefined, recentIssue.id)
+        ? wrapTrackingUrl(sourceUrl, mod.name, recentIssue.date, undefined, recentIssue.id, undefined, pubBaseUrl || undefined)
         : '#'
 
       const itemData: any = {

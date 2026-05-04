@@ -51,7 +51,7 @@ export async function generateArticleModuleSection(
     return ''
   }
 
-  const { primaryColor, secondaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue.publication_id)
+  const { primaryColor, secondaryColor, headingFont, bodyFont, websiteUrl } = businessSettings || await fetchBusinessSettings(issue.publication_id)
 
   // Get block order from mod settings
   const blockOrder: ArticleBlockType[] = mod.block_order || ['title', 'body']
@@ -67,7 +67,7 @@ export async function generateArticleModuleSection(
     const emoji = getArticleEmoji(headline, content)
 
     // Wrap URL with tracking
-    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, mod.name, issue.date, issue.mailerlite_issue_id, issue.id) : '#'
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, mod.name, issue.date, issue.mailerlite_issue_id, issue.id, undefined, websiteUrl) : '#'
 
     // Convert newlines to <br> for proper HTML display
     const formattedContent = content.replace(/\n/g, '<br>')
