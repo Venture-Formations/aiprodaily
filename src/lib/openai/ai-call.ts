@@ -1,4 +1,4 @@
-import { callAIWithPrompt } from './core'
+import { callAIWithPrompt } from './with-prompt'
 import { normalizeTransactionType } from '../transaction-type'
 
 // Complete AI call interface - fetches prompt+provider, replaces placeholders, calls AI

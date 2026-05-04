@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
-import { callAIWithPrompt } from '@/lib/openai/core'
+import { callAIWithPrompt } from '@/lib/openai/with-prompt'
 import type { Logger } from 'pino'
 
 /**

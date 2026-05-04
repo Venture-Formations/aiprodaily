@@ -51,12 +51,9 @@ vi.mock('@/lib/monitoring/metrics-recorder', () => ({
   },
 }))
 
-import {
-  getPrompt,
-  getPromptJSON,
-  callWithStructuredPrompt,
-  callAIWithPrompt,
-} from '../core'
+import { callWithStructuredPrompt } from '../core'
+import { getPrompt, getPromptJSON } from '../prompt-repository'
+import { callAIWithPrompt } from '../with-prompt'
 
 beforeEach(() => {
   // Suppress production console output.
@@ -161,7 +158,7 @@ describe('getPromptJSON', () => {
 
   it('auto-detects Claude provider from a Claude model name (string-stored prompt)', async () => {
     // Stored as a JSON string to exercise the string-parsing branch
-    // (object-stored hits the JSONB-already-parsed branch in core.ts:124).
+    // (object-stored hits the JSONB-already-parsed branch in prompt-repository.ts).
     const stored = JSON.stringify({
       model: 'claude-3-5-sonnet-20241022',
       messages: [{ role: 'user', content: 'hi' }],

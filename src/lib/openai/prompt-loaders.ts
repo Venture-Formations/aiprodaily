@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
-import { getPrompt, callWithStructuredPrompt } from './core'
+import { getPrompt } from './prompt-repository'
+import { callWithStructuredPrompt } from './core'
 import type { StructuredPromptConfig } from './types'
 
 // AI Prompts - Static fallbacks when database is unavailable

@@ -21,7 +21,7 @@ vi.mock('@/lib/supabase', () => ({
 
 // Mock callAIWithPrompt
 const mockCallAI = vi.fn()
-vi.mock('@/lib/openai/core', () => ({
+vi.mock('@/lib/openai/with-prompt', () => ({
   callAIWithPrompt: (...args: any[]) => mockCallAI(...args),
 }))
 
