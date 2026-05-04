@@ -81,11 +81,7 @@ describe('generateWelcomeSection', () => {
     expect(html).toContain('CustomFont, sans-serif')
   })
 
-  // NOTE: sections.ts:27-34 computes a `fullIntro` variable but never uses it —
-  // the `intro` argument is silently dropped from rendered output. This test
-  // characterizes that current (buggy) behavior so we'd notice if it changed.
-  // TODO(#222): fix the dead code in generateWelcomeSection.
-  it('renders greeting, tagline, and summary (intro arg currently unused — see source bug)', async () => {
+  it('renders intro, tagline, and summary', async () => {
     const html = await generateWelcomeSection(
       'Hello there',
       'The bold tagline',
@@ -96,7 +92,7 @@ describe('generateWelcomeSection', () => {
     expect(html).toContain('The bold tagline')
     expect(html).toContain('A short summary.')
     expect(html).toContain(`{$name|default('Accounting Pro')}`)
-    expect(html).not.toContain('Hello there')
+    expect(html).toContain('Hello there')
   })
 })
 
