@@ -65,7 +65,6 @@ export async function getPromptJSON(key: string, newsletterId: string, fallbackT
 
       if (fallbackError || !fallbackData) {
         console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
-        console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
 
         if (!fallbackText) {
           throw new Error(`Prompt ${key} not found and no fallback provided`)
