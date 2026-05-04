@@ -17,5 +17,28 @@ export default defineConfig({
       TZ: 'UTC',
       LANG: 'en_US.UTF-8',
     },
+    // Coverage enforcement (#65). To raise these, add tests then bump the
+    // numbers below. Never lower without writing tests to compensate.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary'],
+      include: [
+        'src/lib/**/*.ts',
+        'src/app/api/cron/**/route.ts',
+      ],
+      exclude: [
+        '**/__tests__/**',
+        '**/*.test.ts',
+        '**/_fixtures.ts',
+        'src/lib/**/index.ts', // barrel files only — keep logic out of index.ts
+        'src/lib/**/types.ts',
+      ],
+      thresholds: {
+        lines: 15,
+        statements: 14,
+        functions: 15,
+        branches: 15,
+      },
+    },
   },
 })
