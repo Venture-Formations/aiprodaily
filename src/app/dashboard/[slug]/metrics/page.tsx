@@ -2,8 +2,21 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import Layout from '@/components/Layout'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+
+const MetricChart = dynamic(() => import('./MetricChart'), {
+  ssr: false,
+  loading: () => (
+    <div
+      role="status"
+      aria-busy="true"
+      className="h-[200px] flex items-center justify-center text-gray-400 text-sm"
+    >
+      Loading chart...
+    </div>
+  ),
+})
 
 interface ChartData {
   hour: string
@@ -83,31 +96,7 @@ function MetricCard({ metricConfig, publicationId, days }: {
       ) : data.length === 0 ? (
         <div className="h-48 flex items-center justify-center text-gray-400 text-sm">No data yet</div>
       ) : (
-        <ResponsiveContainer width="100%" height={200}>
-          {metricConfig.chartType === 'line' ? (
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="hour" tickFormatter={formatHour} tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip
-                labelFormatter={(label: any) => formatHour(String(label))}
-                formatter={(value: any) => [`${value}${metricConfig.unit}`, metricConfig.label]}
-              />
-              <Line type="monotone" dataKey="avg" stroke={metricConfig.color} strokeWidth={2} dot={false} />
-            </LineChart>
-          ) : (
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="hour" tickFormatter={formatHour} tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip
-                labelFormatter={(label: any) => formatHour(String(label))}
-                formatter={(value: any) => [`${value}${metricConfig.unit}`, metricConfig.label]}
-              />
-              <Bar dataKey="avg" fill={metricConfig.color} radius={[2, 2, 0, 0]} />
-            </BarChart>
-          )}
-        </ResponsiveContainer>
+        <MetricChart data={data} config={metricConfig} formatHour={formatHour} />
       )}
     </div>
   )

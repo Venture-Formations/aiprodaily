@@ -1,19 +1,22 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { CheckCircle, TrendingUp, DollarSign, Clock, Users } from 'lucide-react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  LabelList,
-} from 'recharts'
 import type { Recommendation } from '../types'
 import type { ChartStats, EstimatedValue } from './useSparkLoopData'
+
+const OverviewChart = dynamic(() => import('./OverviewChart'), {
+  ssr: false,
+  loading: () => (
+    <div
+      role="status"
+      aria-busy="true"
+      className="h-[300px] flex items-center justify-center text-gray-400 text-sm"
+    >
+      Loading chart...
+    </div>
+  ),
+})
 
 // --- Formatters ---
 
@@ -41,51 +44,6 @@ export function getSourceLabel(source: string) {
   if (source === 'ours') return 'ours'
   if (source === 'sparkloop') return 'SL'
   return 'default'
-}
-
-// --- Chart Tooltip ---
-
-function CustomTooltip({ active, payload, label }: any) {
-  if (active && payload && payload.length) {
-    const dataRow = payload[0]?.payload
-    const pending = dataRow?.pending || 0
-    const confirmed = dataRow?.confirmed || 0
-    const rejected = dataRow?.rejected || 0
-    const projectedEarnings = dataRow?.projectedEarnings || 0
-    const confirmedEarnings = dataRow?.confirmedEarnings || 0
-    const newPending = dataRow?.newPending
-    return (
-      <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-sm">
-        <div className="font-medium mb-1">{label}</div>
-        {pending > 0 && (
-          <>
-            <div className="text-purple-300">Pending Referrals: {formatNumber(pending)}</div>
-            <div className="text-purple-300">Projected Earnings: {formatDollars(projectedEarnings)}</div>
-          </>
-        )}
-        {confirmed > 0 && (
-          <>
-            <div className="text-gray-300">Confirmed Referrals: {formatNumber(confirmed)}</div>
-            <div className="text-gray-300">Confirmed Earnings: {formatDollars(confirmedEarnings)}</div>
-          </>
-        )}
-        {rejected > 0 && (
-          <div className="text-gray-500">Rejected Referrals: {formatNumber(rejected)}</div>
-        )}
-        {newPending !== null && newPending !== undefined && newPending > 0 && (
-          <div className="text-amber-300">
-            New Pending (SL): {formatNumber(newPending)}
-          </div>
-        )}
-        {(projectedEarnings > 0 || confirmedEarnings > 0) && (
-          <div className="text-green-300 mt-1 pt-1 border-t border-gray-700">
-            Total: {formatDollars(projectedEarnings + confirmedEarnings)}
-          </div>
-        )}
-      </div>
-    )
-  }
-  return null
 }
 
 // --- Recommendation Row ---
@@ -261,47 +219,7 @@ export default function OverviewTab({
             Loading chart...
           </div>
         ) : chartStats?.dailyStats && chartStats.dailyStats.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartStats.dailyStats.map(d => ({
-              ...d,
-              earningsLabel: (d.projectedEarnings + d.confirmedEarnings) > 0
-                ? `$${(d.projectedEarnings + d.confirmedEarnings).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : '',
-              newPendingDisplay: d.newPending !== null && d.newPending > 0 ? d.newPending : 0,
-              newPendingLabel: d.newPending !== null && d.newPending > 0
-                ? d.newPending.toLocaleString('en-US')
-                : '',
-            }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11 }}
-                tickFormatter={(value) => {
-                  const [, m, d] = value.split('-')
-                  return `${parseInt(m)}/${parseInt(d)}`
-                }}
-              />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Bar dataKey="pending" name="Pending" stackId="a" fill="#c4b5fd" />
-              <Bar dataKey="confirmed" name="Confirmed" stackId="a" fill="#9ca3af" />
-              <Bar dataKey="rejected" name="Rejected" stackId="a" fill="#4b5563" radius={[2, 2, 0, 0]}>
-                <LabelList
-                  dataKey="earningsLabel"
-                  position="top"
-                  style={{ fontSize: 10, fill: '#7c3aed' }}
-                />
-              </Bar>
-              <Bar dataKey="newPendingDisplay" name="New Pending (SL)" fill="#f59e0b" radius={[2, 2, 0, 0]}>
-                <LabelList
-                  dataKey="newPendingLabel"
-                  position="top"
-                  style={{ fontSize: 9, fill: '#d97706' }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <OverviewChart dailyStats={chartStats.dailyStats} />
         ) : (
           <div className="h-64 flex items-center justify-center text-gray-500">
             No data available for this timeframe
