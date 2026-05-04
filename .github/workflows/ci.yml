@@ -111,8 +111,8 @@ jobs:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
 
-      - name: Unit tests
-        run: npm run test:run
+      - name: Unit tests with coverage
+        run: npm run test:coverage
 
       - name: RSS workflow tests (scoped to changed files)
         run: npm run test:rss-workflow:pr
