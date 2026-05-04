@@ -211,7 +211,7 @@ export async function generateBreakingNewsSection(issue: any, businessSettings?:
   try {
     console.log('Generating Breaking News section for issue:', issue?.id)
 
-    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Use pre-fetched data or fall back to DB query (legacy callers)
     let selections = breakingNewsArticles
@@ -243,7 +243,7 @@ export async function generateBreakingNewsSection(issue: any, businessSettings?:
 
       // Wrap URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, 'Breaking News', issue.date, issue.mailerlite_issue_id, issue.id)
+        ? wrapTrackingUrl(sourceUrl, 'Breaking News', issue.date, issue.mailerlite_issue_id, issue.id, undefined, websiteUrl)
         : '#'
 
       return `
@@ -286,7 +286,7 @@ export async function generateBeyondTheFeedSection(issue: any, businessSettings?
   try {
     console.log('Generating Beyond the Feed section for issue:', issue?.id)
 
-    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Use pre-fetched data or fall back to DB query (legacy callers)
     let selections = beyondFeedArticles
@@ -318,7 +318,7 @@ export async function generateBeyondTheFeedSection(issue: any, businessSettings?
 
       // Wrap URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, 'Beyond the Feed', issue.date, issue.mailerlite_issue_id, issue.id)
+        ? wrapTrackingUrl(sourceUrl, 'Beyond the Feed', issue.date, issue.mailerlite_issue_id, issue.id, undefined, websiteUrl)
         : '#'
 
       return `

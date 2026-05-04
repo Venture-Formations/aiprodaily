@@ -129,7 +129,8 @@ export class AdModuleRenderer {
           context.issueDate,
           context.mailerliteIssueId,
           context.issueId,
-          'ad'
+          'ad',
+          settings.website_url
         )
       : baseUrl
 

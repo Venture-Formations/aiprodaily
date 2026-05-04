@@ -93,7 +93,7 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
     console.log('Generating Advertorial section for issue:', issue?.id)
 
     // Fetch colors from business settings (use passed-in settings if available)
-    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Check if ad already selected for this issue
     const { data: existingAd } = await supabaseAdmin
@@ -117,7 +117,7 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
     // Generate tracked URL for links
     const buttonUrl = selectedAd.button_url || '#'
     const trackedUrl = buttonUrl !== '#'
-      ? wrapTrackingUrl(buttonUrl, 'Advertorial', issue.date, issue.mailerlite_issue_id, issue.id)
+      ? wrapTrackingUrl(buttonUrl, 'Advertorial', issue.date, issue.mailerlite_issue_id, issue.id, undefined, websiteUrl)
       : '#'
 
     // Use the shared advertorial HTML generator
@@ -156,7 +156,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
   try {
     console.log('Generating Ad Modules sections for issue:', issue?.id, moduleId ? `(mod: ${moduleId})` : '(all modules)')
 
-    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Use pre-fetched data or fall back to DB query (legacy callers)
     let selections: any[]
@@ -209,7 +209,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
       // Generate tracked URL for the ad
       const buttonUrl = ad.button_url || '#'
       const trackedUrl = buttonUrl !== '#'
-        ? wrapTrackingUrl(buttonUrl, mod.name, issue.date, issue.mailerlite_issue_id, issue.id)
+        ? wrapTrackingUrl(buttonUrl, mod.name, issue.date, issue.mailerlite_issue_id, issue.id, undefined, websiteUrl)
         : '#'
 
       // Get block order from mod config

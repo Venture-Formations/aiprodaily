@@ -30,7 +30,7 @@ export function wrapTrackingUrl(
   linkType?: LinkType,
   pubBaseUrl?: string
 ): string {
-  const baseUrl = pubBaseUrl || process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
+  const baseUrl = pubBaseUrl || process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiprodaily.com'
 
   const params = new URLSearchParams({
     url: url,

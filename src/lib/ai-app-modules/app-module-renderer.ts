@@ -371,8 +371,8 @@ export class AppModuleRenderer {
 
     // Get publication styling (use passed-in settings if available)
     const baseStyles = businessSettings
-      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont }
-      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color, tertiaryColor: s.tertiary_color, headingFont: s.heading_font, bodyFont: s.body_font }))
+      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont, websiteUrl: businessSettings.websiteUrl }
+      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color, tertiaryColor: s.tertiary_color, headingFont: s.heading_font, bodyFont: s.body_font, websiteUrl: s.website_url }))
 
     // Merge default block config with mod's block config
     const blockConfig: ProductCardBlockConfig = {
@@ -413,7 +413,8 @@ export class AppModuleRenderer {
             context.issueDate,
             context.mailerliteIssueId,
             context.issueId,
-            'ai_app'
+            'ai_app',
+            baseStyles.websiteUrl
           )
         : baseUrl
 
