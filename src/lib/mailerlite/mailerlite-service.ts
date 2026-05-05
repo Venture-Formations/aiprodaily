@@ -6,6 +6,7 @@ import { generateFullNewsletterHtml } from '../newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
 import { getEnvironment, isProduction } from '../env-guard'
 import { isCircuitOpen, recordRateLimitHit } from '../remediation/circuit-breaker'
+import { getTodayStr } from '../date-utils'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -233,9 +234,7 @@ United States
         try {
           // Schedule review for TODAY at scheduled send time
           // issue is created at issue Creation Time (8:50pm) and scheduled to send same day at Scheduled Send Time
-          const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-          const centralDate = new Date(nowCentral)
-          const today = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
+          const today = getTodayStr('CST')
           scheduleData = await this.getReviewScheduleData(today, issue.publication_id)
           console.log('Scheduling review issue for today with data:', scheduleData)
 
@@ -780,9 +779,7 @@ United States
         // Schedule the final issue for TODAY at scheduled send time
         // issue is created at issue Creation Time and scheduled to send same day at Scheduled Send Time
         try {
-          const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-          const centralDate = new Date(nowCentral)
-          const today = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
+          const today = getTodayStr('CST')
           const finalScheduleData = isSecondary
             ? await this.getSecondaryScheduleData(today, issue.publication_id)
             : await this.getFinalScheduleData(today, issue.publication_id)

@@ -1,5 +1,6 @@
 import { Feed } from 'feed'
 import { supabaseAdmin } from '@/lib/supabase'
+import { fetchAllPaginated } from '@/lib/dal/paginate'
 import { XMLParser } from 'fast-xml-parser'
 import { generateAndUploadTradeImage } from './trade-image-generator'
 import { normalizeTransactionType } from './transaction-type'
@@ -178,55 +179,6 @@ export function parseTradeSize(raw: string | null | undefined): number {
   return isNaN(num) ? 0 : num
 }
 
-/**
- * Fetch all rows from a Supabase table using pagination.
- * Supabase defaults to 1,000 rows per request.
- */
-async function fetchAllRows<T>(
-  table: string,
-  columns: string,
-  options?: {
-    order?: { column: string; ascending: boolean }
-    filters?: Array<{ column: string; op: 'eq' | 'neq'; value: any }>
-  }
-): Promise<T[]> {
-  const PAGE_SIZE = 1000
-  const allRows: T[] = []
-  let offset = 0
-
-  while (true) {
-    let query = supabaseAdmin
-      .from(table)
-      .select(columns)
-      .range(offset, offset + PAGE_SIZE - 1)
-
-    if (options?.order) {
-      query = query.order(options.order.column, { ascending: options.order.ascending })
-    }
-
-    if (options?.filters) {
-      for (const f of options.filters) {
-        query = query.eq(f.column, f.value)
-      }
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error(`[RSS-Combiner] Failed to fetch ${table}:`, error.message)
-      break
-    }
-
-    if (!data || data.length === 0) break
-
-    allRows.push(...(data as T[]))
-
-    if (data.length < PAGE_SIZE) break
-    offset += PAGE_SIZE
-  }
-
-  return allRows
-}
 
 /**
  * Get top trades: deduplicate by ticker (keep largest trade_size_parsed),
@@ -243,10 +195,15 @@ export async function getTopTrades(maxTrades: number, tradeFreshnessDays?: numbe
   )
 
   // Fetch all trades with pagination, ordered by size desc
-  const trades = await fetchAllRows<CongressTrade>(
-    'congress_trades',
-    'id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time, image_url',
-    { order: { column: 'trade_size_parsed', ascending: false } }
+  const trades = await fetchAllPaginated<CongressTrade>(
+    () =>
+      supabaseAdmin
+        .from('congress_trades')
+        .select(
+          'id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state, quiver_upload_time, image_url'
+        )
+        .order('trade_size_parsed', { ascending: false }),
+    { label: 'rss-combiner:congress_trades' }
   )
 
   // Helper: run dedup/exclusion/per-member logic on a set of trades

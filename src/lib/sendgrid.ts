@@ -22,6 +22,7 @@ import {
   generateWelcomeSection
 } from './newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from './publication-settings'
+import { getTodayStr } from './date-utils'
 
 // Initialize SendGrid clients
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || ''
@@ -183,9 +184,7 @@ export class SendGridService {
 
       // Schedule the campaign for today at review send time
       try {
-        const nowCentral = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })
-        const centralDate = new Date(nowCentral)
-        const today = centralDate.toISOString().split('T')[0]
+        const today = getTodayStr('CST')
 
         const scheduleSettings = await getScheduleSettings(issue.publication_id)
         const sendAt = toSendGridSchedule(today, scheduleSettings.review_send_time)
@@ -317,9 +316,7 @@ export class SendGridService {
 
       // Schedule the campaign
       try {
-        const nowCentral = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })
-        const centralDate = new Date(nowCentral)
-        const today = centralDate.toISOString().split('T')[0]
+        const today = getTodayStr('CST')
 
         let sendTime: string
         if (isSecondary) {

@@ -96,3 +96,17 @@ export function getDaysAgoStr(days: number, tz: SupportedTz): string {
   }
   return tzDateFormatter.format(shifted)
 }
+
+/**
+ * Get tomorrow's date string in the given timezone. DST-safe: derives "today"
+ * via the timezone-aware path so the returned date is calendar-tomorrow in
+ * that zone, not "now + 24h" (which is wrong on spring-forward days).
+ */
+export function getTomorrowStr(tz: SupportedTz): string {
+  const todayStr = getTodayStr(tz)
+  const [y, m, d] = todayStr.split('-').map(Number)
+  // Construct UTC noon to avoid DST/midnight edge cases, advance one day,
+  // then format back to YYYY-MM-DD using local date parts.
+  const tomorrow = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0))
+  return `${tomorrow.getUTCFullYear()}-${String(tomorrow.getUTCMonth() + 1).padStart(2, '0')}-${String(tomorrow.getUTCDate()).padStart(2, '0')}`
+}

@@ -1,6 +1,7 @@
 import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { fetchAllPaginated } from '@/lib/dal/paginate'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
@@ -159,14 +160,20 @@ async function syncRealClickStatus(log: Logger): Promise<{
       const validClicks = allClicks.filter(c => !isIPExcluded(c.ip_address, exclusions))
       const emailsWithValidClicks = new Set(validClicks.map(c => c.subscriber_email.toLowerCase()))
 
-      // Get current stored state
-      const { data: currentStatus } = await supabaseAdmin
-        .from('subscriber_real_click_status')
-        .select('subscriber_email, has_real_click')
-        .eq('publication_id', publication.id)
+      // Get current stored state — paginate past Supabase's 1000-row default
+      // limit. Without this, every sync past 1000 rows silently dropped
+      // clickers and resent the same MailerLite updates indefinitely.
+      const currentStatus = await fetchAllPaginated<{ subscriber_email: string; has_real_click: boolean }>(
+        () =>
+          supabaseAdmin
+            .from('subscriber_real_click_status')
+            .select('subscriber_email, has_real_click')
+            .eq('publication_id', publication.id),
+        { label: 'process-mailerlite-updates:subscriber_real_click_status' }
+      )
 
       const currentStatusMap = new Map<string, boolean>()
-      for (const status of currentStatus || []) {
+      for (const status of currentStatus) {
         currentStatusMap.set(status.subscriber_email.toLowerCase(), status.has_real_click)
       }
 
