@@ -1,5 +1,9 @@
 import { supabaseAdmin } from '../supabase'
 import { getArticleSettings } from '../publication-settings'
+import { getTomorrowStr } from '../date-utils'
+import { listPostsForScoring, assignPostsToIssue, listPostsByIssue, unassignPosts } from '@/lib/dal/posts'
+import { listModuleArticlesByIssue } from '@/lib/dal/articles'
+import { listDuplicateGroupIdsByIssue } from '@/lib/dal/dedup'
 import type { RSSProcessorContext } from './shared-context'
 import { getNewsletterIdFromIssue, formatError } from './shared-context'
 import type { Deduplication } from './deduplication'
@@ -66,13 +70,7 @@ export class IssueLifecycle {
       // STEP 1: Create NEW issue
       console.log('[Step 1/10] Creating new issue...')
 
-      const ctParts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Chicago',
-        year: 'numeric', month: '2-digit', day: '2-digit'
-      }).format(new Date())
-      const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
-      const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
-      const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
+      const issueDate = getTomorrowStr('CST')
 
       const { data: newissue, error: createError } = await supabaseAdmin
         .from('publication_issues')
@@ -110,30 +108,19 @@ export class IssueLifecycle {
       // STEP 4: Run deduplication
       console.log('[Step 4/10] Deduplicating posts...')
       await this.deduplication.handleDuplicatesForIssue(issueId)
-      const { data: duplicateGroups } = await supabaseAdmin
-        .from('duplicate_groups')
-        .select('id')
-        .eq('issue_id', issueId)
-      const groupsCount = duplicateGroups ? duplicateGroups.length : 0
+      const groupsCount = (await listDuplicateGroupIdsByIssue(issueId)).length
       console.log(`[Step 4/10] ✓ Deduplicated: ${groupsCount} duplicate groups`)
 
       // STEP 5: Article generation now handled by process-rss-workflow.ts -> module-articles.ts
       console.log('[Step 5/10] Counting module articles (generation handled by workflow)...')
-      const { data: generatedArticles } = await supabaseAdmin
-        .from('module_articles')
-        .select('id')
-        .eq('issue_id', issueId)
-      console.log(`[Step 5/10] ✓ Generated ${generatedArticles?.length || 0} module articles`)
+      const generatedArticles = await listModuleArticlesByIssue(issueId, { idsOnly: true })
+      console.log(`[Step 5/10] ✓ Generated ${generatedArticles.length} module articles`)
 
       // STEP 6: Article selection now handled by module pipeline (ArticleModuleSelector)
       console.log('[Step 6/10] Counting active module articles (selection handled by workflow)...')
       await this.articleSelector.selectTopArticlesForIssue(issueId)
-      const { data: activeModuleArticles } = await supabaseAdmin
-        .from('module_articles')
-        .select('id')
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-      console.log(`[Step 6/10] ✓ Selected ${activeModuleArticles?.length || 0} active module articles`)
+      const activeModuleArticles = await listModuleArticlesByIssue(issueId, { idsOnly: true, activeOnly: true })
+      console.log(`[Step 6/10] ✓ Selected ${activeModuleArticles.length} active module articles`)
 
       // STEP 7: Initialize and generate text box modules
       console.log('[Step 7/10] Generating text box modules...')
@@ -314,59 +301,46 @@ export class IssueLifecycle {
 
     const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
 
-    const { data: allPrimaryPosts } = await supabaseAdmin
-      .from('rss_posts')
-      .select(`
-        id,
-        post_ratings(total_score)
-      `)
-      .in('feed_id', primaryFeedIds)
-      .is('issue_id', null)
-      .gte('processed_at', lookbackTimestamp)
-      .not('post_ratings', 'is', null)
+    const allPrimaryPosts = await listPostsForScoring(primaryFeedIds, {
+      unassignedOnly: true,
+      sinceTimestamp: lookbackTimestamp,
+      requireRating: true,
+      columns: 'id, post_ratings(total_score)',
+    })
 
     const topPrimary = allPrimaryPosts
-      ?.sort((a: any, b: any) => {
+      .sort((a: any, b: any) => {
         const scoreA = a.post_ratings?.[0]?.total_score || 0
         const scoreB = b.post_ratings?.[0]?.total_score || 0
         return scoreB - scoreA
       })
-      .slice(0, 12) || []
+      .slice(0, 12)
 
-    const { data: allSecondaryPosts } = await supabaseAdmin
-      .from('rss_posts')
-      .select(`
-        id,
-        post_ratings(total_score)
-      `)
-      .in('feed_id', secondaryFeedIds)
-      .is('issue_id', null)
-      .gte('processed_at', lookbackTimestamp)
-      .not('post_ratings', 'is', null)
+    const allSecondaryPosts = await listPostsForScoring(secondaryFeedIds, {
+      unassignedOnly: true,
+      sinceTimestamp: lookbackTimestamp,
+      requireRating: true,
+      columns: 'id, post_ratings(total_score)',
+    })
 
     const topSecondary = allSecondaryPosts
-      ?.sort((a: any, b: any) => {
+      .sort((a: any, b: any) => {
         const scoreA = a.post_ratings?.[0]?.total_score || 0
         const scoreB = b.post_ratings?.[0]?.total_score || 0
         return scoreB - scoreA
       })
-      .slice(0, 12) || []
+      .slice(0, 12)
 
-    const primaryIds = topPrimary?.map(p => p.id) || []
-    const secondaryIds = topSecondary?.map(p => p.id) || []
+    const primaryIds = topPrimary.map((p: any) => p.id)
+    const secondaryIds = topSecondary.map((p: any) => p.id)
 
-    if (primaryIds.length > 0) {
-      await supabaseAdmin
-        .from('rss_posts')
-        .update({ issue_id: issueId })
-        .in('id', primaryIds)
+    const primaryOk = await assignPostsToIssue(primaryIds, issueId)
+    if (!primaryOk && primaryIds.length > 0) {
+      console.warn(`[Step 3/10] ⚠️ Failed to assign ${primaryIds.length} primary posts to issue ${issueId}`)
     }
-
-    if (secondaryIds.length > 0) {
-      await supabaseAdmin
-        .from('rss_posts')
-        .update({ issue_id: issueId })
-        .in('id', secondaryIds)
+    const secondaryOk = await assignPostsToIssue(secondaryIds, issueId)
+    if (!secondaryOk && secondaryIds.length > 0) {
+      console.warn(`[Step 3/10] ⚠️ Failed to assign ${secondaryIds.length} secondary posts to issue ${issueId}`)
     }
 
     return { primary: primaryIds.length, secondary: secondaryIds.length }
@@ -376,25 +350,15 @@ export class IssueLifecycle {
    * Stage 1 Unassignment: Unassign posts that were assigned but no articles generated
    */
   async unassignUnusedPosts(issueId: string): Promise<{ unassigned: number }> {
-    const { data: assignedPosts } = await supabaseAdmin
-      .from('rss_posts')
-      .select('id')
-      .eq('issue_id', issueId)
-
-    const assignedPostIds = assignedPosts?.map(p => p.id) || []
+    const assignedPosts = await listPostsByIssue(issueId, { idsOnly: true })
+    const assignedPostIds = assignedPosts.map(p => p.id)
 
     if (assignedPostIds.length === 0) {
       return { unassigned: 0 }
     }
 
-    const { data: moduleArticlesUsed } = await supabaseAdmin
-      .from('module_articles')
-      .select('post_id')
-      .eq('issue_id', issueId)
-
-    const usedPostIds = [
-      ...(moduleArticlesUsed?.map(a => a.post_id).filter(Boolean) || [])
-    ]
+    const moduleArticlesUsed = await listModuleArticlesByIssue(issueId, { postIdsOnly: true })
+    const usedPostIds = moduleArticlesUsed.map(a => a.post_id).filter((id): id is string => !!id)
 
     const unusedPostIds = assignedPostIds.filter(id => !usedPostIds.includes(id))
 
@@ -402,10 +366,7 @@ export class IssueLifecycle {
       return { unassigned: 0 }
     }
 
-    await supabaseAdmin
-      .from('rss_posts')
-      .update({ issue_id: null })
-      .in('id', unusedPostIds)
+    await unassignPosts(unusedPostIds)
 
     return { unassigned: unusedPostIds.length }
   }

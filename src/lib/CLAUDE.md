@@ -7,9 +7,25 @@ Check `docs/architecture/DEPENDENCY_MAP.md` for downstream impact. Files in `src
 ## Key Conventions
 
 ### Database Access
-- Always use `supabaseAdmin` — never the anon client
+- **Prefer the DAL** (`src/lib/dal/*`) over direct `supabaseAdmin` calls. New code should import from a DAL module; existing direct calls migrate as files are touched.
+- When writing direct queries, always use `supabaseAdmin` — never the anon client
 - Every query must filter by `publication_id`
 - Explicit column lists in `.select()` — never `select('*')`
+- For lists that can exceed 1000 rows, use `fetchAllPaginated` from `@/lib/dal/paginate` (Supabase's default `.select()` silently truncates at 1000)
+
+### Data Access Layer (`src/lib/dal/`)
+| Module | Domain | Tables |
+|--------|--------|--------|
+| `dal/issues.ts` | Issue lifecycle | `publication_issues` |
+| `dal/posts.ts` | RSS post lifecycle | `rss_posts`, `post_ratings` |
+| `dal/articles.ts` | Article rows per issue | `module_articles`, `manual_articles` |
+| `dal/dedup.ts` | Duplicate detection results | `duplicate_groups`, `duplicate_posts` |
+| `dal/paginate.ts` | Generic paginated reads | (helper, not table-bound) |
+| `dal/analytics.ts` | Analytics aggregates | (existing) |
+
+DAL conventions: exported functions (no classes); reads return `T | null` or `T[]`; writes return `boolean`; errors are logged via pino and swallowed (callers don't need try/catch). Mirror `dal/issues.ts` when adding a new module.
+
+**Module-type domains stay at `src/lib/*-modules/`** (`article-modules/`, `prompt-modules/`, `ai-app-modules/`, `ad-modules/`, `poll-modules/`, `text-box-modules/`, `feedback-modules/`, `sparkloop-rec-modules/`). Each selector class already follows the DAL pattern (DB access centralized, structured methods). Do NOT migrate them to `dal/`; keep new module-type code there too.
 
 ### Settings Access
 Two-tier fallback: publication-specific first, then app-wide:
