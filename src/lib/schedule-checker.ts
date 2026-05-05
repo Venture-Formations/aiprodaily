@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase'
 import { getScheduleConfig } from './settings/schedule-settings'
+import { getTodayStr, getTomorrowStr } from './date-utils'
 
 interface ScheduleSettings {
   reviewScheduleEnabled: boolean
@@ -63,9 +64,7 @@ export class ScheduleChecker {
       // Allow running multiple times per day for testing purposes
       // Only check if time window matches, don't prevent multiple runs per day
       try {
-        const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-        const centralDate = new Date(nowCentral)
-        const today = centralDate.toISOString().split('T')[0]
+        const today = getTodayStr('CST')
 
         // Update the last run date to today (for logging/tracking purposes only)
         await supabaseAdmin
@@ -158,14 +157,7 @@ export class ScheduleChecker {
       if (minutesAfter < 5 || minutesAfter > 30) return false
 
       // Check if there's a draft issue for tomorrow with no review_sent_at
-      // Use Intl.DateTimeFormat to avoid timezone conversion bugs with toISOString()
-      const ctParts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Chicago',
-        year: 'numeric', month: '2-digit', day: '2-digit'
-      }).format(new Date())
-      const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
-      const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
-      const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
+      const issueDate = getTomorrowStr('CST')
 
       const { data: draftIssue } = await supabaseAdmin
         .from('publication_issues')

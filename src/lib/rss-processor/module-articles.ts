@@ -2,6 +2,24 @@ import { supabaseAdmin } from '../supabase'
 import { AI_CALL, callOpenAI } from '../openai'
 import { normalizeTransactionType } from '../transaction-type'
 import { detectAIRefusal, getNewsletterIdFromIssue } from './shared-context'
+import {
+  listPostsForScoring,
+  assignPostsToIssue,
+  listAssignedPostsForModule,
+  POST_WITH_RATINGS_BRIEF,
+} from '@/lib/dal/posts'
+import {
+  moduleArticleExists,
+  insertModuleArticle,
+  listArticlesNeedingBody,
+  listArticlesNeedingFactCheck,
+  updateModuleArticleContent,
+  updateModuleArticleFactCheck,
+} from '@/lib/dal/articles'
+import {
+  listDuplicateGroupIdsByIssue,
+  listDuplicatePostIdsByGroups,
+} from '@/lib/dal/dedup'
 import type { ArticleGenerator } from './article-generator'
 
 /**
@@ -65,40 +83,22 @@ export class ModuleArticles {
 
     console.log(`[Module] Querying posts: feedIds=${JSON.stringify(feedIds)}, lookback=${lookbackTimestamp}, postsToAssign=${postsToAssign}`)
 
-    const { data: topPosts, error: postsError } = await supabaseAdmin
-      .from('rss_posts')
-      .select(`
-        id,
-        ticker,
-        post_ratings(
-          total_score,
-          criteria_1_score,
-          criteria_2_score,
-          criteria_3_score,
-          criteria_4_score,
-          criteria_5_score
-        )
-      `)
-      .in('feed_id', feedIds)
-      .is('issue_id', null)
-      .gte('processed_at', lookbackTimestamp)
-      .not('post_ratings', 'is', null)
-
-    if (postsError) {
-      console.error(`[Module] Query error for mod ${mod.name}:`, postsError.message)
-      return { assigned: 0 }
-    }
+    const topPosts = await listPostsForScoring(feedIds, {
+      unassignedOnly: true,
+      sinceTimestamp: lookbackTimestamp,
+      requireRating: true,
+      columns: POST_WITH_RATINGS_BRIEF,
+    })
 
     if (!topPosts || topPosts.length === 0) {
       // Debug: check without the post_ratings filter
-      const { data: unfilteredPosts, error: unfilteredError } = await supabaseAdmin
-        .from('rss_posts')
-        .select('id')
-        .in('feed_id', feedIds)
-        .is('issue_id', null)
-        .gte('processed_at', lookbackTimestamp)
+      const unfilteredPosts = await listPostsForScoring(feedIds, {
+        unassignedOnly: true,
+        sinceTimestamp: lookbackTimestamp,
+        columns: 'id',
+      })
 
-      console.log(`[Module] No available posts for mod ${mod.name} (unfiltered count: ${unfilteredPosts?.length || 0}, error: ${unfilteredError?.message || 'none'})`)
+      console.log(`[Module] No available posts for mod ${mod.name} (unfiltered count: ${unfilteredPosts.length})`)
       return { assigned: 0 }
     }
 
@@ -169,13 +169,14 @@ export class ModuleArticles {
     }
 
     if (selectedPosts.length > 0) {
-      await supabaseAdmin
-        .from('rss_posts')
-        .update({
-          issue_id: issueId,
-          article_module_id: moduleId
-        })
-        .in('id', selectedPosts.map((p: any) => p.id))
+      const ok = await assignPostsToIssue(
+        selectedPosts.map((p: any) => p.id),
+        issueId,
+        { moduleId }
+      )
+      if (!ok) {
+        console.warn(`[Module] ⚠️ Failed to assign ${selectedPosts.length} posts for mod ${mod.name} (issue ${issueId})`)
+      }
     }
 
     console.log(`[Module] Assigned ${selectedPosts.length} posts to mod ${mod.name}${filteredCount > 0 ? ` (${filteredCount} filtered by minimum scores)` : ''}`)
@@ -201,15 +202,7 @@ export class ModuleArticles {
       return
     }
 
-    const { data: posts } = await supabaseAdmin
-      .from('rss_posts')
-      .select(`
-        id, title, description, content, full_article_text, source_url, image_url, image_alt, feed_id, issue_id, article_module_id, ticker, member_name, transaction_type,
-        post_ratings(total_score, criteria_1_score, criteria_2_score, criteria_3_score, criteria_4_score, criteria_5_score)
-      `)
-      .eq('issue_id', issueId)
-      .eq('article_module_id', moduleId)
-      .in('feed_id', feedIds)
+    const posts = await listAssignedPostsForModule(issueId, moduleId, feedIds)
 
     if (!posts || posts.length === 0) {
       console.log(`[Module Titles] No posts assigned to mod ${mod.name}`)
@@ -217,21 +210,8 @@ export class ModuleArticles {
     }
 
     // Get duplicate post IDs to exclude
-    const { data: duplicateGroups } = await supabaseAdmin
-      .from('duplicate_groups')
-      .select('id')
-      .eq('issue_id', issueId)
-
-    const groupIds = duplicateGroups?.map(g => g.id) || []
-    let duplicatePostIds = new Set<string>()
-
-    if (groupIds.length > 0) {
-      const { data: duplicatePosts } = await supabaseAdmin
-        .from('duplicate_posts')
-        .select('post_id')
-        .in('group_id', groupIds)
-      duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
-    }
+    const groupIds = await listDuplicateGroupIdsByIssue(issueId)
+    const duplicatePostIds = await listDuplicatePostIdsByGroups(groupIds)
 
     const { prompts } = await ArticleModuleSelector.getModulePrompts(moduleId)
     const titlePrompt = prompts.find(p => p.prompt_type === 'article_title')
@@ -256,17 +236,9 @@ export class ModuleArticles {
     for (let i = 0; i < postsWithRatings.length; i += BATCH_SIZE) {
       const batch = postsWithRatings.slice(i, i + BATCH_SIZE)
 
-      await Promise.all(batch.map(async (post) => {
+      await Promise.all(batch.map(async (post: any) => {
         try {
-          const { data: existing } = await supabaseAdmin
-            .from('module_articles')
-            .select('id')
-            .eq('post_id', post.id)
-            .eq('issue_id', issueId)
-            .eq('article_module_id', moduleId)
-            .maybeSingle()
-
-          if (existing) {
+          if (await moduleArticleExists(post.id, issueId, moduleId)) {
             console.log(`[Module Titles] Article already exists for post ${post.id}`)
             return
           }
@@ -312,29 +284,27 @@ export class ModuleArticles {
             return
           }
 
-          const { error: insertError } = await supabaseAdmin
-            .from('module_articles')
-            .insert([{
-              post_id: post.id,
-              issue_id: issueId,
-              article_module_id: moduleId,
-              headline: headline,
-              content: '',
-              rank: null,
-              is_active: false,
-              skipped: false,
-              fact_check_score: null,
-              fact_check_details: null,
-              word_count: 0,
-              ticker: (post as any).ticker || null,
-              member_name: (post as any).member_name || null,
-              transaction_type: (post as any).transaction_type || null,
-              trade_image_url: (post as any).image_url || null,
-              trade_image_alt: (post as any).image_alt || (post as any).ticker || null
-            }])
+          const insertResult = await insertModuleArticle({
+            post_id: post.id,
+            issue_id: issueId,
+            article_module_id: moduleId,
+            headline: headline,
+            content: '',
+            rank: null,
+            is_active: false,
+            skipped: false,
+            fact_check_score: null,
+            fact_check_details: null,
+            word_count: 0,
+            ticker: (post as any).ticker || null,
+            member_name: (post as any).member_name || null,
+            transaction_type: (post as any).transaction_type || null,
+            trade_image_url: (post as any).image_url || null,
+            trade_image_alt: (post as any).image_alt || (post as any).ticker || null,
+          })
 
-          if (insertError && insertError.code !== '23505') {
-            console.error(`[Module Titles] Insert failed for post ${post.id}:`, insertError.message)
+          if (!insertResult.ok && !insertResult.duplicate) {
+            console.error(`[Module Titles] Insert failed for post ${post.id}`)
           }
 
           console.log(`[Module Titles] Generated: "${headline.substring(0, 50)}..."`)
@@ -368,18 +338,7 @@ export class ModuleArticles {
     const { prompts } = await ArticleModuleSelector.getModulePrompts(moduleId)
     const bodyPrompt = prompts.find(p => p.prompt_type === 'article_body')
 
-    const { data: articles } = await supabaseAdmin
-      .from('module_articles')
-      .select(`
-        id, headline, content, post_id,
-        rss_posts(id, title, description, content, full_article_text, source_url, transaction_type)
-      `)
-      .eq('issue_id', issueId)
-      .eq('article_module_id', moduleId)
-      .eq('content', '')
-      .not('headline', 'is', null)
-      .order('post_id', { ascending: true })
-      .limit(limit)
+    const articles = await listArticlesNeedingBody(issueId, moduleId, limit)
 
     if (!articles || articles.length === 0) {
       console.log(`[Module Bodies] No articles awaiting body generation for ${mod.name}`)
@@ -474,13 +433,10 @@ export class ModuleArticles {
             return
           }
 
-          await supabaseAdmin
-            .from('module_articles')
-            .update({
-              content: bodyResult.content,
-              word_count: bodyResult.word_count
-            })
-            .eq('id', article.id)
+          await updateModuleArticleContent(article.id, {
+            content: bodyResult.content,
+            wordCount: bodyResult.word_count,
+          })
 
           console.log(`[Module Bodies] Generated body for article ${article.id} (${bodyResult.word_count} words)`)
 
@@ -510,17 +466,7 @@ export class ModuleArticles {
       return
     }
 
-    const { data: articles } = await supabaseAdmin
-      .from('module_articles')
-      .select(`
-        id, content, fact_check_score,
-        rss_posts(id, content, description)
-      `)
-      .eq('issue_id', issueId)
-      .eq('article_module_id', moduleId)
-      .neq('content', '')
-      .not('content', 'is', null)
-      .is('fact_check_score', null)
+    const articles = await listArticlesNeedingFactCheck(issueId, moduleId)
 
     if (!articles || articles.length === 0) {
       console.log(`[Module Fact-Check] No articles awaiting fact-check for ${mod.name}`)
@@ -544,26 +490,20 @@ export class ModuleArticles {
           const originalContent = post.content || post.description || ''
           const factCheck = await this.articleGenerator.factCheckContent(article.content, originalContent, newsletterId)
 
-          await supabaseAdmin
-            .from('module_articles')
-            .update({
-              fact_check_score: factCheck.score,
-              fact_check_details: factCheck.details
-            })
-            .eq('id', article.id)
+          await updateModuleArticleFactCheck(article.id, {
+            score: factCheck.score,
+            details: factCheck.details,
+          })
 
           console.log(`[Module Fact-Check] Article ${article.id}: Score ${factCheck.score}/10`)
 
         } catch (error) {
           console.error(`[Module Fact-Check] Failed for article ${article.id}:`, error instanceof Error ? error.message : 'Unknown')
 
-          await supabaseAdmin
-            .from('module_articles')
-            .update({
-              fact_check_score: 0,
-              fact_check_details: `Fact-check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-            })
-            .eq('id', article.id)
+          await updateModuleArticleFactCheck(article.id, {
+            score: 0,
+            details: `Fact-check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          })
         }
       }))
 

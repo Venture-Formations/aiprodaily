@@ -2,60 +2,69 @@ import { supabaseAdmin } from '../supabase'
 import { Deduplicator } from '../deduplicator'
 import type { RssPost } from '@/types/database'
 import { getNewsletterIdFromIssue } from './shared-context'
+import { listPostsByIssue } from '@/lib/dal/posts'
+import {
+  isIssueDeduplicated,
+  listDuplicateGroupIdsByIssue,
+  listDuplicatePostIdsByGroups,
+  storeDeduplicationResult,
+  type NewDuplicatePost,
+} from '@/lib/dal/dedup'
+
+/**
+ * A "historical match" is a duplicate group whose primary post was published
+ * in a prior issue — meaning the primary itself should also be flagged as a
+ * duplicate (so we don't re-run an article on it).
+ */
+function isHistoricalDedupGroup(group: {
+  detection_method?: string
+  explanation?: string
+  topic_signature?: string
+}): boolean {
+  if (group.detection_method === 'historical_match') return true
+  if (group.topic_signature?.startsWith('Historical AI match:')) return true
+  if (
+    (group.detection_method === 'title_similarity' || group.detection_method === 'ai_semantic') &&
+    group.explanation?.includes('previously published')
+  ) {
+    return true
+  }
+  return false
+}
 
 /**
  * Duplicate detection and handling module.
  */
 export class Deduplication {
   async handleDuplicatesForIssue(issueId: string) {
-    const { data: allPosts, error } = await supabaseAdmin
-      .from('rss_posts')
-      .select('*')
-      .eq('issue_id', issueId)
+    const allPosts = await listPostsByIssue(issueId)
 
-    if (error || !allPosts || allPosts.length === 0) {
+    if (allPosts.length === 0) {
       return { groups: 0, duplicates: 0 }
     }
 
     await this.handleDuplicates(allPosts, issueId)
 
-    const { data: duplicateGroups } = await supabaseAdmin
-      .from('duplicate_groups')
-      .select('id')
-      .eq('issue_id', issueId)
-
-    const { data: duplicatePosts } = await supabaseAdmin
-      .from('duplicate_posts')
-      .select('id')
-      .in('group_id', duplicateGroups?.map(g => g.id) || [])
+    const groupIds = await listDuplicateGroupIdsByIssue(issueId)
+    const duplicatePostIds = await listDuplicatePostIdsByGroups(groupIds)
 
     return {
-      groups: duplicateGroups ? duplicateGroups.length : 0,
-      duplicates: duplicatePosts ? duplicatePosts.length : 0
+      groups: groupIds.length,
+      duplicates: duplicatePostIds.size,
     }
   }
 
   async handleDuplicates(posts: RssPost[], issueId: string) {
     try {
       // Check if already deduplicated for this issue
-      const { data: existingGroups } = await supabaseAdmin
-        .from('duplicate_groups')
-        .select('id')
-        .eq('issue_id', issueId)
-        .limit(1)
-
-      if (existingGroups && existingGroups.length > 0) {
+      if (await isIssueDeduplicated(issueId)) {
         return
       }
 
-      const { data: allPosts, error } = await supabaseAdmin
-        .from('rss_posts')
-        .select('*')
-        .eq('issue_id', issueId)
-
-      if (error || !allPosts || allPosts.length === 0) {
+      if (posts.length === 0) {
         return
       }
+      const allPosts = posts
 
       // Get publication_id from issue for multi-tenant filtering
       const newsletterId = await getNewsletterIdFromIssue(issueId)
@@ -98,58 +107,31 @@ export class Deduplication {
 
         console.log(`[Dedup] Storing group: "${group.topic_signature?.substring(0, 50)}..." - Primary: ${group.primary_post_id}`)
 
-        // Create duplicate group
-        const { data: duplicateGroup, error: groupError } = await supabaseAdmin
-          .from('duplicate_groups')
-          .insert([{
-            issue_id: issueId,
-            primary_post_id: group.primary_post_id,
-            topic_signature: group.topic_signature
-          }])
-          .select('id')
-          .single()
+        const isHistoricalMatch = isHistoricalDedupGroup(group)
 
-        if (groupError) {
-          console.error(`[Dedup] Failed to create group:`, groupError.message)
+        const duplicates: NewDuplicatePost[] = group.duplicate_post_ids
+          .filter((postId: string) => isHistoricalMatch || postId !== group.primary_post_id)
+          .map((postId: string) => ({
+            postId,
+            similarityScore: group.similarity_score,
+            detectionMethod: group.detection_method,
+          }))
+
+        const { group: created, storedDuplicates: insertedCount } = await storeDeduplicationResult({
+          issueId,
+          primaryPostId: group.primary_post_id,
+          topicSignature: group.topic_signature,
+          duplicates,
+        })
+
+        if (!created) {
+          console.error(`[Dedup] Failed to create group for primary ${group.primary_post_id}`)
           continue
         }
 
         storedGroups++
-
-        if (duplicateGroup) {
-          console.log(`[Dedup] Marking ${group.duplicate_post_ids.length} posts as duplicates`)
-
-          const isHistoricalMatch = group.detection_method === 'historical_match' ||
-                                   (group.detection_method === 'title_similarity' &&
-                                    group.explanation?.includes('previously published')) ||
-                                   (group.detection_method === 'ai_semantic' &&
-                                    group.explanation?.includes('previously published')) ||
-                                   group.topic_signature?.startsWith('Historical AI match:')
-
-          for (const postId of group.duplicate_post_ids) {
-            if (postId === group.primary_post_id && !isHistoricalMatch) {
-              console.log(`[Dedup] Skipping primary post ${postId} from duplicate list`)
-              continue
-            }
-
-            const { error: dupError } = await supabaseAdmin
-              .from('duplicate_posts')
-              .insert([{
-                group_id: duplicateGroup.id,
-                post_id: postId,
-                similarity_score: group.similarity_score,
-                detection_method: group.detection_method,
-                actual_similarity_score: group.similarity_score
-              }])
-
-            if (dupError) {
-              console.error(`[Dedup] Failed to mark post ${postId} as duplicate:`, dupError.message)
-            } else {
-              console.log(`[Dedup] Marked post ${postId} as duplicate (${group.detection_method})`)
-              storedDuplicates++
-            }
-          }
-        }
+        storedDuplicates += insertedCount
+        console.log(`[Dedup] Stored group ${created.id}: ${insertedCount}/${duplicates.length} duplicate rows inserted`)
       }
 
       console.log(`[Dedup] Stored ${storedGroups} groups with ${storedDuplicates} duplicate posts total`)

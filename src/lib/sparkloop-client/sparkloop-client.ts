@@ -15,6 +15,7 @@ import type {
   StoredSparkLoopRecommendation,
 } from '@/types/sparkloop'
 import { supabaseAdmin } from '@/lib/supabase'
+import { fetchAllPaginated } from '@/lib/dal/paginate'
 import { getPublicationSettings, getSparkLoopCredentials } from '@/lib/publication-settings'
 import { toLocalDateStr as toDateString } from '@/lib/date-utils'
 
@@ -994,23 +995,17 @@ export class SparkLoopService {
     snapLowerDate.setDate(snapLowerDate.getDate() - (maxScreeningForFetch + windowDays + 7))
     const snapLowerStr = toDateString(snapLowerDate)
 
-    const allSnaps: Array<{ ref_code: string; sparkloop_confirmed: number; sparkloop_rejected: number; snapshot_date: string }> = []
-    let snapOffset = 0
-    const SNAP_PAGE = 1000
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_daily_snapshots')
-        .select('ref_code, sparkloop_confirmed, sparkloop_rejected, snapshot_date')
-        .eq('publication_id', publicationId)
-        .gte('snapshot_date', snapLowerStr)
-        .lte('snapshot_date', todayStr)
-        .order('snapshot_date', { ascending: false })
-        .range(snapOffset, snapOffset + SNAP_PAGE - 1)
-      if (!page || page.length === 0) break
-      allSnaps.push(...page)
-      if (page.length < SNAP_PAGE) break
-      snapOffset += SNAP_PAGE
-    }
+    const allSnaps = await fetchAllPaginated<{ ref_code: string; sparkloop_confirmed: number; sparkloop_rejected: number; snapshot_date: string }>(
+      () =>
+        supabaseAdmin
+          .from('sparkloop_daily_snapshots')
+          .select('ref_code, sparkloop_confirmed, sparkloop_rejected, snapshot_date')
+          .eq('publication_id', publicationId)
+          .gte('snapshot_date', snapLowerStr)
+          .lte('snapshot_date', todayStr)
+          .order('snapshot_date', { ascending: false }),
+      { label: 'sparkloop:daily_snapshots' }
+    )
 
     // Group snapshots by ref_code, sorted by date descending (most recent first).
     // Exclude each rec's very first snapshot — it captured all-time cumulative totals
@@ -1044,22 +1039,15 @@ export class SparkLoopService {
     sendsRangeEnd.setDate(sendsRangeEnd.getDate() - 1)
 
     // Fetch all referrals in the broadest date range (for sends counting).
-    // Paginate to avoid Supabase's default 1000-row limit.
-    const allReferrals: Array<{ ref_code: string; subscribed_at: string }> = []
-    let refOffset = 0
-    const REF_PAGE = 1000
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_referrals')
-        .select('ref_code, subscribed_at')
-        .eq('publication_id', publicationId)
-        .gte('subscribed_at', toDateString(sendsRangeStart))
-        .range(refOffset, refOffset + REF_PAGE - 1)
-      if (!page || page.length === 0) break
-      allReferrals.push(...page)
-      if (page.length < REF_PAGE) break
-      refOffset += REF_PAGE
-    }
+    const allReferrals = await fetchAllPaginated<{ ref_code: string; subscribed_at: string }>(
+      () =>
+        supabaseAdmin
+          .from('sparkloop_referrals')
+          .select('ref_code, subscribed_at')
+          .eq('publication_id', publicationId)
+          .gte('subscribed_at', toDateString(sendsRangeStart)),
+      { label: 'sparkloop:referrals_for_sends' }
+    )
 
     // Group referrals by ref_code with their dates, and build send date sets for attribution filtering
     const referralsByRefCode = new Map<string, Date[]>()

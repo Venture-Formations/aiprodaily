@@ -3,6 +3,7 @@ import { RSSProcessor } from '@/lib/rss-processor'
 import { ModuleAdSelector } from '@/lib/ad-modules'
 import { PollModuleSelector } from '@/lib/poll-modules'
 import { ArticleModuleSelector } from '@/lib/article-modules'
+import { getTomorrowStr } from '@/lib/date-utils'
 
 /**
  * RSS Processing Workflow (DYNAMIC ARTICLE MODULES)
@@ -117,13 +118,7 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
       console.log(`[Workflow Step 1] Using newsletter: ${newsletter.name} (${newsletter.id})`)
 
       // Always target tomorrow in Central Time (matches send-review logic)
-      const ctParts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Chicago',
-        year: 'numeric', month: '2-digit', day: '2-digit'
-      }).format(new Date())
-      const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
-      const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
-      const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
+      const issueDate = getTomorrowStr('CST')
 
       // Create new issue via DAL (dynamic import: pino uses Node.js modules not available in workflow context)
       const { createIssue } = await import('@/lib/dal')

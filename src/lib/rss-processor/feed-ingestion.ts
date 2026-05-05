@@ -5,6 +5,15 @@ import { alertOnFirecrawl402 } from '../monitoring/firecrawl-monitor'
 import type { RSSProcessorContext } from './shared-context'
 import { isFbcdnUrl } from './shared-context'
 import { Scoring } from './scoring'
+import {
+  getExistingExternalIds,
+  insertPost,
+  applyExtractionResult,
+  listExtractedPostsByIds,
+  listPendingExtractionPosts,
+  getRatedPostIds,
+  insertPostRating,
+} from '@/lib/dal/posts'
 
 const parser = new Parser({
   customFields: {
@@ -113,6 +122,9 @@ export class FeedIngestion {
 
       const blockedDomains = await getBlockedDomains(newsletterId)
 
+      // Pre-filter blocked domains and batch-check which externalIds already exist
+      const candidateItems: typeof recentPosts = []
+      const candidateExternalIds: string[] = []
       for (const item of recentPosts) {
         const externalId = item.guid || item.link || ''
         const sourceUrl = item.link || ''
@@ -123,23 +135,21 @@ export class FeedIngestion {
             const isBlocked = blockedDomains.some(domain =>
               hostname === domain || hostname.endsWith('.' + domain)
             )
-            if (isBlocked) {
-              continue
-            }
+            if (isBlocked) continue
           } catch {
             // Invalid URL, continue processing
           }
         }
+        candidateItems.push(item)
+        candidateExternalIds.push(externalId)
+      }
 
-        const { data: existing } = await supabaseAdmin
-          .from('rss_posts')
-          .select('id')
-          .eq('external_id', externalId)
-          .in('feed_id', publicationFeedIds)
-          .limit(1)
-          .maybeSingle()
+      const existingExternalIds = await getExistingExternalIds(candidateExternalIds, publicationFeedIds)
 
-        if (existing) continue
+      for (const item of candidateItems) {
+        const externalId = item.guid || item.link || ''
+
+        if (existingExternalIds.has(externalId)) continue
 
         const excludedSources = await getExcludedRssSources(newsletterId)
         const author = item.creator || (item as any)['dc:creator'] || null
@@ -170,28 +180,24 @@ export class FeedIngestion {
         const memberName = extractField((item as any).member)
         const transactionType = extractField((item as any).transaction)
 
-        const { data: newPost, error: insertError } = await supabaseAdmin
-          .from('rss_posts')
-          .insert([{
-            feed_id: feed.id,
-            issue_id: null,
-            article_module_id: feed.article_module_id || null,
-            external_id: externalId,
-            title: item.title || '',
-            description: item.contentSnippet || item.content || '',
-            content: item.content || '',
-            author,
-            publication_date: item.pubDate,
-            source_url: item.link,
-            image_url: imageUrl,
-            ticker,
-            member_name: memberName,
-            transaction_type: transactionType,
-          }])
-          .select('id, source_url')
-          .single()
+        const newPost = await insertPost({
+          feed_id: feed.id,
+          issue_id: null,
+          article_module_id: feed.article_module_id || null,
+          external_id: externalId,
+          title: item.title || '',
+          description: item.contentSnippet || item.content || '',
+          content: item.content || '',
+          author,
+          publication_date: item.pubDate,
+          source_url: item.link,
+          image_url: imageUrl,
+          ticker,
+          member_name: memberName,
+          transaction_type: transactionType,
+        })
 
-        if (insertError || !newPost) continue
+        if (!newPost) continue
 
         newPosts.push(newPost)
       }
@@ -208,26 +214,7 @@ export class FeedIngestion {
 
           for (const post of newPosts) {
             if (!post.source_url) continue
-
-            const result = extractionResults.get(post.source_url)
-            if (result?.success && result.fullText) {
-              await supabaseAdmin
-                .from('rss_posts')
-                .update({
-                  full_article_text: result.fullText,
-                  extraction_status: 'success',
-                  extraction_error: null
-                })
-                .eq('id', post.id)
-            } else if (result) {
-              await supabaseAdmin
-                .from('rss_posts')
-                .update({
-                  extraction_status: result.status || 'failed',
-                  extraction_error: result.error?.substring(0, 500) || null
-                })
-                .eq('id', post.id)
-            }
+            await applyExtractionResult(post.id, extractionResults.get(post.source_url))
           }
         } catch (error) {
           console.error('[Ingest] Extraction failed:', error instanceof Error ? error.message : 'Unknown')
@@ -240,12 +227,7 @@ export class FeedIngestion {
       let scoredCount = 0
 
       if (newPosts.length > 0) {
-        const { data: fullPosts } = await supabaseAdmin
-          .from('rss_posts')
-          .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id, ticker, transaction_type')
-          .in('id', newPosts.map(p => p.id))
-          .eq('extraction_status', 'success')
-          .not('full_article_text', 'is', null)
+        const fullPosts = await listExtractedPostsByIds(newPosts.map(p => p.id))
 
         if (fullPosts && fullPosts.length > 0) {
           console.log(`[Ingest] Scoring ${fullPosts.length}/${newPosts.length} posts (${newPosts.length - fullPosts.length} skipped — extraction not successful)`)
@@ -272,71 +254,32 @@ export class FeedIngestion {
       // from prior runs that timed out before finishing. Caps at 20 per run
       // so we chip away at the backlog without blowing the timeout.
       const CATCHUP_LIMIT = 20
-      let pendingQuery = supabaseAdmin
-        .from('rss_posts')
-        .select('id, source_url')
-        .eq('feed_id', feed.id)
-        .eq('extraction_status', 'pending')
-
-      // Exclude posts from this run (avoid double-processing)
-      if (newPosts.length > 0) {
-        pendingQuery = pendingQuery.not('id', 'in', `(${newPosts.map(p => p.id).join(',')})`)
-      }
-
-      // Process oldest first so the backlog clears from the bottom up
-      const { data: pendingPosts } = await pendingQuery
-        .order('processed_at', { ascending: true })
-        .limit(CATCHUP_LIMIT)
+      const pendingPosts = await listPendingExtractionPosts(feed.id, {
+        limit: CATCHUP_LIMIT,
+        excludeIds: newPosts.length > 0 ? newPosts.map(p => p.id) : undefined,
+      })
 
       if (pendingPosts && pendingPosts.length > 0) {
         console.log(`[Ingest] Catch-up: extracting ${pendingPosts.length} pending posts from prior runs`)
 
-        const pendingUrls = pendingPosts.filter(p => p.source_url).map(p => p.source_url)
+        const pendingUrls = pendingPosts.map(p => p.source_url).filter((u): u is string => !!u)
         try {
           const catchupResults = await this.ctx.articleExtractor.extractBatch(pendingUrls, 3)
           await alertOnFirecrawl402(catchupResults, { feedName: feed.name })
 
           for (const post of pendingPosts) {
             if (!post.source_url) continue
-            const result = catchupResults.get(post.source_url)
-            if (result?.success && result.fullText) {
-              await supabaseAdmin
-                .from('rss_posts')
-                .update({
-                  full_article_text: result.fullText,
-                  extraction_status: 'success',
-                  extraction_error: null
-                })
-                .eq('id', post.id)
-            } else if (result) {
-              await supabaseAdmin
-                .from('rss_posts')
-                .update({
-                  extraction_status: result.status || 'failed',
-                  extraction_error: result.error?.substring(0, 500) || null
-                })
-                .eq('id', post.id)
-            }
+            await applyExtractionResult(post.id, catchupResults.get(post.source_url))
           }
 
           // Score successfully extracted catch-up posts
-          const { data: catchupExtracted } = await supabaseAdmin
-            .from('rss_posts')
-            .select('id, title, description, content, source_url, full_article_text, article_module_id, feed_id, ticker, transaction_type')
-            .in('id', pendingPosts.map(p => p.id))
-            .eq('extraction_status', 'success')
-            .not('full_article_text', 'is', null)
+          const catchupExtracted = await listExtractedPostsByIds(pendingPosts.map(p => p.id))
 
           if (catchupExtracted && catchupExtracted.length > 0) {
             // Filter to only posts without existing ratings
-            const postIds = catchupExtracted.map(p => p.id)
-            const { data: existingRatings } = await supabaseAdmin
-              .from('post_ratings')
-              .select('post_id')
-              .in('post_id', postIds)
-
-            const ratedIds = new Set((existingRatings || []).map(r => r.post_id))
-            const unratedPosts = catchupExtracted.filter(p => !ratedIds.has(p.id))
+            const postIds = catchupExtracted.map((p: any) => p.id)
+            const ratedIds = await getRatedPostIds(postIds)
+            const unratedPosts = catchupExtracted.filter((p: any) => !ratedIds.has(p.id))
 
             if (unratedPosts.length > 0) {
               console.log(`[Ingest] Catch-up: scoring ${unratedPosts.length} newly extracted posts`)
@@ -429,12 +372,9 @@ export class FeedIngestion {
       }
     }
 
-    const { error } = await supabaseAdmin
-      .from('post_ratings')
-      .insert([ratingRecord])
-
-    if (error) {
-      throw new Error(`Rating insert failed: ${error.message}`)
+    const result = await insertPostRating(ratingRecord)
+    if (!result.ok) {
+      throw new Error(`Rating insert failed${result.errorMessage ? `: ${result.errorMessage}` : ''}`)
     }
   }
 
