@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
+import { clearPromptCache } from '@/lib/openai/prompt-loaders'
 
 type DebugHandler = (context: ApiHandlerContext) => Promise<NextResponse>
 
@@ -601,6 +602,10 @@ Respond with valid JSON in this exact format:
 
         logger.info({ key: prompt.key }, 'Restored prompt')
       }
+
+      // Active app_settings prompt values changed — drop the in-process
+      // cache so callers don't keep reading stale prompts for up to 60s.
+      clearPromptCache()
 
       return NextResponse.json({
         success: true,

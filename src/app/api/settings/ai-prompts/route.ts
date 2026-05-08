@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
+import { clearPromptCache } from '@/lib/openai/prompt-loaders'
 
 /** Resolve publication_id from query param (no fallback — caller must provide it) */
 function resolvePublicationId(request: NextRequest): string | null {
@@ -173,6 +174,11 @@ export const PATCH = withApiHandler(
       throw error
     }
 
+    // Invalidate the in-process prompt cache so warm Vercel instances pick
+    // up the new value immediately instead of serving the old prompt for up
+    // to the cache TTL (60s).
+    clearPromptCache()
+
     return NextResponse.json({
       success: true,
       message: 'Prompt updated successfully'
@@ -316,6 +322,11 @@ export const POST = withApiHandler(
       console.error('[RESET_DEFAULT] Update error:', updateError)
       throw updateError
     }
+
+    // Active prompt value changed — drop the cache (see PATCH handler).
+    // The 'save_as_default' branch above only updates `custom_default` and
+    // doesn't change what callers read, so it deliberately does NOT invalidate.
+    clearPromptCache()
 
     const usedCustomDefault = settings?.custom_default ? true : false
     console.log('[RESET_DEFAULT] Successfully reset. Used custom default:', usedCustomDefault)
