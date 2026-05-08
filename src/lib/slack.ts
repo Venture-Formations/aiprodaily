@@ -423,7 +423,7 @@ export class HealthMonitor {
     try {
       const { data: feeds, error } = await supabaseAdmin
         .from('rss_feeds')
-        .select('*')
+        .select('id, name, processing_errors')
         .eq('active', true)
 
       if (error) throw error
@@ -475,7 +475,7 @@ export class HealthMonitor {
 
       const { data: issues, error } = await supabaseAdmin
         .from('publication_issues')
-        .select('*')
+        .select('id')
         .gte('created_at', yesterday.toISOString())
 
       if (error) throw error

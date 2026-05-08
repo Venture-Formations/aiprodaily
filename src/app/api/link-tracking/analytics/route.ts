@@ -67,7 +67,7 @@ export const GET = withApiHandler(
     while (hasMore) {
       let query = supabaseAdmin
         .from('link_clicks')
-        .select('*')
+        .select('id, ip_address, link_section, link_url, subscriber_email, issue_date, clicked_at')
         .gte('issue_date', startDateStr)
         .lte('issue_date', endDateStr)
         .order('clicked_at', { ascending: false })

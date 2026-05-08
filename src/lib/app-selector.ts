@@ -88,10 +88,21 @@ export class AppSelector {
       const { totalApps, maxPerCategory, affiliateCooldownDays } = await this.getAppSettings(newsletterId)
       console.log(`[AppSelector] Settings: totalApps=${totalApps}, maxPerCategory=${maxPerCategory}, cooldown=${affiliateCooldownDays} days`)
 
-      // Get all active apps for this newsletter
+      // Get all active apps for this newsletter. AIApplication has ~40
+      // columns and downstream callers spread the full row; explicit list.
       const { data: allApps, error: appsError } = await supabaseAdmin
         .from('ai_applications')
-        .select('*')
+        .select(`
+          id, publication_id, app_name, tagline, description, category, app_url,
+          tracked_link, logo_url, logo_alt, screenshot_url, screenshot_alt, tool_type,
+          category_priority, is_featured, is_paid_placement, is_affiliate, is_active,
+          display_order, last_used_date, times_used, created_at, updated_at,
+          clerk_user_id, submitter_email, submitter_name, submitter_image_url,
+          submission_status, rejection_reason, approved_by, approved_at,
+          plan, stripe_payment_id, stripe_subscription_id, stripe_customer_id,
+          sponsor_start_date, sponsor_end_date, view_count, click_count,
+          ai_app_module_id, priority, pinned_position, button_text
+        `)
         .eq('publication_id', newsletterId)
         .eq('is_active', true)
 

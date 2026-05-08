@@ -44,10 +44,15 @@ export class BreakingNewsProcessor {
     console.log('Starting Breaking News RSS processing for issue:', issueId)
 
     try {
-      // Get active Breaking News RSS feeds
+      // Get active Breaking News RSS feeds. processFeed() consumes the full
+      // RssFeed shape, hence the explicit column list.
       const { data: feeds, error: feedsError } = await supabaseAdmin
         .from('rss_feeds')
-        .select('*')
+        .select(`
+          id, publication_id, url, name, description, active,
+          use_for_primary_section, use_for_secondary_section, article_module_id,
+          last_processed, last_error, processing_errors, created_at, updated_at
+        `)
         .eq('active', true)
         .not('publication_id', 'is', null) // Only feeds associated with a newsletter
 
@@ -201,10 +206,19 @@ export class BreakingNewsProcessor {
       )
     }
 
-    // Get all posts for this issue that haven't been scored yet
+    // Get all posts for this issue that haven't been scored yet.
+    // scoreArticle/generateSummaryAndTitle take the full RssPost shape.
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
-      .select('*')
+      .select(`
+        id, feed_id, issue_id, article_module_id, external_id, title, description,
+        content, full_article_text, author, publication_date, source_url, image_url,
+        image_alt, processed_at, breaking_news_score, breaking_news_category,
+        ai_summary, ai_title, extraction_status, extraction_error,
+        criteria_1_score, criteria_1_reason, criteria_2_score, criteria_2_reason,
+        criteria_3_score, criteria_3_reason, criteria_4_score, criteria_4_reason,
+        criteria_5_score, criteria_5_reason, final_priority_score, criteria_enabled
+      `)
       .eq('issue_id', issueId)
       .is('breaking_news_score', null) // Only score unscored posts
 

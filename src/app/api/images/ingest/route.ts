@@ -24,7 +24,7 @@ export const POST = withApiHandler(
     // Get image record from database
     const { data: image, error: fetchError } = await supabaseAdmin
       .from('images')
-      .select('*')
+      .select('id, cdn_url, variant_16x9_url')
       .eq('id', image_id)
       .single()
 
