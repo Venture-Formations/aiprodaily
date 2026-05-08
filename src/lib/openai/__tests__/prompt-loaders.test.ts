@@ -32,10 +32,13 @@ vi.mock('../core', () => ({
   callWithStructuredPrompt: mocks.mockCallStructured,
 }))
 
-import { AI_PROMPTS } from '../prompt-loaders'
+import { AI_PROMPTS, clearPromptCache } from '../prompt-loaders'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Cache is module-scoped; reset between tests so mockResolvedValueOnce
+  // sequencing isn't short-circuited by hits from prior tests.
+  clearPromptCache()
 })
 
 // ---------------------------------------------------------------------------
@@ -101,6 +104,114 @@ describe('AI_PROMPTS.contentEvaluator (plain-text via fetchPromptRow)', () => {
     expect(result).toBe('App: Z')
     expect(mocks.mockFrom).toHaveBeenCalledWith('app_settings')
     expect(mocks.mockFrom).not.toHaveBeenCalledWith('publication_settings')
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('fetchPromptRow caching behavior', () => {
+  it('second call with same key+publicationId is a cache hit (no DB roundtrip)', async () => {
+    mocks.mockMaybeSingle.mockResolvedValueOnce({
+      data: { value: 'Cached: {{title}}' },
+      error: null,
+    })
+
+    const a = await AI_PROMPTS.contentEvaluator(
+      { title: 'First', description: '', hasImage: false },
+      'pub-cache',
+    )
+    const b = await AI_PROMPTS.contentEvaluator(
+      { title: 'Second', description: '', hasImage: false },
+      'pub-cache',
+    )
+
+    expect(a).toContain('Cached: First')
+    expect(b).toContain('Cached: Second')
+    // Only one DB call across both AI_PROMPTS invocations
+    expect(mocks.mockMaybeSingle).toHaveBeenCalledTimes(1)
+  })
+
+  it('different publicationIds do not collide in the cache', async () => {
+    mocks.mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: 'Pub A: {{title}}' }, error: null })
+      .mockResolvedValueOnce({ data: { value: 'Pub B: {{title}}' }, error: null })
+
+    const a = await AI_PROMPTS.contentEvaluator(
+      { title: 'X', description: '', hasImage: false },
+      'pub-A',
+    )
+    const b = await AI_PROMPTS.contentEvaluator(
+      { title: 'X', description: '', hasImage: false },
+      'pub-B',
+    )
+
+    expect(a).toContain('Pub A: X')
+    expect(b).toContain('Pub B: X')
+    expect(mocks.mockMaybeSingle).toHaveBeenCalledTimes(2)
+  })
+
+  it('caches the "no row" result so double-misses are not repeated', async () => {
+    // Both publication and app reads return null on the first call
+    mocks.mockMaybeSingle
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+
+    await AI_PROMPTS.contentEvaluator(
+      { title: 'X', description: '', hasImage: false },
+      'pub-empty',
+    )
+    await AI_PROMPTS.contentEvaluator(
+      { title: 'Y', description: '', hasImage: false },
+      'pub-empty',
+    )
+
+    // Two DB queries on the first call (pub miss → app miss); zero on the second
+    expect(mocks.mockMaybeSingle).toHaveBeenCalledTimes(2)
+  })
+
+  it('does NOT cache when the app_settings query errors (transient blip retries)', async () => {
+    // First call: pub miss, app errors
+    mocks.mockMaybeSingle
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: 'connection reset' } as any })
+      // Second call: pub miss, app returns a real row
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: { value: 'Recovered: {{title}}', ai_provider: null }, error: null })
+
+    const first = await AI_PROMPTS.contentEvaluator(
+      { title: 'X', description: '', hasImage: false },
+      'pub-blip',
+    )
+    // Error → fell through to fallback
+    expect(first).toContain('Article Title: X')
+
+    const second = await AI_PROMPTS.contentEvaluator(
+      { title: 'Y', description: '', hasImage: false },
+      'pub-blip',
+    )
+    // Second call retried both queries (error wasn't cached) and got the recovered prompt
+    expect(second).toBe('Recovered: Y')
+    expect(mocks.mockMaybeSingle).toHaveBeenCalledTimes(4)
+  })
+
+  it('clearPromptCache() forces the next call to hit the DB', async () => {
+    mocks.mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: 'V1: {{title}}' }, error: null })
+      .mockResolvedValueOnce({ data: { value: 'V2: {{title}}' }, error: null })
+
+    const a = await AI_PROMPTS.contentEvaluator(
+      { title: 'X', description: '', hasImage: false },
+      'pub-clear',
+    )
+    expect(a).toContain('V1: X')
+
+    clearPromptCache()
+
+    const b = await AI_PROMPTS.contentEvaluator(
+      { title: 'X', description: '', hasImage: false },
+      'pub-clear',
+    )
+    expect(b).toContain('V2: X')
+    expect(mocks.mockMaybeSingle).toHaveBeenCalledTimes(2)
   })
 })
 

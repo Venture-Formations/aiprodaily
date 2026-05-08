@@ -927,6 +927,63 @@ Response format:
   },
 }
 
+// In-process prompt cache. Hot scoring loops (breakingNewsScorer per-post,
+// criteria evaluators per-article) hit the same key+publicationId tens to
+// hundreds of times per workflow run. Without caching, each call is a 1-2
+// round-trip read against publication_settings + app_settings. The cache
+// short-circuits to a Map lookup after the first miss.
+//
+// TTL is short (60s) so prompt edits propagate quickly; correctness over
+// perf for editorial changes. Errors are NOT cached so a transient DB blip
+// won't poison the cache for the full TTL. Successful "no row" reads ARE
+// cached (most prompts have no per-publication override; cache prevents
+// repeated double-misses). The cache is per-process — Vercel Fluid Compute
+// reuses instances across requests, so this amortizes across invocations.
+type CachedPromptRow = { value: any; ai_provider: string | null } | null
+type CacheEntry = { row: CachedPromptRow; expiresAt: number }
+
+const PROMPT_CACHE_TTL_MS = 60_000
+const PROMPT_CACHE_MAX_SIZE = 500
+const promptRowCache = new Map<string, CacheEntry>()
+
+function buildCacheKey(key: string, publicationId?: string): string {
+  // Treat empty string and undefined the same (matches the `if (publicationId)`
+  // gate that skips the publication query).
+  return `${publicationId || '_app_'}::${key}`
+}
+
+function readCache(key: string, publicationId?: string): CacheEntry | null {
+  const entry = promptRowCache.get(buildCacheKey(key, publicationId))
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) {
+    promptRowCache.delete(buildCacheKey(key, publicationId))
+    return null
+  }
+  return entry
+}
+
+function writeCache(key: string, publicationId: string | undefined, row: CachedPromptRow): void {
+  // Crude size cap. The keyspace is small in practice (~14 prompt keys ×
+  // active publications), but bound it anyway to defend against pathological
+  // growth from one-off pubIds (e.g. tests, debug calls).
+  if (promptRowCache.size >= PROMPT_CACHE_MAX_SIZE) {
+    const firstKey = promptRowCache.keys().next().value
+    if (firstKey !== undefined) promptRowCache.delete(firstKey)
+  }
+  promptRowCache.set(buildCacheKey(key, publicationId), {
+    row,
+    expiresAt: Date.now() + PROMPT_CACHE_TTL_MS,
+  })
+}
+
+/**
+ * Drop all cached prompt rows. Call from settings-write paths (or tests) to
+ * force the next prompt read to hit the DB.
+ */
+export function clearPromptCache(): void {
+  promptRowCache.clear()
+}
+
 // Internal helper: fetch a prompt row with publication→app fallback.
 // `publication_settings` has no `ai_provider` column (only `app_settings` does),
 // so when a publication override exists the provider defaults to whatever the
@@ -942,7 +999,12 @@ Response format:
 async function fetchPromptRow(
   key: string,
   publicationId?: string,
-): Promise<{ value: any; ai_provider: string | null } | null> {
+): Promise<CachedPromptRow> {
+  const cached = readCache(key, publicationId)
+  if (cached) return cached.row
+
+  let hadError = false
+
   if (publicationId) {
     const { data: pubData, error: pubError } = await supabaseAdmin
       .from('publication_settings')
@@ -951,16 +1013,32 @@ async function fetchPromptRow(
       .eq('key', key)
       .maybeSingle()
     if (!pubError && pubData?.value) {
-      return { value: pubData.value, ai_provider: null }
+      const row: CachedPromptRow = { value: pubData.value, ai_provider: null }
+      writeCache(key, publicationId, row)
+      return row
     }
+    if (pubError) hadError = true
   }
+
   const { data, error } = await supabaseAdmin
     .from('app_settings')
     .select('value, ai_provider')
     .eq('key', key)
     .maybeSingle()
-  if (error || !data?.value) return null
-  return { value: data.value, ai_provider: (data as any).ai_provider ?? null }
+  if (error) hadError = true
+
+  const row: CachedPromptRow =
+    !error && data?.value
+      ? { value: data.value, ai_provider: (data as any).ai_provider ?? null }
+      : null
+
+  // Only cache when both reads completed without error. A transient DB blip
+  // shouldn't lock in `null` (which would force fallback prompts) for 60s.
+  if (!hadError) {
+    writeCache(key, publicationId, row)
+  }
+
+  return row
 }
 
 // Shared loader for the 5 criteria evaluators — same shape, different key suffix.
