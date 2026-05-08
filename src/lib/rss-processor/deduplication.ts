@@ -2,14 +2,14 @@ import { Deduplicator } from '../deduplicator'
 import { getPublicationSettings } from '../publication-settings'
 import type { RssPost } from '@/types/database'
 import { getNewsletterIdFromIssue } from './shared-context'
-import { listPostsByIssue } from '@/lib/dal/posts'
 import {
+  listPostsByIssue,
   isIssueDeduplicated,
   listDuplicateGroupIdsByIssue,
   listDuplicatePostIdsByGroups,
   storeDeduplicationResult,
   type NewDuplicatePost,
-} from '@/lib/dal/dedup'
+} from '@/lib/dal'
 
 /**
  * A "historical match" is a duplicate group whose primary post was published

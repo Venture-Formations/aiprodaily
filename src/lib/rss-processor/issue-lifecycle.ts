@@ -1,9 +1,14 @@
 import { supabaseAdmin } from '../supabase'
 import { getArticleSettings } from '../publication-settings'
 import { getTomorrowStr } from '../date-utils'
-import { listPostsForScoring, assignPostsToIssue, listPostsByIssue, unassignPosts } from '@/lib/dal/posts'
-import { listModuleArticlesByIssue } from '@/lib/dal/articles'
-import { listDuplicateGroupIdsByIssue } from '@/lib/dal/dedup'
+import {
+  listPostsForScoring,
+  assignPostsToIssue,
+  listPostsByIssue,
+  unassignPosts,
+  listModuleArticlesByIssue,
+  listDuplicateGroupIdsByIssue,
+} from '@/lib/dal'
 import type { RSSProcessorContext } from './shared-context'
 import { getNewsletterIdFromIssue, formatError } from './shared-context'
 import type { Deduplication } from './deduplication'

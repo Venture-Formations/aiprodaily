@@ -7,19 +7,15 @@ import {
   assignPostsToIssue,
   listAssignedPostsForModule,
   POST_WITH_RATINGS_BRIEF,
-} from '@/lib/dal/posts'
-import {
   moduleArticleExists,
   insertModuleArticle,
   listArticlesNeedingBody,
   listArticlesNeedingFactCheck,
   updateModuleArticleContent,
   updateModuleArticleFactCheck,
-} from '@/lib/dal/articles'
-import {
   listDuplicateGroupIdsByIssue,
   listDuplicatePostIdsByGroups,
-} from '@/lib/dal/dedup'
+} from '@/lib/dal'
 import type { ArticleGenerator } from './article-generator'
 
 /**
