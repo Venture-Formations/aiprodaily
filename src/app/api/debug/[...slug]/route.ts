@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { isProduction, isStaging } from '@/lib/env-guard'
@@ -45,12 +45,6 @@ async function handleRequest(
   context: ApiHandlerContext,
   method: 'GET' | 'POST' | 'DELETE'
 ): Promise<NextResponse> {
-  // Gate debug routes off in real production. Staging Vercel project keeps
-  // them enabled (STAGING=true overrides), as does Preview and local dev.
-  if (isProduction() && !isStaging()) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
   const routeName = extractRouteName(context.request)
 
   const entry = allHandlers[routeName]
@@ -72,17 +66,40 @@ async function handleRequest(
   return handler(context)
 }
 
-export const GET = withApiHandler(
+// Production gate runs BEFORE withApiHandler so unauthenticated prod requests
+// don't get a 401 (which would reveal the route exists). Staging Vercel
+// project (STAGING=true override) keeps debug routes live, as does Preview
+// and local dev.
+const isProdGated = (): boolean => isProduction() && !isStaging()
+
+const handleGET = withApiHandler(
   { authTier: 'admin', logContext: 'debug/catch-all' },
   async (context) => handleRequest(context, 'GET')
 )
 
-export const POST = withApiHandler(
+const handlePOST = withApiHandler(
   { authTier: 'admin', logContext: 'debug/catch-all' },
   async (context) => handleRequest(context, 'POST')
 )
 
-export const DELETE = withApiHandler(
+const handleDELETE = withApiHandler(
   { authTier: 'admin', logContext: 'debug/catch-all' },
   async (context) => handleRequest(context, 'DELETE')
 )
+
+type RouteCtx = { params: Promise<Record<string, string>> }
+
+export const GET = async (req: NextRequest, ctx: RouteCtx): Promise<NextResponse> => {
+  if (isProdGated()) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return handleGET(req, ctx)
+}
+
+export const POST = async (req: NextRequest, ctx: RouteCtx): Promise<NextResponse> => {
+  if (isProdGated()) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return handlePOST(req, ctx)
+}
+
+export const DELETE = async (req: NextRequest, ctx: RouteCtx): Promise<NextResponse> => {
+  if (isProdGated()) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return handleDELETE(req, ctx)
+}
