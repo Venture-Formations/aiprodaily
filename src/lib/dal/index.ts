@@ -82,6 +82,9 @@ export {
 } from './dedup'
 export type { NewDuplicatePost, DeduplicationResultInput, DeduplicationResultOutput } from './dedup'
 
+// Excluded IPs DAL — bot/honeypot exclusion list
+export { getExcludedIPs } from './excluded-ips'
+
 // Pagination helper — most callers want fetchAllPaginated directly
 export { fetchAllPaginated } from './paginate'
 export type { FetchAllPaginatedOptions } from './paginate'

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded, type IPExclusion } from '@/lib/ip-utils'
 import { withApiHandler } from '@/lib/api-handler'
-import { fetchAllPaginated } from '@/lib/dal/paginate'
+import { fetchAllPaginated, getExcludedIPs } from '@/lib/dal'
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'feedback/analytics' },
@@ -38,41 +38,10 @@ export const GET = withApiHandler(
 
     console.log(`[Feedback Analytics] Fetching for last ${days} days (${startDateStr} to ${endDateStr})`)
 
-    // Fetch excluded IPs if publication_id provided
-    let exclusions: IPExclusion[] = []
-    let excludedIpCount = 0
-
-    if (publicationId && shouldExcludeIps) {
-      try {
-        const excludedIpsData = await fetchAllPaginated<{
-          ip_address: string
-          is_range: boolean | null
-          cidr_prefix: number | null
-        }>(
-          () =>
-            supabaseAdmin
-              .from('excluded_ips')
-              .select('ip_address, is_range, cidr_prefix')
-              .eq('publication_id', publicationId!),
-          { label: 'feedback/analytics:excluded_ips' },
-        )
-
-        exclusions = excludedIpsData.map(e => ({
-          ip_address: e.ip_address,
-          is_range: e.is_range || false,
-          cidr_prefix: e.cidr_prefix
-        }))
-        excludedIpCount = exclusions.length
-      } catch (err) {
-        console.error('[Feedback Analytics] Failed to fetch excluded IPs:', err)
-        // Continue with empty exclusions — analytics still useful, just not IP-filtered
-      }
-    }
-
-    // Fetch feedback responses within date range, scoped to publication.
-    // Paginated past Supabase's 1000-row default — section/daily aggregates
-    // depend on the full set; truncation silently corrupts those metrics.
-    let responsesRaw: Array<{
+    // Both reads are independent — only depend on publicationId + date range.
+    // Run in parallel: feedback_responses dominates latency on a hot dashboard
+    // refresh, no point waiting for it sequentially after exclusions.
+    type FeedbackResponseRow = {
       id: string
       publication_id: string
       campaign_date: string
@@ -80,10 +49,13 @@ export const GET = withApiHandler(
       ip_address: string
       mailerlite_updated: boolean | null
       created_at: string
-    }> = []
+    }
 
-    try {
-      responsesRaw = await fetchAllPaginated<typeof responsesRaw[number]>(
+    const [exclusionsResult, responsesResult] = await Promise.allSettled([
+      shouldExcludeIps
+        ? getExcludedIPs(publicationId, 'feedback/analytics:excluded_ips')
+        : Promise.resolve<IPExclusion[]>([]),
+      fetchAllPaginated<FeedbackResponseRow>(
         () =>
           supabaseAdmin
             .from('feedback_responses')
@@ -93,8 +65,16 @@ export const GET = withApiHandler(
             .lte('campaign_date', endDateStr)
             .order('created_at', { ascending: false }),
         { label: 'feedback/analytics:feedback_responses' },
-      )
-    } catch (err: any) {
+      ),
+    ])
+
+    // getExcludedIPs swallows its own errors, so this branch is defensive only.
+    const exclusions: IPExclusion[] =
+      exclusionsResult.status === 'fulfilled' ? exclusionsResult.value : []
+    const excludedIpCount = exclusions.length
+
+    if (responsesResult.status === 'rejected') {
+      const err = responsesResult.reason as any
       console.error('[Feedback Analytics] Error fetching responses:', err)
       // If table doesn't exist or other DB error, return empty analytics
       const isMissingTable =
@@ -122,6 +102,8 @@ export const GET = withApiHandler(
       }
       return NextResponse.json({ error: err?.message ?? 'unknown error' }, { status: 500 })
     }
+
+    const responsesRaw = responsesResult.value
 
     // Filter out excluded IPs from analytics
     const responses = shouldExcludeIps && exclusions.length > 0

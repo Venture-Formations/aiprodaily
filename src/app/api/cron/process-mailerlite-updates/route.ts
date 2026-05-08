@@ -1,8 +1,8 @@
 import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { fetchAllPaginated } from '@/lib/dal/paginate'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { fetchAllPaginated, getExcludedIPs } from '@/lib/dal'
+import { isIPExcluded } from '@/lib/ip-utils'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 import type { Logger } from '@/lib/logger'
@@ -117,33 +117,12 @@ async function syncRealClickStatus(log: Logger): Promise<{
 
   for (const publication of publications) {
     try {
-      // Get excluded IPs for this publication. Paginated past Supabase's
-      // 1000-row default — truncation here causes false positive clicker
-      // detection and re-sends the same MailerLite field updates indefinitely.
-      let exclusions: IPExclusion[] = []
-      try {
-        const excludedIpsData = await fetchAllPaginated<{
-          ip_address: string
-          is_range: boolean | null
-          cidr_prefix: number | null
-        }>(
-          () =>
-            supabaseAdmin
-              .from('excluded_ips')
-              .select('ip_address, is_range, cidr_prefix')
-              .eq('publication_id', publication.id),
-          { label: `process-mailerlite-updates:excluded_ips:${publication.slug}` },
-        )
-
-        exclusions = excludedIpsData.map(e => ({
-          ip_address: e.ip_address,
-          is_range: e.is_range || false,
-          cidr_prefix: e.cidr_prefix
-        }))
-      } catch (err) {
-        errors.push(`[${publication.slug}] Failed to fetch excluded IPs: ${err instanceof Error ? err.message : 'unknown'}`)
-        continue
-      }
+      // Without exclusions, bot clicks count as real clickers and re-send
+      // the same MailerLite field updates indefinitely.
+      const exclusions = await getExcludedIPs(
+        publication.id,
+        `process-mailerlite-updates:excluded_ips:${publication.slug}`,
+      )
 
       // Get ALL link clicks for this publication (paginated)
       const FETCH_BATCH = 1000

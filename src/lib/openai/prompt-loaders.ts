@@ -927,50 +927,47 @@ Response format:
   },
 }
 
-// In-process prompt cache. Hot scoring loops (breakingNewsScorer per-post,
-// criteria evaluators per-article) hit the same key+publicationId tens to
-// hundreds of times per workflow run. Without caching, each call is a 1-2
-// round-trip read against publication_settings + app_settings. The cache
-// short-circuits to a Map lookup after the first miss.
-//
-// TTL is short (60s) so prompt edits propagate quickly; correctness over
-// perf for editorial changes. Errors are NOT cached so a transient DB blip
-// won't poison the cache for the full TTL. Successful "no row" reads ARE
-// cached (most prompts have no per-publication override; cache prevents
-// repeated double-misses). The cache is per-process — Vercel Fluid Compute
-// reuses instances across requests, so this amortizes across invocations.
+// In-process prompt cache for fetchPromptRow.
+// - Short TTL (60s) so editorial prompt edits propagate quickly.
+// - Errors NOT cached: a transient DB blip would otherwise lock in null
+//   and force fallback prompts for the full TTL.
+// - "No row" results ARE cached: most prompts have no per-publication
+//   override, so this prevents repeated publication-miss → app-miss
+//   double-roundtrips on every per-post call.
 type CachedPromptRow = { value: any; ai_provider: string | null } | null
 type CacheEntry = { row: CachedPromptRow; expiresAt: number }
 
 const PROMPT_CACHE_TTL_MS = 60_000
 const PROMPT_CACHE_MAX_SIZE = 500
+// Sentinel used in the cache key when no publicationId is provided. Treats
+// empty string and undefined the same (matches the `if (publicationId)`
+// gate in fetchPromptRow that skips the publication query).
+const APP_SCOPE_SENTINEL = '_app_'
 const promptRowCache = new Map<string, CacheEntry>()
 
 function buildCacheKey(key: string, publicationId?: string): string {
-  // Treat empty string and undefined the same (matches the `if (publicationId)`
-  // gate that skips the publication query).
-  return `${publicationId || '_app_'}::${key}`
+  return `${publicationId || APP_SCOPE_SENTINEL}::${key}`
 }
 
-function readCache(key: string, publicationId?: string): CacheEntry | null {
-  const entry = promptRowCache.get(buildCacheKey(key, publicationId))
+function readCache(cacheKey: string): CacheEntry | null {
+  const entry = promptRowCache.get(cacheKey)
   if (!entry) return null
   if (Date.now() > entry.expiresAt) {
-    promptRowCache.delete(buildCacheKey(key, publicationId))
+    promptRowCache.delete(cacheKey)
     return null
   }
   return entry
 }
 
-function writeCache(key: string, publicationId: string | undefined, row: CachedPromptRow): void {
-  // Crude size cap. The keyspace is small in practice (~14 prompt keys ×
-  // active publications), but bound it anyway to defend against pathological
-  // growth from one-off pubIds (e.g. tests, debug calls).
+function writeCache(cacheKey: string, row: CachedPromptRow): void {
+  // Bounded as defense-in-depth. Keyspace is small in practice (~14 prompt
+  // keys × active publications), but pathological pubIds from tests or
+  // debug calls could grow it unboundedly otherwise.
   if (promptRowCache.size >= PROMPT_CACHE_MAX_SIZE) {
     const firstKey = promptRowCache.keys().next().value
     if (firstKey !== undefined) promptRowCache.delete(firstKey)
   }
-  promptRowCache.set(buildCacheKey(key, publicationId), {
+  promptRowCache.set(cacheKey, {
     row,
     expiresAt: Date.now() + PROMPT_CACHE_TTL_MS,
   })
@@ -985,6 +982,8 @@ export function clearPromptCache(): void {
 }
 
 // Internal helper: fetch a prompt row with publication→app fallback.
+// Results are cached per (key, publicationId) for 60s; see `clearPromptCache`.
+//
 // `publication_settings` has no `ai_provider` column (only `app_settings` does),
 // so when a publication override exists the provider defaults to whatever the
 // caller's downstream auto-detect produces (typically openai unless the model
@@ -1000,7 +999,8 @@ async function fetchPromptRow(
   key: string,
   publicationId?: string,
 ): Promise<CachedPromptRow> {
-  const cached = readCache(key, publicationId)
+  const cacheKey = buildCacheKey(key, publicationId)
+  const cached = readCache(cacheKey)
   if (cached) return cached.row
 
   let hadError = false
@@ -1014,7 +1014,7 @@ async function fetchPromptRow(
       .maybeSingle()
     if (!pubError && pubData?.value) {
       const row: CachedPromptRow = { value: pubData.value, ai_provider: null }
-      writeCache(key, publicationId, row)
+      writeCache(cacheKey, row)
       return row
     }
     if (pubError) hadError = true
@@ -1032,10 +1032,9 @@ async function fetchPromptRow(
       ? { value: data.value, ai_provider: (data as any).ai_provider ?? null }
       : null
 
-  // Only cache when both reads completed without error. A transient DB blip
-  // shouldn't lock in `null` (which would force fallback prompts) for 60s.
+  // Don't cache when a query errored — see comment block above the cache.
   if (!hadError) {
-    writeCache(key, publicationId, row)
+    writeCache(cacheKey, row)
   }
 
   return row
