@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import type { ApiHandlerContext } from '@/lib/api-handler'
+import { isProduction, isStaging } from '@/lib/env-guard'
 
 // Import handler registries from each group
 import { handlers as aiHandlers } from '../handlers/ai'
@@ -44,6 +45,12 @@ async function handleRequest(
   context: ApiHandlerContext,
   method: 'GET' | 'POST' | 'DELETE'
 ): Promise<NextResponse> {
+  // Gate debug routes off in real production. Staging Vercel project keeps
+  // them enabled (STAGING=true overrides), as does Preview and local dev.
+  if (isProduction() && !isStaging()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   const routeName = extractRouteName(context.request)
 
   const entry = allHandlers[routeName]
