@@ -7,8 +7,30 @@
  */
 
 import { supabaseAdmin } from '../supabase'
-import { isIPExcluded, IPExclusion } from '../ip-utils'
+import { isIPExcluded } from '../ip-utils'
+import { getExcludedIPs } from '../dal'
 import type { FeedbackModule, FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVote, FeedbackComment, FeedbackVoteBreakdown, FeedbackIssueStats } from '@/types/database'
+
+// Column lists matching the FeedbackModule / FeedbackBlock / FeedbackVote
+// shapes in src/types/database.ts. Centralized so the 4 read sites stay in
+// sync if a column is added (currently the only schema drift signal we have).
+const FEEDBACK_MODULE_COLUMNS = `
+  id, publication_id, name, display_order, is_active, show_name, config,
+  created_at, updated_at,
+  block_order, title_text, body_text, body_is_italic, sign_off_text,
+  sign_off_is_italic, vote_options, team_photos
+` as const
+
+const FEEDBACK_BLOCK_COLUMNS = `
+  id, feedback_module_id, block_type, display_order, is_enabled,
+  title_text, static_content, is_italic, is_bold, text_size, label,
+  vote_options, team_photos, config, created_at, updated_at
+` as const
+
+const FEEDBACK_VOTE_COLUMNS = `
+  id, feedback_module_id, publication_id, issue_id, subscriber_email,
+  ip_address, selected_value, selected_label, voted_at
+` as const
 
 export class FeedbackModuleSelector {
   /**
@@ -17,7 +39,7 @@ export class FeedbackModuleSelector {
   static async getFeedbackModule(publicationId: string): Promise<FeedbackModule | null> {
     const { data: mod, error } = await supabaseAdmin
       .from('feedback_modules')
-      .select('*')
+      .select(FEEDBACK_MODULE_COLUMNS)
       .eq('publication_id', publicationId)
       .single()
 
@@ -64,7 +86,7 @@ export class FeedbackModuleSelector {
   static async getModuleById(moduleId: string): Promise<FeedbackModule | null> {
     const { data: mod, error } = await supabaseAdmin
       .from('feedback_modules')
-      .select('*')
+      .select(FEEDBACK_MODULE_COLUMNS)
       .eq('id', moduleId)
       .single()
 
@@ -82,7 +104,7 @@ export class FeedbackModuleSelector {
   static async getBlocks(moduleId: string): Promise<FeedbackBlock[]> {
     const { data: blocks, error } = await supabaseAdmin
       .from('feedback_blocks')
-      .select('*')
+      .select(FEEDBACK_BLOCK_COLUMNS)
       .eq('feedback_module_id', moduleId)
       .order('display_order', { ascending: true })
 
@@ -503,19 +525,9 @@ export class FeedbackModuleSelector {
       .single()
 
     // Fetch excluded IPs if we have a publication
-    let exclusions: IPExclusion[] = []
-    if (mod?.publication_id) {
-      const { data: excludedIpsData } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', mod.publication_id)
-
-      exclusions = (excludedIpsData || []).map(e => ({
-        ip_address: e.ip_address,
-        is_range: e.is_range || false,
-        cidr_prefix: e.cidr_prefix
-      }))
-    }
+    const exclusions = mod?.publication_id
+      ? await getExcludedIPs(mod.publication_id, 'feedback-selector:vote-breakdown:excluded_ips')
+      : []
 
     // Get all votes for this issue (include ip_address for filtering)
     const { data: allVotes, error } = await supabaseAdmin
@@ -582,7 +594,7 @@ export class FeedbackModuleSelector {
   ): Promise<FeedbackVote | null> {
     const { data: vote, error } = await supabaseAdmin
       .from('feedback_votes')
-      .select('*')
+      .select(FEEDBACK_VOTE_COLUMNS)
       .eq('feedback_module_id', moduleId)
       .eq('issue_id', issueId)
       .eq('subscriber_email', email)
@@ -610,16 +622,7 @@ export class FeedbackModuleSelector {
     }
 
     // Fetch excluded IPs for this publication
-    const { data: excludedIpsData } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('ip_address, is_range, cidr_prefix')
-      .eq('publication_id', publicationId)
-
-    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-      ip_address: e.ip_address,
-      is_range: e.is_range || false,
-      cidr_prefix: e.cidr_prefix
-    }))
+    const exclusions = await getExcludedIPs(publicationId, 'feedback-selector:excluded_ips')
 
     // Build query for votes (include ip_address for filtering)
     let query = supabaseAdmin

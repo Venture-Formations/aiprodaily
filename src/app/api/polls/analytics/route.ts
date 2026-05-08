@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded } from '@/lib/ip-utils'
+import { getExcludedIPs } from '@/lib/dal'
 import { withApiHandler } from '@/lib/api-handler'
 
 /**
@@ -52,17 +53,8 @@ export const GET = withApiHandler(
 
     const publicationId = newsletter.id
 
-    // Fetch excluded IPs for this publication (for filtering analytics)
-    const { data: excludedIpsData } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('ip_address, is_range, cidr_prefix')
-      .eq('publication_id', publicationId)
-
-    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-      ip_address: e.ip_address,
-      is_range: e.is_range || false,
-      cidr_prefix: e.cidr_prefix
-    }))
+    // Fetch excluded IPs for this publication (for filtering analytics).
+    const exclusions = await getExcludedIPs(publicationId, 'polls/analytics:excluded_ips')
     const excludedIpCount = exclusions.length
 
     // Calculate date range using local timezone (NO UTC - per CLAUDE.md)

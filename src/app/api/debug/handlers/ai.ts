@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
+import { clearPromptCache } from '@/lib/openai/prompt-loaders'
 
 type DebugHandler = (context: ApiHandlerContext) => Promise<NextResponse>
 
@@ -365,7 +366,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       // Check existing selections
       const { data: existingSelections } = await supabaseAdmin
         .from('issue_ai_app_selections')
-        .select('*')
+        .select('id')
         .eq('issue_id', issue.id)
 
       logger.info({ issueId: issue.id, count: existingSelections?.length || 0 }, 'Existing selections for issue')
@@ -601,6 +602,10 @@ Respond with valid JSON in this exact format:
 
         logger.info({ key: prompt.key }, 'Restored prompt')
       }
+
+      // Active app_settings prompt values changed — drop the in-process
+      // cache so callers don't keep reading stale prompts for up to 60s.
+      clearPromptCache()
 
       return NextResponse.json({
         success: true,

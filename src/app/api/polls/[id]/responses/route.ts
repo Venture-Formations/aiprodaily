@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded } from '@/lib/ip-utils'
+import { getExcludedIPs } from '@/lib/dal'
 import { withApiHandler } from '@/lib/api-handler'
 
 // GET /api/polls/[id]/responses - Get responses for a poll with analytics
@@ -31,16 +32,7 @@ export const GET = withApiHandler(
     }
 
     // Get excluded IPs for this publication
-    const { data: excludedIpsData } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('ip_address, is_range, cidr_prefix')
-      .eq('publication_id', publicationId)
-
-    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-      ip_address: e.ip_address,
-      is_range: e.is_range || false,
-      cidr_prefix: e.cidr_prefix
-    }))
+    const exclusions = await getExcludedIPs(publicationId, 'polls/responses:excluded_ips')
 
     // Get all responses for this poll
     const { data: responsesRaw, error } = await supabaseAdmin
