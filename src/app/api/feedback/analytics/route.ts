@@ -55,6 +55,9 @@ export const GET = withApiHandler(
       shouldExcludeIps
         ? getExcludedIPs(publicationId, 'feedback/analytics:excluded_ips')
         : Promise.resolve<IPExclusion[]>([]),
+      // No .order() in the builder — Supabase paginates via offset, and
+      // ORDER BY + concurrent inserts can shift rows across page boundaries
+      // (duplicates or skips). Sort in-memory after fetch instead.
       fetchAllPaginated<FeedbackResponseRow>(
         () =>
           supabaseAdmin
@@ -62,8 +65,7 @@ export const GET = withApiHandler(
             .select('id, publication_id, campaign_date, section_choice, ip_address, mailerlite_updated, created_at')
             .eq('publication_id', publicationId!)
             .gte('campaign_date', startDateStr)
-            .lte('campaign_date', endDateStr)
-            .order('created_at', { ascending: false }),
+            .lte('campaign_date', endDateStr),
         { label: 'feedback/analytics:feedback_responses' },
       ),
     ])
@@ -103,7 +105,11 @@ export const GET = withApiHandler(
       return NextResponse.json({ error: err?.message ?? 'unknown error' }, { status: 500 })
     }
 
+    // Sort by created_at desc in-memory — see the .order() comment on the
+    // paginated query above for why we don't sort at the DB layer.
     const responsesRaw = responsesResult.value
+      .slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
 
     // Filter out excluded IPs from analytics
     const responses = shouldExcludeIps && exclusions.length > 0
@@ -133,8 +139,15 @@ export const GET = withApiHandler(
     const successfulSyncs = responses.filter(r => r.mailerlite_updated).length
     const syncSuccessRate = totalResponses > 0 ? (successfulSyncs / totalResponses) * 100 : 0
 
-    // Get most recent responses
-    const recentResponses = responses.slice(0, 10)
+    // Get most recent responses. Project away ip_address (PII) and
+    // publication_id (already known to caller) before serializing.
+    const recentResponses = responses.slice(0, 10).map(r => ({
+      id: r.id,
+      campaign_date: r.campaign_date,
+      section_choice: r.section_choice,
+      mailerlite_updated: r.mailerlite_updated,
+      created_at: r.created_at,
+    }))
 
     return NextResponse.json({
       success: true,
