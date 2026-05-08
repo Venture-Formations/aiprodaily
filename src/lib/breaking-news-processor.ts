@@ -3,6 +3,7 @@ import { supabaseAdmin } from './supabase'
 import { callOpenAI } from './openai'
 import { AI_PROMPTS } from './openai/prompt-loaders'
 import { ErrorHandler, SlackNotificationService } from './slack'
+import { getIssuePublicationId } from './dal/issues'
 import type { RssFeed, RssPost } from '@/types/database'
 
 const parser = new Parser({
@@ -43,10 +44,15 @@ export class BreakingNewsProcessor {
     console.log('Starting Breaking News RSS processing for issue:', issueId)
 
     try {
-      // Get active Breaking News RSS feeds
+      // Get active Breaking News RSS feeds. processFeed() consumes the full
+      // RssFeed shape, hence the explicit column list.
       const { data: feeds, error: feedsError } = await supabaseAdmin
         .from('rss_feeds')
-        .select('*')
+        .select(`
+          id, publication_id, url, name, description, active,
+          use_for_primary_section, use_for_secondary_section, article_module_id,
+          last_processed, last_error, processing_errors, created_at, updated_at
+        `)
         .eq('active', true)
         .not('publication_id', 'is', null) // Only feeds associated with a newsletter
 
@@ -192,10 +198,27 @@ export class BreakingNewsProcessor {
   private async scoreAndCategorizeArticles(issueId: string) {
     console.log('Starting Breaking News scoring and categorization...')
 
-    // Get all posts for this issue that haven't been scored yet
+    // Resolve publication once so per-publication prompt overrides apply
+    const publicationId = await getIssuePublicationId(issueId)
+    if (!publicationId) {
+      console.error(
+        `[BreakingNews] Could not resolve publicationId for issue ${issueId} — scoring will use app-wide / fallback prompts`,
+      )
+    }
+
+    // Get all posts for this issue that haven't been scored yet.
+    // scoreArticle/generateSummaryAndTitle take the full RssPost shape.
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
-      .select('*')
+      .select(`
+        id, feed_id, issue_id, article_module_id, external_id, title, description,
+        content, full_article_text, author, publication_date, source_url, image_url,
+        image_alt, processed_at, breaking_news_score, breaking_news_category,
+        ai_summary, ai_title, extraction_status, extraction_error,
+        criteria_1_score, criteria_1_reason, criteria_2_score, criteria_2_reason,
+        criteria_3_score, criteria_3_reason, criteria_4_score, criteria_4_reason,
+        criteria_5_score, criteria_5_reason, final_priority_score, criteria_enabled
+      `)
       .eq('issue_id', issueId)
       .is('breaking_news_score', null) // Only score unscored posts
 
@@ -223,7 +246,7 @@ export class BreakingNewsProcessor {
           console.log(`Scoring post ${overallIndex}/${posts.length}: ${post.title}`)
 
           // Score the article
-          const score = await this.scoreArticle(post)
+          const score = await this.scoreArticle(post, publicationId ?? undefined)
 
           // Generate summary and title
           const summary = await this.generateSummaryAndTitle(post)
@@ -285,12 +308,12 @@ export class BreakingNewsProcessor {
     })
   }
 
-  private async scoreArticle(post: RssPost): Promise<BreakingNewsScore> {
+  private async scoreArticle(post: RssPost, publicationId?: string): Promise<BreakingNewsScore> {
     const prompt = await AI_PROMPTS.breakingNewsScorer({
       title: post.title,
       description: post.description || '',
       content: post.content || ''
-    })
+    }, publicationId)
 
     const result = await callOpenAI(prompt, 1000, 0.3)
 

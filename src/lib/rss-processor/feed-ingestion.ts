@@ -13,7 +13,7 @@ import {
   listPendingExtractionPosts,
   getRatedPostIds,
   insertPostRating,
-} from '@/lib/dal/posts'
+} from '@/lib/dal'
 
 const parser = new Parser({
   customFields: {

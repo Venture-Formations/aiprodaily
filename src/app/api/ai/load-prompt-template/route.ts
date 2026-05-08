@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { withApiHandler } from '@/lib/api-handler'
 import { AI_PROMPTS } from '@/lib/openai/prompt-loaders'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'ai/load-prompt-template' },
-  async ({ request, logger }) => {
-    const body = await request.json()
-    const { promptType } = body
+const inputSchema = z.object({
+  promptType: z.string().min(1),
+  publicationId: z.string().uuid().optional(),
+})
 
-    if (!promptType) {
-      return NextResponse.json(
-        { error: 'Missing required field: promptType' },
-        { status: 400 }
-      )
-    }
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai/load-prompt-template', inputSchema },
+  async ({ input, logger }) => {
+    const { promptType, publicationId } = input
+    const pubId = publicationId
 
     // Check if this is a module-based prompt type (e.g., "module-{uuid}-title" or "module-{uuid}-body")
     const moduleMatch = promptType.match(/^module-(.+)-(title|body)$/)
@@ -63,33 +62,33 @@ export const POST = withApiHandler(
         title: '{{title}}',
         description: '{{description}}',
         content: '{{content}}'
-      })
+      }, pubId)
     } else if (promptType === 'primary-body') {
       templatePrompt = await AI_PROMPTS.primaryArticleBody({
         title: '{{title}}',
         description: '{{description}}',
         content: '{{content}}',
         source_url: '{{url}}'
-      }, '{{headline}}')
+      }, '{{headline}}', pubId)
     } else if (promptType === 'secondary-title') {
       templatePrompt = await AI_PROMPTS.secondaryArticleTitle({
         title: '{{title}}',
         description: '{{description}}',
         content: '{{content}}'
-      })
+      }, pubId)
     } else if (promptType === 'secondary-body') {
       templatePrompt = await AI_PROMPTS.secondaryArticleBody({
         title: '{{title}}',
         description: '{{description}}',
         content: '{{content}}',
         source_url: '{{url}}'
-      }, '{{headline}}')
+      }, '{{headline}}', pubId)
     } else if (promptType === 'post-scorer') {
       templatePrompt = await AI_PROMPTS.criteria1Evaluator({
         title: '{{title}}',
         description: '{{description}}',
         content: '{{content}}'
-      })
+      }, pubId)
     } else if (promptType === 'subject-line') {
       templatePrompt = await AI_PROMPTS.subjectLineGenerator({
         headline: '{{headline}}',

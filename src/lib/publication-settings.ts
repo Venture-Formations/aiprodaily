@@ -50,39 +50,44 @@ export async function getPublicationSetting(
 
 /**
  * Get multiple settings for a publication with fallback
- * Returns a map of key -> value
+ * Returns a map of key -> value.
+ *
+ * When `publicationId` is null, the publication_settings lookup is skipped
+ * and values are read directly from `app_settings`. Used by app-wide consumers
+ * (e.g., the Slack notification service) that don't have a publication context.
  */
 export async function getPublicationSettings(
-  publicationId: string,
+  publicationId: string | null,
   keys: string[]
 ): Promise<Record<string, string>> {
   const result: Record<string, string> = {}
-
-  // Try publication_settings first
-  const { data: pubSettings } = await supabaseAdmin
-    .from('publication_settings')
-    .select('key, value')
-    .eq('publication_id', publicationId)
-    .in('key', keys)
-
-  // Build map from publication_settings
   const foundKeys = new Set<string>()
-  pubSettings?.forEach((setting) => {
-    if (setting.value) {
-      // Strip extra quotes if value was JSON stringified (e.g., '"#1C293D"' -> '#1C293D')
-      let cleanValue = setting.value
-      if (cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
-        cleanValue = cleanValue.slice(1, -1)
+
+  // Try publication_settings first (skip when null)
+  if (publicationId !== null) {
+    const { data: pubSettings } = await supabaseAdmin
+      .from('publication_settings')
+      .select('key, value')
+      .eq('publication_id', publicationId)
+      .in('key', keys)
+
+    pubSettings?.forEach((setting) => {
+      if (setting.value) {
+        // Strip extra quotes if value was JSON stringified (e.g., '"#1C293D"' -> '#1C293D')
+        let cleanValue = setting.value
+        if (cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+          cleanValue = cleanValue.slice(1, -1)
+        }
+        result[setting.key] = cleanValue
+        foundKeys.add(setting.key)
       }
-      result[setting.key] = cleanValue
-      foundKeys.add(setting.key)
-    }
-  })
+    })
+  }
 
   // Find missing keys
   const missingKeys = keys.filter((key) => !foundKeys.has(key))
 
-  // Fallback to app_settings for missing keys
+  // Fallback to app_settings for missing keys (or all keys when null)
   if (missingKeys.length > 0) {
     const { data: fallbackSettings } = await supabaseAdmin
       .from('app_settings')
@@ -91,9 +96,11 @@ export async function getPublicationSettings(
 
     fallbackSettings?.forEach((setting) => {
       if (setting.value) {
-        console.warn(
-          `[SETTINGS FALLBACK] Using app_settings for key="${setting.key}" (publication=${publicationId}). Migrate this setting!`
-        )
+        if (publicationId !== null) {
+          console.warn(
+            `[SETTINGS FALLBACK] Using app_settings for key="${setting.key}" (publication=${publicationId}). Migrate this setting!`
+          )
+        }
         result[setting.key] = setting.value
       }
     })
@@ -507,9 +514,13 @@ export async function getAIPrompt(
 }
 
 /**
- * Get Slack notification settings for a publication
+ * Get Slack notification settings.
+ *
+ * Pass a `publicationId` to read per-publication overrides with app_settings
+ * fallback. Pass `null` for the app-wide settings only (used by the legacy
+ * `SlackNotificationService` which lacks publication context).
  */
-export async function getSlackSettings(publicationId: string): Promise<{
+export async function getSlackSettings(publicationId: string | null = null): Promise<{
   webhook_url: string
   low_article_count_enabled: boolean
   rss_processing_updates_enabled: boolean
@@ -524,6 +535,50 @@ export async function getSlackSettings(publicationId: string): Promise<{
     webhook_url: settings.slack_webhook_url || '',
     low_article_count_enabled: settings.slack_low_article_count_enabled === 'true',
     rss_processing_updates_enabled: settings.slack_rss_processing_updates_enabled === 'true',
+  }
+}
+
+/**
+ * Get AI app rotation settings for a publication.
+ * Defaults match the historic hardcoded fallbacks in `app-selector.ts`.
+ */
+export async function getAIAppSettings(publicationId: string): Promise<{
+  totalApps: number
+  maxPerCategory: number
+  affiliateCooldownDays: number
+}> {
+  const settings = await getPublicationSettings(publicationId, [
+    'ai_apps_per_newsletter',
+    'ai_apps_max_per_category',
+    'affiliate_cooldown_days',
+  ])
+
+  return {
+    totalApps: parseInt(settings.ai_apps_per_newsletter || '6', 10),
+    maxPerCategory: parseInt(settings.ai_apps_max_per_category || '3', 10),
+    affiliateCooldownDays: parseInt(settings.affiliate_cooldown_days || '7', 10),
+  }
+}
+
+/**
+ * Get directory pricing settings for a publication.
+ * Defaults match the historic `DEFAULT_PRICING` in `directory.ts`.
+ */
+export async function getDirectorySettings(publicationId: string): Promise<{
+  paidPlacementPrice: number
+  featuredPrice: number
+  yearlyDiscountMonths: number
+}> {
+  const settings = await getPublicationSettings(publicationId, [
+    'directory_paid_placement_price',
+    'directory_featured_price',
+    'directory_yearly_discount_months',
+  ])
+
+  return {
+    paidPlacementPrice: parseFloat(settings.directory_paid_placement_price || '30'),
+    featuredPrice: parseFloat(settings.directory_featured_price || '60'),
+    yearlyDiscountMonths: parseInt(settings.directory_yearly_discount_months || '2', 10),
   }
 }
 

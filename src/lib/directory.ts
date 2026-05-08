@@ -1,6 +1,21 @@
 import { supabaseAdmin } from './supabase'
 import { PUBLICATION_ID } from './config'
+import { getDirectorySettings } from './publication-settings'
 import type { AIApplication, AIAppCategory } from '@/types/database'
+
+// Full ai_applications column list. transformApp() spreads the entire row,
+// so every consumer of getApprovedTools/getToolById/etc. needs all columns.
+const AI_APPLICATION_COLUMNS = `
+  id, publication_id, app_name, tagline, description, category, app_url,
+  tracked_link, logo_url, logo_alt, screenshot_url, screenshot_alt, tool_type,
+  category_priority, is_featured, is_paid_placement, is_affiliate, is_active,
+  display_order, last_used_date, times_used, created_at, updated_at,
+  clerk_user_id, submitter_email, submitter_name, submitter_image_url,
+  submission_status, rejection_reason, approved_by, approved_at,
+  plan, stripe_payment_id, stripe_subscription_id, stripe_customer_id,
+  sponsor_start_date, sponsor_end_date, view_count, click_count,
+  ai_app_module_id, priority, pinned_position, button_text
+` as const
 
 // Categories derived from AIAppCategory type
 const CATEGORIES: { id: string; name: AIAppCategory; slug: string; description: string }[] = [
@@ -70,7 +85,7 @@ export async function getApprovedTools(publicationId?: string): Promise<Director
   // Get apps: either no module (backwards compatible) or in a visible module
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('*')
+    .select(AI_APPLICATION_COLUMNS)
     .eq('publication_id', pubId)
     .eq('is_active', true)
     .or(`ai_app_module_id.is.null,ai_app_module_id.in.(${visibleModuleIds.join(',')})`)
@@ -137,7 +152,7 @@ export async function getToolById(toolId: string, publicationId?: string): Promi
   const pubId = publicationId || PUBLICATION_ID
   const { data: app, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('*')
+    .select(AI_APPLICATION_COLUMNS)
     .eq('id', toolId)
     .eq('publication_id', pubId)
     .single()
@@ -177,7 +192,7 @@ export async function getToolsByCategory(categorySlug: string, publicationId?: s
   // Get tools in this category (filtered by directory visibility)
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('*')
+    .select(AI_APPLICATION_COLUMNS)
     .eq('publication_id', pubId)
     .eq('is_active', true)
     .eq('category', category.name)
@@ -215,7 +230,7 @@ export async function searchTools(query: string, publicationId?: string): Promis
   // Search by name or description
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('*')
+    .select(AI_APPLICATION_COLUMNS)
     .eq('publication_id', pubId)
     .eq('is_active', true)
     .or(`app_name.ilike.%${query}%,description.ilike.%${query}%`)
@@ -245,7 +260,7 @@ export async function getPendingTools(publicationId?: string): Promise<Directory
   const pubId = publicationId || PUBLICATION_ID
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('*')
+    .select(AI_APPLICATION_COLUMNS)
     .eq('publication_id', pubId)
     .eq('is_active', false)
     .order('created_at', { ascending: false })
@@ -319,44 +334,14 @@ export interface DirectoryPricing {
 }
 
 /**
- * Get directory pricing from publication_settings
- * Falls back to defaults if settings are not configured
+ * Get directory pricing via the typed DAL helper (publication→app fallback).
+ * Falls back to hardcoded defaults if the helper throws.
  */
 export async function getDirectoryPricing(publicationId?: string): Promise<DirectoryPricing> {
   const pubId = publicationId || PUBLICATION_ID
   try {
-    const { data: settings, error } = await supabaseAdmin
-      .from('publication_settings')
-      .select('key, value')
-      .eq('publication_id', pubId)
-      .in('key', ['directory_paid_placement_price', 'directory_featured_price', 'directory_yearly_discount_months'])
-
-    if (error) {
-      console.error('[Directory] Error fetching pricing settings:', error)
-      return computePricing(DEFAULT_PRICING)
-    }
-
-    // Build settings map from database
-    const settingsMap: Record<string, string> = {}
-    settings?.forEach(s => {
-      if (s.value !== null) {
-        settingsMap[s.key] = s.value
-      }
-    })
-
-    const pricing = {
-      paidPlacementPrice: settingsMap.directory_paid_placement_price
-        ? parseFloat(settingsMap.directory_paid_placement_price)
-        : DEFAULT_PRICING.paidPlacementPrice,
-      featuredPrice: settingsMap.directory_featured_price
-        ? parseFloat(settingsMap.directory_featured_price)
-        : DEFAULT_PRICING.featuredPrice,
-      yearlyDiscountMonths: settingsMap.directory_yearly_discount_months
-        ? parseInt(settingsMap.directory_yearly_discount_months)
-        : DEFAULT_PRICING.yearlyDiscountMonths
-    }
-
-    return computePricing(pricing)
+    const base = await getDirectorySettings(pubId)
+    return computePricing(base)
   } catch (error) {
     console.error('[Directory] Unexpected error fetching pricing:', error)
     return computePricing(DEFAULT_PRICING)

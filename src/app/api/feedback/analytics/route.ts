@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded, type IPExclusion } from '@/lib/ip-utils'
 import { withApiHandler } from '@/lib/api-handler'
+import { fetchAllPaginated, getExcludedIPs } from '@/lib/dal'
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'feedback/analytics' },
@@ -37,42 +38,53 @@ export const GET = withApiHandler(
 
     console.log(`[Feedback Analytics] Fetching for last ${days} days (${startDateStr} to ${endDateStr})`)
 
-    // Fetch excluded IPs if publication_id provided
-    let exclusions: IPExclusion[] = []
-    let excludedIpCount = 0
-
-    if (publicationId && shouldExcludeIps) {
-      const { data: excludedIpsData } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', publicationId)
-
-      exclusions = (excludedIpsData || []).map(e => ({
-        ip_address: e.ip_address,
-        is_range: e.is_range || false,
-        cidr_prefix: e.cidr_prefix
-      }))
-      excludedIpCount = exclusions.length
+    // Both reads are independent — only depend on publicationId + date range.
+    // Run in parallel: feedback_responses dominates latency on a hot dashboard
+    // refresh, no point waiting for it sequentially after exclusions.
+    type FeedbackResponseRow = {
+      id: string
+      publication_id: string
+      campaign_date: string
+      section_choice: string
+      ip_address: string
+      mailerlite_updated: boolean | null
+      created_at: string
     }
 
-    // Fetch feedback responses within date range, scoped to publication
-    const { data: responsesRaw, error } = await supabaseAdmin
-      .from('feedback_responses')
-      .select('id, publication_id, campaign_date, section_choice, ip_address, mailerlite_updated, created_at')
-      .eq('publication_id', publicationId)
-      .gte('campaign_date', startDateStr)
-      .lte('campaign_date', endDateStr)
-      .order('created_at', { ascending: false })
+    const [exclusionsResult, responsesResult] = await Promise.allSettled([
+      shouldExcludeIps
+        ? getExcludedIPs(publicationId, 'feedback/analytics:excluded_ips')
+        : Promise.resolve<IPExclusion[]>([]),
+      // No .order() in the builder — Supabase paginates via offset, and
+      // ORDER BY + concurrent inserts can shift rows across page boundaries
+      // (duplicates or skips). Sort in-memory after fetch instead.
+      fetchAllPaginated<FeedbackResponseRow>(
+        () =>
+          supabaseAdmin
+            .from('feedback_responses')
+            .select('id, publication_id, campaign_date, section_choice, ip_address, mailerlite_updated, created_at')
+            .eq('publication_id', publicationId!)
+            .gte('campaign_date', startDateStr)
+            .lte('campaign_date', endDateStr),
+        { label: 'feedback/analytics:feedback_responses' },
+      ),
+    ])
 
-    if (error) {
-      console.error('[Feedback Analytics] Error fetching responses:', error)
+    // getExcludedIPs swallows its own errors, so this branch is defensive only.
+    const exclusions: IPExclusion[] =
+      exclusionsResult.status === 'fulfilled' ? exclusionsResult.value : []
+    const excludedIpCount = exclusions.length
+
+    if (responsesResult.status === 'rejected') {
+      const err = responsesResult.reason as any
+      console.error('[Feedback Analytics] Error fetching responses:', err)
       // If table doesn't exist or other DB error, return empty analytics
       const isMissingTable =
-        error.code === 'PGRST116' ||
-        error.code === '42P01' ||
-        error.message?.includes('relation') ||
-        error.message?.includes('does not exist') ||
-        error.message?.includes('feedback_responses')
+        err?.code === 'PGRST116' ||
+        err?.code === '42P01' ||
+        err?.message?.includes('relation') ||
+        err?.message?.includes('does not exist') ||
+        err?.message?.includes('feedback_responses')
 
       if (isMissingTable) {
         console.log('[Feedback Analytics] Table not found - returning empty analytics')
@@ -90,14 +102,20 @@ export const GET = withApiHandler(
           }
         })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: err?.message ?? 'unknown error' }, { status: 500 })
     }
+
+    // Sort by created_at desc in-memory — see the .order() comment on the
+    // paginated query above for why we don't sort at the DB layer.
+    const responsesRaw = responsesResult.value
+      .slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
 
     // Filter out excluded IPs from analytics
     const responses = shouldExcludeIps && exclusions.length > 0
-      ? (responsesRaw || []).filter(r => !isIPExcluded(r.ip_address, exclusions))
-      : (responsesRaw || [])
-    const excludedResponseCount = (responsesRaw?.length || 0) - responses.length
+      ? responsesRaw.filter(r => !isIPExcluded(r.ip_address, exclusions))
+      : responsesRaw
+    const excludedResponseCount = responsesRaw.length - responses.length
 
     if (excludedResponseCount > 0) {
       console.log(`[Feedback Analytics] Filtered ${excludedResponseCount} responses from ${excludedIpCount} excluded IP(s)`)
@@ -121,8 +139,15 @@ export const GET = withApiHandler(
     const successfulSyncs = responses.filter(r => r.mailerlite_updated).length
     const syncSuccessRate = totalResponses > 0 ? (successfulSyncs / totalResponses) * 100 : 0
 
-    // Get most recent responses
-    const recentResponses = responses.slice(0, 10)
+    // Get most recent responses. Project away ip_address (PII) and
+    // publication_id (already known to caller) before serializing.
+    const recentResponses = responses.slice(0, 10).map(r => ({
+      id: r.id,
+      campaign_date: r.campaign_date,
+      section_choice: r.section_choice,
+      mailerlite_updated: r.mailerlite_updated,
+      created_at: r.created_at,
+    }))
 
     return NextResponse.json({
       success: true,

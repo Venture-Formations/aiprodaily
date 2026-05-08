@@ -1,6 +1,6 @@
 import type { RSSProcessorContext } from './shared-context'
 import { logInfo, logError } from './shared-context'
-import { listPostsForExtractionByIssue, applyExtractionResult } from '@/lib/dal/posts'
+import { listPostsForExtractionByIssue, applyExtractionResult } from '@/lib/dal'
 
 /**
  * Article text extraction module.

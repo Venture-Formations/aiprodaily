@@ -1,8 +1,8 @@
 import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { fetchAllPaginated } from '@/lib/dal/paginate'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { fetchAllPaginated, getExcludedIPs } from '@/lib/dal'
+import { isIPExcluded, type IPExclusion } from '@/lib/ip-utils'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { updateBeehiivSubscriberField } from '@/lib/beehiiv'
 import type { Logger } from '@/lib/logger'
@@ -117,17 +117,23 @@ async function syncRealClickStatus(log: Logger): Promise<{
 
   for (const publication of publications) {
     try {
-      // Get excluded IPs for this publication
-      const { data: excludedIpsData } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', publication.id)
-
-      const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-        ip_address: e.ip_address,
-        is_range: e.is_range || false,
-        cidr_prefix: e.cidr_prefix
-      }))
+      // Without exclusions, bot clicks count as real clickers and trigger
+      // MailerLite/Beehiiv field writes. On a DB error we MUST skip the
+      // publication rather than degrade to empty exclusions — see the
+      // throwOnError docstring.
+      let exclusions: IPExclusion[]
+      try {
+        exclusions = await getExcludedIPs(
+          publication.id,
+          `process-mailerlite-updates:excluded_ips:${publication.slug}`,
+          { throwOnError: true },
+        )
+      } catch (err) {
+        errors.push(
+          `[${publication.slug}] Skipping — failed to fetch excluded IPs: ${err instanceof Error ? err.message : 'unknown'}`,
+        )
+        continue
+      }
 
       // Get ALL link clicks for this publication (paginated)
       const FETCH_BATCH = 1000

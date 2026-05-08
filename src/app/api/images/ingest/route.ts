@@ -16,15 +16,15 @@ interface IngestRequest {
 }
 
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'images/ingest' },
-  async ({ request }) => {
+  { authTier: 'authenticated', logContext: 'images/ingest', requirePublicationId: true },
+  async ({ request, publicationId }) => {
     const body: IngestRequest = await request.json()
     const { image_id, source_url, license, credit, location } = body
 
     // Get image record from database
     const { data: image, error: fetchError } = await supabaseAdmin
       .from('images')
-      .select('*')
+      .select('id, cdn_url, variant_16x9_url')
       .eq('id', image_id)
       .single()
 
@@ -39,8 +39,8 @@ export const POST = withApiHandler(
     const imageUrl = image.cdn_url
 
     try {
-      // Get image analyzer prompt from database
-      const imageAnalyzerPrompt = await AI_PROMPTS.imageAnalyzer()
+      // Get image analyzer prompt from database (publication-scoped with app_settings fallback)
+      const imageAnalyzerPrompt = await AI_PROMPTS.imageAnalyzer(publicationId!)
 
       // Analyze image with OpenAI Vision using Responses API
       const response = await (openai as any).responses.create({

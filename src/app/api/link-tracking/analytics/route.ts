@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded } from '@/lib/ip-utils'
 import { withApiHandler } from '@/lib/api-handler'
+import { getExcludedIPs } from '@/lib/dal'
 
 /**
  * Link Click Analytics Endpoint
@@ -40,20 +41,11 @@ export const GET = withApiHandler(
       publicationId = newsletter.id
     }
 
-    // Fetch excluded IPs for this publication (if we have a publication_id)
-    let exclusions: IPExclusion[] = []
-    if (publicationId) {
-      const { data: excludedIpsData } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', publicationId)
-
-      exclusions = (excludedIpsData || []).map(e => ({
-        ip_address: e.ip_address,
-        is_range: e.is_range || false,
-        cidr_prefix: e.cidr_prefix
-      }))
-    }
+    // Without exclusions, bot clicks count as real and inflate CTR. The DAL
+    // helper paginates past the 1000-row default and swallows errors.
+    const exclusions = publicationId
+      ? await getExcludedIPs(publicationId, 'link-tracking/analytics:excluded_ips')
+      : []
 
     // Calculate date range using local timezone
     const endDate = new Date()
@@ -75,7 +67,7 @@ export const GET = withApiHandler(
     while (hasMore) {
       let query = supabaseAdmin
         .from('link_clicks')
-        .select('*')
+        .select('id, ip_address, link_section, link_url, subscriber_email, issue_date, clicked_at')
         .gte('issue_date', startDateStr)
         .lte('issue_date', endDateStr)
         .order('clicked_at', { ascending: false })
