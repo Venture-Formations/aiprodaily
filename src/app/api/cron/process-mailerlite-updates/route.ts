@@ -117,17 +117,33 @@ async function syncRealClickStatus(log: Logger): Promise<{
 
   for (const publication of publications) {
     try {
-      // Get excluded IPs for this publication
-      const { data: excludedIpsData } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', publication.id)
+      // Get excluded IPs for this publication. Paginated past Supabase's
+      // 1000-row default — truncation here causes false positive clicker
+      // detection and re-sends the same MailerLite field updates indefinitely.
+      let exclusions: IPExclusion[] = []
+      try {
+        const excludedIpsData = await fetchAllPaginated<{
+          ip_address: string
+          is_range: boolean | null
+          cidr_prefix: number | null
+        }>(
+          () =>
+            supabaseAdmin
+              .from('excluded_ips')
+              .select('ip_address, is_range, cidr_prefix')
+              .eq('publication_id', publication.id),
+          { label: `process-mailerlite-updates:excluded_ips:${publication.slug}` },
+        )
 
-      const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-        ip_address: e.ip_address,
-        is_range: e.is_range || false,
-        cidr_prefix: e.cidr_prefix
-      }))
+        exclusions = excludedIpsData.map(e => ({
+          ip_address: e.ip_address,
+          is_range: e.is_range || false,
+          cidr_prefix: e.cidr_prefix
+        }))
+      } catch (err) {
+        errors.push(`[${publication.slug}] Failed to fetch excluded IPs: ${err instanceof Error ? err.message : 'unknown'}`)
+        continue
+      }
 
       // Get ALL link clicks for this publication (paginated)
       const FETCH_BATCH = 1000

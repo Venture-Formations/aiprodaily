@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 import { withApiHandler } from '@/lib/api-handler'
+import { fetchAllPaginated } from '@/lib/dal/paginate'
 
 /**
  * Link Click Analytics Endpoint
@@ -40,19 +41,34 @@ export const GET = withApiHandler(
       publicationId = newsletter.id
     }
 
-    // Fetch excluded IPs for this publication (if we have a publication_id)
+    // Fetch excluded IPs for this publication (if we have a publication_id).
+    // Paginated past Supabase's 1000-row default — without this, missing
+    // exclusions cause bot clicks to be counted as real, inflating CTR.
     let exclusions: IPExclusion[] = []
     if (publicationId) {
-      const { data: excludedIpsData } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', publicationId)
+      try {
+        const excludedIpsData = await fetchAllPaginated<{
+          ip_address: string
+          is_range: boolean | null
+          cidr_prefix: number | null
+        }>(
+          () =>
+            supabaseAdmin
+              .from('excluded_ips')
+              .select('ip_address, is_range, cidr_prefix')
+              .eq('publication_id', publicationId!),
+          { label: 'link-tracking/analytics:excluded_ips' },
+        )
 
-      exclusions = (excludedIpsData || []).map(e => ({
-        ip_address: e.ip_address,
-        is_range: e.is_range || false,
-        cidr_prefix: e.cidr_prefix
-      }))
+        exclusions = excludedIpsData.map(e => ({
+          ip_address: e.ip_address,
+          is_range: e.is_range || false,
+          cidr_prefix: e.cidr_prefix
+        }))
+      } catch (err) {
+        console.error('[Link Analytics] Failed to fetch excluded IPs:', err)
+        // Continue with empty exclusions — analytics still works, just unfiltered
+      }
     }
 
     // Calculate date range using local timezone
