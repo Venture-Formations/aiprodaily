@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded } from '@/lib/ip-utils'
+import { getExcludedIPs } from '@/lib/dal'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { SlackNotificationService } from '@/lib/slack'
 import axios from 'axios'
@@ -162,16 +163,10 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
           }
 
           // Get excluded IPs for this publication
-          const { data: excludedIpsData } = await supabaseAdmin
-            .from('excluded_ips')
-            .select('ip_address, is_range, cidr_prefix')
-            .eq('publication_id', publication.id)
-
-          const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-            ip_address: e.ip_address,
-            is_range: e.is_range || false,
-            cidr_prefix: e.cidr_prefix
-          }))
+          const exclusions = await getExcludedIPs(
+            publication.id,
+            `debug/integrations:excluded_ips:${publication.slug}`,
+          )
 
           // Get ALL link clicks for this publication (paginated)
           const FETCH_BATCH = 1000

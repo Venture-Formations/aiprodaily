@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { toProjectDateStr } from '@/lib/date-utils'
-import { isIPExcluded, type IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded } from '@/lib/ip-utils'
+import { getExcludedIPs } from '@/lib/dal'
 
 export interface AdData {
   id: string
@@ -127,16 +128,7 @@ export async function fetchAdClicks(
   }
 
   // Fetch excluded IPs
-  const { data: excludedIpsData } = await supabaseAdmin
-    .from('excluded_ips')
-    .select('ip_address, is_range, cidr_prefix')
-    .eq('publication_id', publicationId)
-
-  const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-    ip_address: e.ip_address,
-    is_range: e.is_range || false,
-    cidr_prefix: e.cidr_prefix
-  }))
+  const exclusions = await getExcludedIPs(publicationId, 'ads/ad-analytics-helpers:excluded_ips')
 
   // Fetch link clicks
   const { data: clicksData } = await supabaseAdmin

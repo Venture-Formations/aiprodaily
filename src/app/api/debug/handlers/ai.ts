@@ -366,7 +366,7 @@ export const handlers: Record<string, { GET?: DebugHandler; POST?: DebugHandler 
       // Check existing selections
       const { data: existingSelections } = await supabaseAdmin
         .from('issue_ai_app_selections')
-        .select('*')
+        .select('id')
         .eq('issue_id', issue.id)
 
       logger.info({ issueId: issue.id, count: existingSelections?.length || 0 }, 'Existing selections for issue')

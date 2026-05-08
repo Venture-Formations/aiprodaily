@@ -7,7 +7,8 @@
  */
 
 import { supabaseAdmin } from '../supabase'
-import { isIPExcluded, IPExclusion } from '../ip-utils'
+import { isIPExcluded } from '../ip-utils'
+import { getExcludedIPs } from '../dal'
 import type { FeedbackModule, FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVote, FeedbackComment, FeedbackVoteBreakdown, FeedbackIssueStats } from '@/types/database'
 
 export class FeedbackModuleSelector {
@@ -503,19 +504,9 @@ export class FeedbackModuleSelector {
       .single()
 
     // Fetch excluded IPs if we have a publication
-    let exclusions: IPExclusion[] = []
-    if (mod?.publication_id) {
-      const { data: excludedIpsData } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', mod.publication_id)
-
-      exclusions = (excludedIpsData || []).map(e => ({
-        ip_address: e.ip_address,
-        is_range: e.is_range || false,
-        cidr_prefix: e.cidr_prefix
-      }))
-    }
+    const exclusions = mod?.publication_id
+      ? await getExcludedIPs(mod.publication_id, 'feedback-selector:vote-breakdown:excluded_ips')
+      : []
 
     // Get all votes for this issue (include ip_address for filtering)
     const { data: allVotes, error } = await supabaseAdmin
@@ -610,16 +601,7 @@ export class FeedbackModuleSelector {
     }
 
     // Fetch excluded IPs for this publication
-    const { data: excludedIpsData } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('ip_address, is_range, cidr_prefix')
-      .eq('publication_id', publicationId)
-
-    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
-      ip_address: e.ip_address,
-      is_range: e.is_range || false,
-      cidr_prefix: e.cidr_prefix
-    }))
+    const exclusions = await getExcludedIPs(publicationId, 'feedback-selector:excluded_ips')
 
     // Build query for votes (include ip_address for filtering)
     let query = supabaseAdmin

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { isIPExcluded } from '@/lib/ip-utils'
 import { getKnownIPRange, getKnownRangesByOrganization } from '@/lib/known-ip-ranges'
 import { withApiHandler } from '@/lib/api-handler'
+import { getExcludedIPs } from '@/lib/dal'
+
+const BATCH_SIZE = 1000
 
 /**
  * GET - Get suggested IPs to exclude based on suspicious patterns
@@ -27,34 +30,8 @@ export const GET = withApiHandler(
       )
     }
 
-    // Get already excluded IPs to filter them out of suggestions
-    // Use pagination since Supabase limits to 1000 rows per query
-    const BATCH_SIZE = 1000
-    let excludedIpsData: any[] = []
-    let excludedOffset = 0
-    let excludedHasMore = true
-
-    while (excludedHasMore) {
-      const { data: batch } = await supabaseAdmin
-        .from('excluded_ips')
-        .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', publicationId)
-        .range(excludedOffset, excludedOffset + BATCH_SIZE - 1)
-
-      if (batch && batch.length > 0) {
-        excludedIpsData = excludedIpsData.concat(batch)
-        excludedOffset += BATCH_SIZE
-        excludedHasMore = batch.length === BATCH_SIZE
-      } else {
-        excludedHasMore = false
-      }
-    }
-
-    const exclusions: IPExclusion[] = excludedIpsData.map(e => ({
-      ip_address: e.ip_address,
-      is_range: e.is_range || false,
-      cidr_prefix: e.cidr_prefix
-    }))
+    // Get already excluded IPs to filter them out of suggestions.
+    const exclusions = await getExcludedIPs(publicationId, 'excluded-ips/suggestions:excluded_ips')
 
     // Fetch poll responses with IP (with pagination to handle >1000 rows)
     let pollData: any[] = []
