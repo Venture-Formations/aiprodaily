@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { supabaseAdmin } from './supabase'
 import { triageAlert, isTriageEnabled } from './monitoring/alert-triage'
+import { getPublicationSettings, getSlackSettings } from './publication-settings'
 
 export class SlackNotificationService {
   private webhookUrl: string
@@ -11,13 +12,16 @@ export class SlackNotificationService {
 
   private async isNotificationEnabled(notificationType: string): Promise<boolean> {
     try {
-      const { data: setting } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', `slack_${notificationType}_enabled`)
-        .single()
-
-      return setting?.value === 'true'
+      // App-wide check — this service has no publication context. Threading
+      // publicationId through callers is a follow-up.
+      const key = `slack_${notificationType}_enabled`
+      const settings = await getPublicationSettings(null, [key])
+      // Default to enabled when the key is absent. The prior implementation
+      // used .single() which errored on missing rows and fell into a catch
+      // that returned true; getPublicationSettings instead returns {} for
+      // missing keys, so we must check undefined explicitly to preserve
+      // that "default-true" behavior.
+      return settings[key] === undefined ? true : settings[key] === 'true'
     } catch (error) {
       // Default to enabled if setting doesn't exist
       return true
@@ -26,13 +30,8 @@ export class SlackNotificationService {
 
   private async getWebhookUrl(): Promise<string> {
     try {
-      const { data: setting } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'slack_webhook_url')
-        .single()
-
-      return setting?.value || this.webhookUrl
+      const slack = await getSlackSettings(null)
+      return slack.webhook_url || this.webhookUrl
     } catch (error) {
       return this.webhookUrl
     }

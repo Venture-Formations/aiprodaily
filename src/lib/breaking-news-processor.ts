@@ -3,6 +3,7 @@ import { supabaseAdmin } from './supabase'
 import { callOpenAI } from './openai'
 import { AI_PROMPTS } from './openai/prompt-loaders'
 import { ErrorHandler, SlackNotificationService } from './slack'
+import { getIssuePublicationId } from './dal/issues'
 import type { RssFeed, RssPost } from '@/types/database'
 
 const parser = new Parser({
@@ -192,6 +193,14 @@ export class BreakingNewsProcessor {
   private async scoreAndCategorizeArticles(issueId: string) {
     console.log('Starting Breaking News scoring and categorization...')
 
+    // Resolve publication once so per-publication prompt overrides apply
+    const publicationId = await getIssuePublicationId(issueId)
+    if (!publicationId) {
+      console.error(
+        `[BreakingNews] Could not resolve publicationId for issue ${issueId} — scoring will use app-wide / fallback prompts`,
+      )
+    }
+
     // Get all posts for this issue that haven't been scored yet
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
@@ -223,7 +232,7 @@ export class BreakingNewsProcessor {
           console.log(`Scoring post ${overallIndex}/${posts.length}: ${post.title}`)
 
           // Score the article
-          const score = await this.scoreArticle(post)
+          const score = await this.scoreArticle(post, publicationId ?? undefined)
 
           // Generate summary and title
           const summary = await this.generateSummaryAndTitle(post)
@@ -285,12 +294,12 @@ export class BreakingNewsProcessor {
     })
   }
 
-  private async scoreArticle(post: RssPost): Promise<BreakingNewsScore> {
+  private async scoreArticle(post: RssPost, publicationId?: string): Promise<BreakingNewsScore> {
     const prompt = await AI_PROMPTS.breakingNewsScorer({
       title: post.title,
       description: post.description || '',
       content: post.content || ''
-    })
+    }, publicationId)
 
     const result = await callOpenAI(prompt, 1000, 0.3)
 

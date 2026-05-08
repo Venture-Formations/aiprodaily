@@ -1,9 +1,10 @@
 import { supabaseAdmin } from './supabase'
+import { getAIAppSettings } from './publication-settings'
 import type { AIApplication } from '@/types/database'
 
 export class AppSelector {
   /**
-   * Get app selection settings from publication_settings table
+   * Get app selection settings via the typed DAL helper (publication→app fallback).
    */
   private static async getAppSettings(newsletterId: string): Promise<{
     totalApps: number
@@ -11,26 +12,13 @@ export class AppSelector {
     affiliateCooldownDays: number
   }> {
     try {
-      const { data: settings } = await supabaseAdmin
-        .from('publication_settings')
-        .select('key, value')
-        .eq('publication_id', newsletterId)
-        .in('key', ['ai_apps_per_newsletter', 'ai_apps_max_per_category', 'affiliate_cooldown_days'])
-
-      const settingsMap = new Map(settings?.map(s => [s.key, parseInt(s.value || '0')]) || [])
-
-      return {
-        totalApps: settingsMap.get('ai_apps_per_newsletter') || 6,
-        maxPerCategory: settingsMap.get('ai_apps_max_per_category') || 3,
-        affiliateCooldownDays: settingsMap.get('affiliate_cooldown_days') || 7
-      }
+      return await getAIAppSettings(newsletterId)
     } catch (error) {
       console.error('Error fetching app settings:', error)
-      // Return defaults
       return {
         totalApps: 6,
         maxPerCategory: 3,
-        affiliateCooldownDays: 7
+        affiliateCooldownDays: 7,
       }
     }
   }

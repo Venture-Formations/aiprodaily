@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase'
 import { PUBLICATION_ID } from './config'
+import { getDirectorySettings } from './publication-settings'
 import type { AIApplication, AIAppCategory } from '@/types/database'
 
 // Categories derived from AIAppCategory type
@@ -319,44 +320,14 @@ export interface DirectoryPricing {
 }
 
 /**
- * Get directory pricing from publication_settings
- * Falls back to defaults if settings are not configured
+ * Get directory pricing via the typed DAL helper (publication→app fallback).
+ * Falls back to hardcoded defaults if the helper throws.
  */
 export async function getDirectoryPricing(publicationId?: string): Promise<DirectoryPricing> {
   const pubId = publicationId || PUBLICATION_ID
   try {
-    const { data: settings, error } = await supabaseAdmin
-      .from('publication_settings')
-      .select('key, value')
-      .eq('publication_id', pubId)
-      .in('key', ['directory_paid_placement_price', 'directory_featured_price', 'directory_yearly_discount_months'])
-
-    if (error) {
-      console.error('[Directory] Error fetching pricing settings:', error)
-      return computePricing(DEFAULT_PRICING)
-    }
-
-    // Build settings map from database
-    const settingsMap: Record<string, string> = {}
-    settings?.forEach(s => {
-      if (s.value !== null) {
-        settingsMap[s.key] = s.value
-      }
-    })
-
-    const pricing = {
-      paidPlacementPrice: settingsMap.directory_paid_placement_price
-        ? parseFloat(settingsMap.directory_paid_placement_price)
-        : DEFAULT_PRICING.paidPlacementPrice,
-      featuredPrice: settingsMap.directory_featured_price
-        ? parseFloat(settingsMap.directory_featured_price)
-        : DEFAULT_PRICING.featuredPrice,
-      yearlyDiscountMonths: settingsMap.directory_yearly_discount_months
-        ? parseInt(settingsMap.directory_yearly_discount_months)
-        : DEFAULT_PRICING.yearlyDiscountMonths
-    }
-
-    return computePricing(pricing)
+    const base = await getDirectorySettings(pubId)
+    return computePricing(base)
   } catch (error) {
     console.error('[Directory] Unexpected error fetching pricing:', error)
     return computePricing(DEFAULT_PRICING)

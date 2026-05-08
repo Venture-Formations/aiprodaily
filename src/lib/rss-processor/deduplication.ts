@@ -1,5 +1,5 @@
-import { supabaseAdmin } from '../supabase'
 import { Deduplicator } from '../deduplicator'
+import { getPublicationSettings } from '../publication-settings'
 import type { RssPost } from '@/types/database'
 import { getNewsletterIdFromIssue } from './shared-context'
 import { listPostsByIssue } from '@/lib/dal/posts'
@@ -69,16 +69,12 @@ export class Deduplication {
       // Get publication_id from issue for multi-tenant filtering
       const newsletterId = await getNewsletterIdFromIssue(issueId)
 
-      // Load deduplication settings
-      const { data: settings } = await supabaseAdmin
-        .from('publication_settings')
-        .select('key, value')
-        .eq('publication_id', newsletterId)
-        .in('key', ['dedup_historical_lookback_days', 'dedup_strictness_threshold'])
-
-      const settingsMap = new Map(settings?.map(s => [s.key, s.value]) || [])
-      const historicalLookbackDays = parseInt(settingsMap.get('dedup_historical_lookback_days') || '3')
-      const strictnessThreshold = parseFloat(settingsMap.get('dedup_strictness_threshold') || '0.80')
+      const settings = await getPublicationSettings(newsletterId, [
+        'dedup_historical_lookback_days',
+        'dedup_strictness_threshold',
+      ])
+      const historicalLookbackDays = parseInt(settings.dedup_historical_lookback_days || '3', 10)
+      const strictnessThreshold = parseFloat(settings.dedup_strictness_threshold || '0.80')
 
       // Run 4-stage deduplication with config
       const deduplicator = new Deduplicator({

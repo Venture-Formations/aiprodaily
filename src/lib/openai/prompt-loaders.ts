@@ -855,7 +855,8 @@ Respond with valid JSON in this exact format:
   "word_count": <exact word count>
 }`,
 
-  breakingNewsScorer: (article: { title: string; description: string; content?: string }) => `
+  breakingNewsScorer: (article: { title: string; description: string; content?: string }) => {
+    const template = `
 You are evaluating a news article for inclusion in the AI Accounting Professionals newsletter's "Breaking News" section.
 
 Your task is to score this article's RELEVANCE and IMPORTANCE to accounting professionals on a scale of 0-100.
@@ -919,33 +920,88 @@ Response format:
   "urgency": "<high|medium|low>",
   "actionable": <true|false>
 }`
+    return template
+      .replace(/\{\{title\}\}/g, article.title)
+      .replace(/\{\{description\}\}/g, article.description || 'No description available')
+      .replace(/\{\{content\}\}/g, article.content ? article.content.substring(0, 1500) + '...' : 'No content available')
+  },
 }
 
-// Dynamic AI Prompts - Uses database with fallbacks (Oct 7 2025 - Force cache bust)
-// WARNING: These legacy functions query app_settings WITHOUT publication_id filter.
-// For multi-tenant per-publication prompts, use callAIWithPrompt(key, newsletterId, vars)
-// which reads from publication_settings first. These functions should be migrated
-// to accept a publicationId parameter when their callers are updated.
-export const AI_PROMPTS = {
-  contentEvaluator: async (post: { title: string; description: string; content?: string; hasImage?: boolean }) => {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_content_evaluator')
-        .single()
+// Internal helper: fetch a prompt row with publication→app fallback.
+// `publication_settings` has no `ai_provider` column (only `app_settings` does),
+// so when a publication override exists the provider defaults to whatever the
+// caller's downstream auto-detect produces (typically openai unless the model
+// name says claude). Callers handle the value-shape variance (string vs JSONB).
+//
+// Empty/null publication values fall through to app_settings (via the
+// `pubData?.value` check). This intentionally diverges from
+// `prompt-repository.ts:getPrompt`, which treats an empty publication row as a
+// "win" and returns `''`. Falling through is safer because an accidentally-
+// blank override would otherwise feed an empty prompt to the AI. Aligning
+// `getPrompt` to match is tracked as a follow-up.
+async function fetchPromptRow(
+  key: string,
+  publicationId?: string,
+): Promise<{ value: any; ai_provider: string | null } | null> {
+  if (publicationId) {
+    const { data: pubData, error: pubError } = await supabaseAdmin
+      .from('publication_settings')
+      .select('value')
+      .eq('publication_id', publicationId)
+      .eq('key', key)
+      .maybeSingle()
+    if (!pubError && pubData?.value) {
+      return { value: pubData.value, ai_provider: null }
+    }
+  }
+  const { data, error } = await supabaseAdmin
+    .from('app_settings')
+    .select('value, ai_provider')
+    .eq('key', key)
+    .maybeSingle()
+  if (error || !data?.value) return null
+  return { value: data.value, ai_provider: (data as any).ai_provider ?? null }
+}
 
-      if (error || !data) {
-        console.log('Using code fallback for contentEvaluator prompt')
+// Shared loader for the 5 criteria evaluators — same shape, different key suffix.
+async function loadCriteriaPrompt(
+  n: 1 | 2 | 3 | 4 | 5,
+  post: { title: string; description: string; content?: string },
+  publicationId?: string,
+): Promise<string> {
+  const fallback = FALLBACK_PROMPTS[`criteria${n}Evaluator` as keyof typeof FALLBACK_PROMPTS] as
+    (p: typeof post) => string
+  try {
+    const row = await fetchPromptRow(`ai_prompt_criteria_${n}`, publicationId)
+    if (!row || !row.value) return fallback(post)
+    const valueStr = typeof row.value === 'string' ? row.value : JSON.stringify(row.value)
+    return valueStr
+      .replace(/\{\{title\}\}/g, post.title)
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+  } catch (error) {
+    console.error(`Error fetching criteria${n}Evaluator prompt, using fallback:`, error)
+    return fallback(post)
+  }
+}
+
+// Dynamic AI Prompts - publication→app_settings fallback via fetchPromptRow.
+// Each function accepts an optional `publicationId` for per-publication prompt
+// overrides. Callers without publication context (debug/admin tools) can omit
+// it for app-wide behavior.
+export const AI_PROMPTS = {
+  contentEvaluator: async (post: { title: string; description: string; content?: string; hasImage?: boolean }, publicationId?: string) => {
+    try {
+      const row = await fetchPromptRow('ai_prompt_content_evaluator', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.contentEvaluator(post)
       }
 
-      // Database template uses {{}} placeholders
       const imagePenaltyText = post.hasImage
         ? 'This post HAS an image.'
         : 'This post has NO image - subtract 5 points from interest_level.'
 
-      return data.value
+      return row.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -956,20 +1012,13 @@ export const AI_PROMPTS = {
     }
   },
 
-  newsletterWriter: async (post: { title: string; description: string; content?: string; source_url?: string }) => {
+  newsletterWriter: async (post: { title: string; description: string; content?: string; source_url?: string }, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_newsletter_writer')
-        .single()
-
-      if (error || !data) {
-        console.log('Using code fallback for newsletterWriter prompt')
+      const row = await fetchPromptRow('ai_prompt_newsletter_writer', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.newsletterWriter(post)
       }
-
-      return data.value
+      return row.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
@@ -980,20 +1029,13 @@ export const AI_PROMPTS = {
     }
   },
 
-  eventSummarizer: async (event: { title: string; description: string | null; venue?: string | null }) => {
+  eventSummarizer: async (event: { title: string; description: string | null; venue?: string | null }, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_event_summary')
-        .single()
-
-      if (error || !data) {
-        console.log('Using code fallback for eventSummarizer prompt')
+      const row = await fetchPromptRow('ai_prompt_event_summary', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.eventSummarizer(event)
       }
-
-      return data.value
+      return row.value
         .replace(/\{\{title\}\}/g, event.title)
         .replace(/\{\{description\}\}/g, event.description || 'No description available')
         .replace(/\{\{venue\}\}/g, event.venue || 'No venue specified')
@@ -1013,28 +1055,22 @@ export const AI_PROMPTS = {
     return FALLBACK_PROMPTS.roadWorkGenerator(issueDate)
   },
 
-  imageAnalyzer: async () => {
+  imageAnalyzer: async (publicationId?: string) => {
     return await getPrompt(
       'ai_prompt_image_analyzer',
-      FALLBACK_PROMPTS.imageAnalyzer()
+      FALLBACK_PROMPTS.imageAnalyzer(),
+      publicationId
     )
   },
 
-  topicDeduper: async (posts: Array<{ title: string; description: string; full_article_text: string }>) => {
+  topicDeduper: async (posts: Array<{ title: string; description: string; full_article_text: string }>, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value, ai_provider')
-        .eq('key', 'ai_prompt_topic_deduper')
-        .single()
-
-      if (error || !data) {
-        console.log('[AI] Using fallback for topicDeduper prompt')
+      const row = await fetchPromptRow('ai_prompt_topic_deduper', publicationId)
+      if (!row) {
         return FALLBACK_PROMPTS.topicDeduper(posts)
       }
 
-      console.log('[AI] Using database prompt for topicDeduper')
-      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
+      const provider = (row.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
 
       // Format articles list for the prompt with full article text
       const articlesText = posts.map((post, i) => `
@@ -1045,108 +1081,68 @@ ${i}. Title: ${post.title}
 
       // Check if value is already an object (JSONB auto-parsed) or needs parsing
       let promptConfig: any
-      if (typeof data.value === 'string') {
-        // String value - try to parse as JSON
+      if (typeof row.value === 'string') {
         try {
-          promptConfig = JSON.parse(data.value)
-        } catch (jsonError) {
-          // Not JSON, treat as plain text prompt
-          console.log('[AI] Using plain text prompt for topicDeduper')
-          return data.value.replace(/\{\{articles\}\}/g, articlesText)
+          promptConfig = JSON.parse(row.value)
+        } catch {
+          return row.value.replace(/\{\{articles\}\}/g, articlesText)
         }
-      } else if (typeof data.value === 'object' && data.value !== null) {
-        // Already an object (JSONB was auto-parsed)
-        promptConfig = data.value
+      } else if (typeof row.value === 'object' && row.value !== null) {
+        promptConfig = row.value
       } else {
-        console.log('[AI] Unknown value format for topicDeduper, treating as plain text')
-        return String(data.value).replace(/\{\{articles\}\}/g, articlesText)
+        return String(row.value).replace(/\{\{articles\}\}/g, articlesText)
       }
 
-      // Check if it's a structured prompt
       if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-        console.log('[AI] Using structured JSON prompt for topicDeduper with provider:', provider)
-        const placeholders = { articles: articlesText }
-        return await callWithStructuredPrompt(promptConfig, placeholders, provider)
+        return await callWithStructuredPrompt(promptConfig, { articles: articlesText }, provider)
       }
 
-      // Fallback to plain text
-      console.log('[AI] Using plain text format for topicDeduper')
       const promptText = typeof promptConfig === 'string' ? promptConfig : JSON.stringify(promptConfig)
       return promptText.replace(/\{\{articles\}\}/g, articlesText)
-
     } catch (error) {
       console.error('[AI] Error loading topicDeduper prompt:', error)
       return FALLBACK_PROMPTS.topicDeduper(posts)
     }
   },
-  factChecker: async (newsletterContent: string, originalContent: string) => {
+  factChecker: async (newsletterContent: string, originalContent: string, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value, ai_provider')
-        .eq('key', 'ai_prompt_fact_checker')
-        .single()
-
-      if (error || !data) {
-        console.log('[AI] Using fallback for factChecker prompt')
+      const row = await fetchPromptRow('ai_prompt_fact_checker', publicationId)
+      if (!row) {
         return FALLBACK_PROMPTS.factChecker(newsletterContent, originalContent)
       }
 
-      console.log('[AI] Using database prompt for factChecker')
-      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
+      const provider = (row.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
 
-      // Check if value is already an object (JSONB auto-parsed) or needs parsing
-      let promptConfig: any
-      if (typeof data.value === 'string') {
-        // String value - try to parse as JSON
-        try {
-          promptConfig = JSON.parse(data.value)
-        } catch (jsonError) {
-          // Not JSON, treat as plain text prompt
-          console.log('[AI] Using plain text prompt for factChecker')
-          return data.value
-            .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
-            .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
-            .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
-            .replace(/\{\{original_content\}\}/g, originalContent.substring(0, 2000))
-        }
-      } else if (typeof data.value === 'object' && data.value !== null) {
-        // Already an object (JSONB was auto-parsed)
-        promptConfig = data.value
-      } else {
-        // Unknown format, use as plain text
-        console.log('[AI] Unknown value format for factChecker, treating as plain text')
-        const valueStr = String(data.value)
-        return valueStr
-          .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
-          .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
-          .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
-          .replace(/\{\{original_content\}\}/g, originalContent.substring(0, 2000))
+      const placeholders = {
+        newsletterContent,
+        newsletter_content: newsletterContent,
+        originalContent: originalContent.substring(0, 2000),
+        original_content: originalContent.substring(0, 2000),
       }
 
-      // Check if it's a structured prompt
-      if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-        console.log('[AI] Detected structured JSON prompt for factChecker with provider:', provider)
-
-        // Support both camelCase and snake_case placeholders for backward compatibility
-        const placeholders = {
-          newsletterContent,
-          newsletter_content: newsletterContent,
-          originalContent: originalContent.substring(0, 2000),
-          original_content: originalContent.substring(0, 2000)
-        }
-
-        return await callWithStructuredPrompt(promptConfig, placeholders, provider)
-      }
-
-      // Plain text prompt - support both placeholder formats
-      console.log('[AI] Using plain text prompt for factChecker')
-      const configStr = String(promptConfig)
-      return configStr
+      const applyPlaceholders = (text: string) => text
         .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
         .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
         .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
         .replace(/\{\{original_content\}\}/g, originalContent.substring(0, 2000))
+
+      let promptConfig: any
+      if (typeof row.value === 'string') {
+        try {
+          promptConfig = JSON.parse(row.value)
+        } catch {
+          return applyPlaceholders(row.value)
+        }
+      } else if (typeof row.value === 'object' && row.value !== null) {
+        promptConfig = row.value
+      } else {
+        return applyPlaceholders(String(row.value))
+      }
+
+      if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
+        return await callWithStructuredPrompt(promptConfig, placeholders, provider)
+      }
+      return applyPlaceholders(String(promptConfig))
     } catch (error) {
       console.error('[AI] Error fetching factChecker prompt, using fallback:', error)
       return FALLBACK_PROMPTS.factChecker(newsletterContent, originalContent)
@@ -1156,20 +1152,13 @@ ${i}. Title: ${post.title}
     return FALLBACK_PROMPTS.roadWorkValidator(roadWorkItems, date)
   },
 
-  breakingNewsScorer: async (article: { title: string; description: string; content?: string }) => {
+  breakingNewsScorer: async (article: { title: string; description: string; content?: string }, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_breaking_news_scorer')
-        .single()
-
-      if (error || !data) {
-        console.log('Using code fallback for breakingNewsScorer prompt')
+      const row = await fetchPromptRow('ai_prompt_breaking_news_scorer', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.breakingNewsScorer(article)
       }
-
-      return data.value
+      return row.value
         .replace(/\{\{title\}\}/g, article.title)
         .replace(/\{\{description\}\}/g, article.description || 'No description available')
         .replace(/\{\{content\}\}/g, article.content ? article.content.substring(0, 1500) + '...' : 'No content available')
@@ -1179,58 +1168,35 @@ ${i}. Title: ${post.title}
     }
   },
 
-  welcomeSection: async (articles: Array<{ headline: string; content: string }>) => {
+  welcomeSection: async (articles: Array<{ headline: string; content: string }>, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value, ai_provider')
-        .eq('key', 'ai_prompt_welcome_section')
-        .single()
-
-      if (error || !data) {
-        console.log('[AI] Using fallback for welcomeSection prompt')
+      const row = await fetchPromptRow('ai_prompt_welcome_section', publicationId)
+      if (!row) {
         return FALLBACK_PROMPTS.welcomeSection(articles)
       }
 
-      console.log('[AI] Using database prompt for welcomeSection')
-      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
+      const provider = (row.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
 
-      // Format articles for the prompt
       const articlesText = articles
         .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 200)}...`)
         .join('\n\n')
 
-      // Check if value is already an object (JSONB auto-parsed) or needs parsing
       let promptConfig: any
-      if (typeof data.value === 'string') {
-        // String value - try to parse as JSON
+      if (typeof row.value === 'string') {
         try {
-          promptConfig = JSON.parse(data.value)
-        } catch (jsonError) {
-          // Not JSON, treat as plain text prompt
-          console.log('[AI] Using plain text prompt for welcomeSection')
-          return data.value.replace(/\{\{articles\}\}/g, articlesText)
+          promptConfig = JSON.parse(row.value)
+        } catch {
+          return row.value.replace(/\{\{articles\}\}/g, articlesText)
         }
-      } else if (typeof data.value === 'object' && data.value !== null) {
-        // Already an object (JSONB was auto-parsed)
-        promptConfig = data.value
+      } else if (typeof row.value === 'object' && row.value !== null) {
+        promptConfig = row.value
       } else {
-        // Unknown format, use as plain text
-        console.log('[AI] Unknown value format for welcomeSection, treating as plain text')
-        return String(data.value).replace(/\{\{articles\}\}/g, articlesText)
+        return String(row.value).replace(/\{\{articles\}\}/g, articlesText)
       }
 
-      // Check if it's a structured prompt
       if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-        console.log('[AI] Using structured JSON prompt for welcomeSection with provider:', provider)
-        const placeholders = {
-          articles: articlesText
-        }
-        return await callWithStructuredPrompt(promptConfig, placeholders, provider)
+        return await callWithStructuredPrompt(promptConfig, { articles: articlesText }, provider)
       }
-
-      // Plain text prompt
-      console.log('[AI] Using plain text prompt for welcomeSection')
       return String(promptConfig).replace(/\{\{articles\}\}/g, articlesText)
     } catch (error) {
       console.error('[AI] Error fetching welcomeSection prompt, using fallback:', error)
@@ -1238,151 +1204,27 @@ ${i}. Title: ${post.title}
     }
   },
 
-  // Multi-Criteria Evaluators (database-driven with fallbacks)
-  criteria1Evaluator: async (post: { title: string; description: string; content?: string }) => {
+  // Multi-Criteria Evaluators (database-driven with fallbacks).
+  // All five share the same shape: load the prompt template, substitute the
+  // post fields, return the rendered text.
+  criteria1Evaluator: async (post: { title: string; description: string; content?: string }, publicationId?: string) =>
+    loadCriteriaPrompt(1, post, publicationId),
+  criteria2Evaluator: async (post: { title: string; description: string; content?: string }, publicationId?: string) =>
+    loadCriteriaPrompt(2, post, publicationId),
+  criteria3Evaluator: async (post: { title: string; description: string; content?: string }, publicationId?: string) =>
+    loadCriteriaPrompt(3, post, publicationId),
+  criteria4Evaluator: async (post: { title: string; description: string; content?: string }, publicationId?: string) =>
+    loadCriteriaPrompt(4, post, publicationId),
+  criteria5Evaluator: async (post: { title: string; description: string; content?: string }, publicationId?: string) =>
+    loadCriteriaPrompt(5, post, publicationId),
+
+  articleWriter: async (post: { title: string; description: string; content?: string; source_url?: string }, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_criteria_1')
-        .single()
-
-      if (error || !data || !data.value) {
-        console.log('Using code fallback for criteria1Evaluator prompt')
-        return FALLBACK_PROMPTS.criteria1Evaluator(post)
-      }
-
-      // Ensure value is a string (handle JSONB auto-parsing)
-      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
-
-      return valueStr
-        .replace(/\{\{title\}\}/g, post.title)
-        .replace(/\{\{description\}\}/g, post.description || 'No description available')
-        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
-    } catch (error) {
-      console.error('Error fetching criteria1Evaluator prompt, using fallback:', error)
-      return FALLBACK_PROMPTS.criteria1Evaluator(post)
-    }
-  },
-
-  criteria2Evaluator: async (post: { title: string; description: string; content?: string }) => {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_criteria_2')
-        .single()
-
-      if (error || !data || !data.value) {
-        console.log('Using code fallback for criteria2Evaluator prompt')
-        return FALLBACK_PROMPTS.criteria2Evaluator(post)
-      }
-
-      // Ensure value is a string (handle JSONB auto-parsing)
-      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
-
-      return valueStr
-        .replace(/\{\{title\}\}/g, post.title)
-        .replace(/\{\{description\}\}/g, post.description || 'No description available')
-        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
-    } catch (error) {
-      console.error('Error fetching criteria2Evaluator prompt, using fallback:', error)
-      return FALLBACK_PROMPTS.criteria2Evaluator(post)
-    }
-  },
-
-  criteria3Evaluator: async (post: { title: string; description: string; content?: string }) => {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_criteria_3')
-        .single()
-
-      if (error || !data || !data.value) {
-        console.log('Using code fallback for criteria3Evaluator prompt')
-        return FALLBACK_PROMPTS.criteria3Evaluator(post)
-      }
-
-      // Ensure value is a string (handle JSONB auto-parsing)
-      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
-
-      return valueStr
-        .replace(/\{\{title\}\}/g, post.title)
-        .replace(/\{\{description\}\}/g, post.description || 'No description available')
-        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
-    } catch (error) {
-      console.error('Error fetching criteria3Evaluator prompt, using fallback:', error)
-      return FALLBACK_PROMPTS.criteria3Evaluator(post)
-    }
-  },
-
-  criteria4Evaluator: async (post: { title: string; description: string; content?: string }) => {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_criteria_4')
-        .single()
-
-      if (error || !data || !data.value) {
-        console.log('Using code fallback for criteria4Evaluator prompt')
-        return FALLBACK_PROMPTS.criteria4Evaluator(post)
-      }
-
-      // Ensure value is a string (handle JSONB auto-parsing)
-      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
-
-      return valueStr
-        .replace(/\{\{title\}\}/g, post.title)
-        .replace(/\{\{description\}\}/g, post.description || 'No description available')
-        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
-    } catch (error) {
-      console.error('Error fetching criteria4Evaluator prompt, using fallback:', error)
-      return FALLBACK_PROMPTS.criteria4Evaluator(post)
-    }
-  },
-
-  criteria5Evaluator: async (post: { title: string; description: string; content?: string }) => {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_criteria_5')
-        .single()
-
-      if (error || !data || !data.value) {
-        console.log('Using code fallback for criteria5Evaluator prompt')
-        return FALLBACK_PROMPTS.criteria5Evaluator(post)
-      }
-
-      // Ensure value is a string (handle JSONB auto-parsing)
-      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
-
-      return valueStr
-        .replace(/\{\{title\}\}/g, post.title)
-        .replace(/\{\{description\}\}/g, post.description || 'No description available')
-        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
-    } catch (error) {
-      console.error('Error fetching criteria5Evaluator prompt, using fallback:', error)
-      return FALLBACK_PROMPTS.criteria5Evaluator(post)
-    }
-  },
-
-  articleWriter: async (post: { title: string; description: string; content?: string; source_url?: string }) => {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_article_writer')
-        .single()
-
-      if (error || !data) {
-        console.log('Using code fallback for articleWriter prompt')
+      const row = await fetchPromptRow('ai_prompt_article_writer', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.articleWriter(post)
       }
-
-      return data.value
+      return row.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
@@ -1395,53 +1237,32 @@ ${i}. Title: ${post.title}
 ,
 
   // Primary Article Title Generator
-  primaryArticleTitle: async (post: { title: string; description: string; content?: string }) => {
+  primaryArticleTitle: async (post: { title: string; description: string; content?: string }, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value, ai_provider')
-        .eq('key', 'ai_prompt_primary_article_title')
-        .single()
+      const row = await fetchPromptRow('ai_prompt_primary_article_title', publicationId)
+      if (!row || !row.value) return FALLBACK_PROMPTS.primaryArticleTitle(post)
 
-      if (error) {
-        console.log('[AI] Error fetching primaryArticleTitle prompt:', error.message)
-        console.log('[AI] Using code fallback for primaryArticleTitle prompt')
-        return FALLBACK_PROMPTS.primaryArticleTitle(post)
-      }
+      const provider = (row.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
 
-      if (!data || !data.value) {
-        console.log('[AI] No database value found for primaryArticleTitle prompt')
-        console.log('[AI] Using code fallback for primaryArticleTitle prompt')
-        return FALLBACK_PROMPTS.primaryArticleTitle(post)
-      }
-
-      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
-
-      // Check if the prompt is JSON (structured format) or plain text
+      // Check if the prompt is structured JSON or plain text
+      const valueStr = typeof row.value === 'string' ? row.value : JSON.stringify(row.value)
       try {
-        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
-
-        // If it has a messages array, it's a structured prompt
+        const promptConfig = (typeof row.value === 'object' && row.value !== null
+          ? row.value
+          : JSON.parse(valueStr)) as StructuredPromptConfig
         if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-          console.log('[AI] Using structured database prompt for primaryArticleTitle with provider:', provider)
-
-          // Prepare placeholders
           const placeholders = {
             title: post.title,
             description: post.description || 'No description available',
-            content: post.content ? post.content.substring(0, 1000) + '...' : 'No content available'
+            content: post.content ? post.content.substring(0, 1000) + '...' : 'No content available',
           }
-
-          // Call with structured format
           return await callWithStructuredPrompt(promptConfig, placeholders, provider)
         }
-      } catch (jsonError) {
-        // Not JSON, treat as plain text prompt (fallthrough to below)
+      } catch {
+        // Fallthrough to plain text path
       }
 
-      // Plain text prompt - use old format
-      console.log('[AI] Using plain text database prompt for primaryArticleTitle (length:', data.value.length, 'chars)')
-      return data.value
+      return valueStr
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -1452,20 +1273,13 @@ ${i}. Title: ${post.title}
   },
 
   // Primary Article Body Generator
-  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string) => {
+  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_primary_article_body')
-        .single()
-
-      if (error || !data) {
-        console.log('Using code fallback for primaryArticleBody prompt')
+      const row = await fetchPromptRow('ai_prompt_primary_article_body', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.primaryArticleBody(post, headline)
       }
-
-      return data.value
+      return row.value
         .replace(/\{\{headline\}\}/g, headline)
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1478,20 +1292,13 @@ ${i}. Title: ${post.title}
   },
 
   // Secondary Article Title Generator
-  secondaryArticleTitle: async (post: { title: string; description: string; content?: string }) => {
+  secondaryArticleTitle: async (post: { title: string; description: string; content?: string }, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_secondary_article_title')
-        .single()
-
-      if (error || !data) {
-        console.log('Using code fallback for secondaryArticleTitle prompt')
+      const row = await fetchPromptRow('ai_prompt_secondary_article_title', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.secondaryArticleTitle(post)
       }
-
-      return data.value
+      return row.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -1502,20 +1309,13 @@ ${i}. Title: ${post.title}
   },
 
   // Secondary Article Body Generator
-  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string) => {
+  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string, publicationId?: string) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_prompt_secondary_article_body')
-        .single()
-
-      if (error || !data) {
-        console.log('Using code fallback for secondaryArticleBody prompt')
+      const row = await fetchPromptRow('ai_prompt_secondary_article_body', publicationId)
+      if (!row || typeof row.value !== 'string') {
         return FALLBACK_PROMPTS.secondaryArticleBody(post, headline)
       }
-
-      return data.value
+      return row.value
         .replace(/\{\{headline\}\}/g, headline)
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
