@@ -274,10 +274,11 @@ export class SparkLoopService {
    */
   async getPartnerCampaigns(): Promise<{
     byUuid: Map<string, { remaining_budget_dollars: number; referral_pending_period: number; name: string; status: string }>;
+    byPartnerProgramUuid: Map<string, { remaining_budget_dollars: number; referral_pending_period: number; status: string }>;
     nameSet: Set<string>;
     byName: Map<string, { remaining_budget_dollars: number; referral_pending_period: number; status: string }>;
   }> {
-    const emptyResult = { byUuid: new Map(), nameSet: new Set<string>(), byName: new Map() }
+    const emptyResult = { byUuid: new Map(), byPartnerProgramUuid: new Map(), nameSet: new Set<string>(), byName: new Map() }
     const url = `${SPARKLOOP_API_BASE}/partner_profile/partner_campaigns?per_page=200`
 
     const response = await fetch(url, {
@@ -306,18 +307,29 @@ export class SparkLoopService {
 
     // Build multiple lookup maps for reliable matching
     const byUuid = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number; name: string; status: string }>()
+    // byPartnerProgramUuid is the primary match key: the partner_program_uuid is stable
+    // across upscribe placements, while `uuid` is placement-specific and only matches
+    // for one upscribe per program.
+    const byPartnerProgramUuid = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number; status: string }>()
     const nameSet = new Set<string>()
     const byName = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number; status: string }>()
 
     for (const campaign of campaigns) {
-      const campaignName = (campaign.name || campaign.publication_name || campaign.title || '').trim().toLowerCase()
+      // partner_campaigns names come as "<Pub Name>'s Partner Program"; recommendations
+      // use bare "<Pub Name>". Strip the suffix so byName can be a useful fallback.
+      const rawName = (campaign.name || campaign.publication_name || campaign.title || '').trim().toLowerCase()
+      const campaignName = rawName
+        .replace(/'s partner program$/i, '')
+        .replace(/ partner program$/i, '')
+        .trim()
       const budgetData = {
         remaining_budget_dollars: campaign.remaining_budget_dollars ?? 0,
         referral_pending_period: campaign.referral_pending_period ?? 14,
         status: (campaign.status || 'active').toLowerCase(),
       }
 
-      byUuid.set(campaign.uuid, { ...budgetData, name: campaignName })
+      if (campaign.uuid) byUuid.set(campaign.uuid, { ...budgetData, name: campaignName })
+      if (campaign.partner_program_uuid) byPartnerProgramUuid.set(campaign.partner_program_uuid, budgetData)
       if (campaignName) {
         nameSet.add(campaignName)
         byName.set(campaignName, budgetData)
@@ -328,8 +340,8 @@ export class SparkLoopService {
     for (const c of Array.from(byUuid.values())) {
       statusCounts[c.status] = (statusCounts[c.status] || 0) + 1
     }
-    console.log(`[SparkLoop] Fetched ${byUuid.size} partner campaigns (${nameSet.size} unique names, statuses: ${JSON.stringify(statusCounts)})`)
-    return { byUuid, nameSet, byName }
+    console.log(`[SparkLoop] Fetched ${byUuid.size} partner campaigns (${byPartnerProgramUuid.size} programs, ${nameSet.size} unique names, statuses: ${JSON.stringify(statusCounts)})`)
+    return { byUuid, byPartnerProgramUuid, nameSet, byName }
   }
 
   /**
@@ -364,12 +376,14 @@ export class SparkLoopService {
     let created = 0
     let updated = 0
     let lowBudget = 0
+    let unknownBudget = 0
     let confirmDeltas = 0
     let rejectionDeltas = 0
 
     // Log budget match diagnostics
     let budgetMatched = 0
     let budgetUnmatched = 0
+    let matchedByProgramUuid = 0
     let matchedByUuid = 0
     let matchedByName = 0
 
@@ -388,32 +402,44 @@ export class SparkLoopService {
         .eq('ref_code', rec.ref_code)
         .single()
 
-      // Get budget info from partner campaigns using multiple matching strategies
-      // Strategy 1: Match by partner_program_uuid (trust UUID — it's a unique identifier)
-      // Strategy 2: Match by rec.uuid
-      // Strategy 3: Match by publication name (case-insensitive, fallback)
+      // Get budget info from partner campaigns. Strategies in priority order:
+      //   1. byPartnerProgramUuid — `partner_program_uuid` is stable across upscribe
+      //      placements, so this matches every rec whose program is in our inventory.
+      //   2. byUuid via rec.uuid — matches when this upscribe IS the primary placement
+      //      that partner_campaigns happens to return per-program.
+      //   3. byName — last-resort fallback. partner_campaigns.name is normalized to
+      //      "<Pub Name>" (suffix stripped) in getPartnerCampaigns above.
       const recNameNormalized = (rec.publication_name || '').trim().toLowerCase()
 
       let budgetInfo: { remaining_budget_dollars: number; referral_pending_period: number; status: string } | undefined
       let matchMethod = 'none'
 
-      // Try UUID-based matching first — trust UUID matches without name verification.
-      // UUIDs are unique identifiers; requiring name verification caused mass false-negatives
-      // because campaign names often differ slightly from recommendation names.
-      const uuidMatch = campaignData.byUuid.get(rec.partner_program_uuid) || campaignData.byUuid.get(rec.uuid)
-      if (uuidMatch) {
-        budgetInfo = uuidMatch
-        matchMethod = 'uuid'
+      const programMatch = campaignData.byPartnerProgramUuid.get(rec.partner_program_uuid)
+      if (programMatch) {
+        budgetInfo = programMatch
+        matchMethod = 'partner_program_uuid'
       } else {
-        // No UUID match — try name-based matching
-        budgetInfo = campaignData.byName.get(recNameNormalized)
-        if (budgetInfo) {
-          matchMethod = 'name'
-          matchedByName++
+        const uuidMatch = campaignData.byUuid.get(rec.uuid) || campaignData.byUuid.get(rec.partner_program_uuid)
+        if (uuidMatch) {
+          budgetInfo = uuidMatch
+          matchMethod = 'uuid'
+        } else {
+          const nameMatch = campaignData.byName.get(recNameNormalized)
+          if (nameMatch) {
+            budgetInfo = nameMatch
+            matchMethod = 'name'
+          }
         }
       }
 
-      if (budgetInfo) { budgetMatched++; if (matchMethod === 'uuid') matchedByUuid++ } else { budgetUnmatched++ }
+      if (budgetInfo) {
+        budgetMatched++
+        if (matchMethod === 'partner_program_uuid') matchedByProgramUuid++
+        else if (matchMethod === 'uuid') matchedByUuid++
+        else if (matchMethod === 'name') matchedByName++
+      } else {
+        budgetUnmatched++
+      }
 
       // Trust rec.status from the recommendations API as source of truth for paused/active.
       // The partner_campaigns endpoint can disagree — recommendations API is authoritative.
@@ -425,23 +451,39 @@ export class SparkLoopService {
         ? 'manual'
         : (rec.status === 'paused' ? 'api_paused' : null)
 
-      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
+      // Store null (not 0) when budget is unknown so UI can distinguish "depleted"
+      // from "no data" — the column is nullable and CellRenderer renders null as "—".
+      const remainingBudget: number | null = budgetInfo ? budgetInfo.remaining_budget_dollars : null
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * minConversionsBudget
+      const isPaidRec = (rec.cpa || 0) > 0
 
-      // Budget-based auto-pause only for active recs with known budget
-      const isLowBudget = budgetInfo && remainingBudget < minBudgetRequired
+      const isLowBudget = budgetInfo != null && budgetInfo.remaining_budget_dollars < minBudgetRequired
+      // Paid recs with no budget info — we'd be sending traffic without knowing the
+      // partner can pay. Pause as a precaution; restored automatically once the
+      // partner_campaign reappears in the inventory.
+      //
+      // Safety: only apply this if partner_campaigns returned a real inventory.
+      // An empty response (API error, bad/rotated key) would otherwise pause every
+      // paid rec across all publications — a self-inflicted outage.
+      const haveCampaignInventory = campaignData.byPartnerProgramUuid.size > 0
+      const isUnknownBudget = !budgetInfo && isPaidRec && haveCampaignInventory
 
       if (isLowBudget && effectiveStatus === 'active' && !isManuallyPaused) {
         effectiveStatus = 'paused'
         pausedReason = 'low_budget'
         lowBudget++
-        console.log(`[SparkLoop] Auto-pausing ${rec.publication_name} (budget $${remainingBudget} < ${minConversionsBudget}x CPA $${minBudgetRequired})`)
-      } else if (budgetInfo && !isLowBudget && existing?.paused_reason === 'low_budget') {
-        // Budget restored — un-pause (effectiveStatus already set from rec.status above)
+        console.log(`[SparkLoop] Auto-pausing ${rec.publication_name} (budget $${budgetInfo?.remaining_budget_dollars} < ${minConversionsBudget}x CPA $${minBudgetRequired})`)
+      } else if (isUnknownBudget && effectiveStatus === 'active' && !isManuallyPaused) {
+        effectiveStatus = 'paused'
+        pausedReason = 'unknown_budget'
+        unknownBudget++
+        console.log(`[SparkLoop] Auto-pausing ${rec.publication_name} (no partner_campaign match — budget unknown, CPA $${cpaInDollars})`)
+      } else if (budgetInfo && !isLowBudget && (existing?.paused_reason === 'low_budget' || existing?.paused_reason === 'unknown_budget')) {
+        // Budget data restored — un-pause (effectiveStatus already set from rec.status above)
         pausedReason = rec.status === 'paused' ? 'api_paused' : null
-        console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
+        console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${budgetInfo.remaining_budget_dollars})`)
       }
 
       // Preserve manual exclusion state (not related to budget)
@@ -599,7 +641,7 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByPartner} disappeared, ${lowBudget} low-budget-paused, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByPartner} disappeared, ${lowBudget} low-budget-paused, ${unknownBudget} unknown-budget-paused, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByProgramUuid} program_uuid, ${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
