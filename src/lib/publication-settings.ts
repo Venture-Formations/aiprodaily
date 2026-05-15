@@ -344,17 +344,19 @@ export async function getEmailSettings(publicationId: string): Promise<{
   const settings = await getPublicationSettings(publicationId, [
     'email_senderName',
     'email_fromEmail',
+    'mailerlite_review_group_id',
     'email_reviewGroupId',
     'subject_line_emoji',
+    'mailerlite_main_group_id',
     'mailerlite_group_id',
   ])
 
   const result = {
     sender_name: settings.email_senderName || 'Newsletter',
     from_email: settings.email_fromEmail || 'newsletter@example.com',
-    review_group_id: settings.email_reviewGroupId || '',
+    review_group_id: settings.mailerlite_review_group_id || settings.email_reviewGroupId || '',
     subject_line_emoji: settings.subject_line_emoji || '',
-    mailerlite_group_id: settings.mailerlite_group_id || '',
+    mailerlite_group_id: settings.mailerlite_main_group_id || settings.mailerlite_group_id || '',
   }
 
   // Fail-closed on non-production/staging: require override env vars so Preview/Staging never targets production audiences
