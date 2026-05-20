@@ -15,6 +15,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
 import { fetchAllPaginated } from './paginate'
+import { toLocalDateStr } from '@/lib/date-utils'
 import type { ModuleArticle, ManualArticleStatus } from '@/types/database'
 
 const log = createLogger({ module: 'dal:articles' })
@@ -280,9 +281,11 @@ export async function listRecentlyFeaturedTickers(
   excludeIssueId: string
 ): Promise<Set<string>> {
   try {
-    const cutoff = new Date(`${issueDate}T00:00:00Z`)
-    cutoff.setUTCDate(cutoff.getUTCDate() - cooldownDays)
-    const cutoffDate = cutoff.toISOString().split('T')[0]
+    // Local-date arithmetic (no toISOString/UTC shift) — issueDate is a plain
+    // YYYY-MM-DD; parse, subtract, and format all in the same (local) frame.
+    const cutoff = new Date(`${issueDate}T00:00:00`)
+    cutoff.setDate(cutoff.getDate() - cooldownDays)
+    const cutoffDate = toLocalDateStr(cutoff)
 
     // fetchAllPaginated pages past Supabase's silent 1000-row cap. The
     // publication_issues!inner join is required: the publication_issues.*
