@@ -62,4 +62,10 @@ describe('selectPostsWithTickerCooldown', () => {
     const r = selectPostsWithTickerCooldown(posts, new Set<string>(), 2, 3)
     expect(r.selected.map(p => p.id)).toEqual(['a', 'b', 'c'])
   })
+
+  it('honors articlesNeeded even when postsToAssign is set below it', () => {
+    const posts = [post('a', 'A'), post('b', 'B'), post('c', 'C'), post('d', 'D')]
+    const r = selectPostsWithTickerCooldown(posts, new Set<string>(), 3, 1)
+    expect(r.selected.map(p => p.id)).toEqual(['a', 'b', 'c'])
+  })
 })

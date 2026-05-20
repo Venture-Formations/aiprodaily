@@ -29,7 +29,9 @@ export interface TickerCooldownResult<T> {
  * @param sortedPosts      candidates already sorted by score, descending
  * @param cooldownTickers  UPPER-CASED tickers featured in a recent issue
  * @param articlesNeeded   minimum posts the module must fill (articles_count)
- * @param postsToAssign    candidate target (>= articlesNeeded)
+ * @param postsToAssign    upper bound on candidates to select; the primary pass
+ *                         effectively uses max(postsToAssign, articlesNeeded) so
+ *                         the module is never left short of articlesNeeded
  */
 export function selectPostsWithTickerCooldown<T extends CandidatePost>(
   sortedPosts: T[],
@@ -42,9 +44,13 @@ export function selectPostsWithTickerCooldown<T extends CandidatePost>(
   const cooledDown: T[] = []
   let skippedByCooldown = 0
 
+  // The primary pass never stops short of articlesNeeded — postsToAssign is
+  // only an upper bound on extra candidates.
+  const primaryTarget = Math.max(postsToAssign, articlesNeeded)
+
   // Primary pass: one post per ticker, skipping tickers on cooldown.
   for (const post of sortedPosts) {
-    if (selected.length >= postsToAssign) break
+    if (selected.length >= primaryTarget) break
 
     const ticker = post.ticker ? post.ticker.toUpperCase() : ''
 
