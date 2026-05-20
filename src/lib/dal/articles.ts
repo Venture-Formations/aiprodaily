@@ -14,6 +14,8 @@
 
 import { supabaseAdmin } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
+import { fetchAllPaginated } from './paginate'
+import { toLocalDateStr } from '@/lib/date-utils'
 import type { ModuleArticle, ManualArticleStatus } from '@/types/database'
 
 const log = createLogger({ module: 'dal:articles' })
@@ -259,6 +261,57 @@ export async function updateModuleArticleFactCheck(
   } catch (err) {
     log.error({ err, articleId: id }, 'updateModuleArticleFactCheck exception')
     return false
+  }
+}
+
+/**
+ * Tickers featured as an active article in a publication's recent issues.
+ * Used to enforce a cross-issue ticker cooldown during article selection.
+ *
+ * Returns the distinct set of UPPER-CASED tickers that were `is_active`
+ * module_articles in issues dated within `[issueDate - cooldownDays, issueDate]`,
+ * excluding the issue currently being built. Issue status is intentionally NOT
+ * filtered — sent, in-review, and draft issues all count. On any failure
+ * returns an empty set, degrading safely to "no cooldown".
+ */
+export async function listRecentlyFeaturedTickers(
+  publicationId: string,
+  issueDate: string,
+  cooldownDays: number,
+  excludeIssueId: string
+): Promise<Set<string>> {
+  try {
+    // Local-date arithmetic (no toISOString/UTC shift) — issueDate is a plain
+    // YYYY-MM-DD; parse, subtract, and format all in the same (local) frame.
+    const cutoff = new Date(`${issueDate}T00:00:00`)
+    cutoff.setDate(cutoff.getDate() - cooldownDays)
+    const cutoffDate = toLocalDateStr(cutoff)
+
+    // fetchAllPaginated pages past Supabase's silent 1000-row cap. The
+    // publication_issues!inner join is required: the publication_issues.*
+    // dot-notation filters only run as a server-side WHERE with an !inner
+    // join — a !left join would filter client-side and leak other
+    // publications' rows.
+    const rows = await fetchAllPaginated<{ ticker: string | null }>(() =>
+      supabaseAdmin
+        .from('module_articles')
+        .select('ticker, publication_issues!inner(publication_id, date)')
+        .eq('is_active', true)
+        .not('ticker', 'is', null)
+        .eq('publication_issues.publication_id', publicationId)
+        .gte('publication_issues.date', cutoffDate)
+        .lte('publication_issues.date', issueDate)
+        .neq('issue_id', excludeIssueId) as any
+    )
+
+    const tickers = new Set<string>()
+    for (const row of rows) {
+      if (row.ticker) tickers.add(String(row.ticker).toUpperCase())
+    }
+    return tickers
+  } catch (err) {
+    log.error({ err, publicationId }, 'listRecentlyFeaturedTickers failed')
+    return new Set()
   }
 }
 

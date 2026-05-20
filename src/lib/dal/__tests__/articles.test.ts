@@ -55,6 +55,7 @@ import {
   insertManualArticle,
   updateManualArticle,
   deleteManualArticle,
+  listRecentlyFeaturedTickers,
 } from '../articles'
 
 beforeEach(() => {
@@ -337,5 +338,57 @@ describe('deleteManualArticle', () => {
     await deleteManualArticle('m1', 'pub-1')
     expect(mockChain.eq).toHaveBeenCalledWith('id', 'm1')
     expect(mockChain.eq).toHaveBeenCalledWith('publication_id', 'pub-1')
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('listRecentlyFeaturedTickers', () => {
+  it('returns the distinct, upper-cased set of recent active tickers', async () => {
+    mockChainResult = {
+      data: [{ ticker: 'COR' }, { ticker: 'ibm' }, { ticker: 'COR' }],
+      error: null,
+    }
+    const result = await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
+    expect(result).toEqual(new Set(['COR', 'IBM']))
+  })
+
+  it('computes the cutoff date as issueDate minus cooldownDays', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
+    expect(mockChain.gte).toHaveBeenCalledWith('publication_issues.date', '2026-05-13')
+    expect(mockChain.lte).toHaveBeenCalledWith('publication_issues.date', '2026-05-20')
+  })
+
+  it('filters by is_active, non-null ticker, publication, and excludes the current issue', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
+    expect(mockChain.eq).toHaveBeenCalledWith('is_active', true)
+    expect(mockChain.not).toHaveBeenCalledWith('ticker', 'is', null)
+    expect(mockChain.eq).toHaveBeenCalledWith('publication_issues.publication_id', 'pub-1')
+    expect(mockChain.neq).toHaveBeenCalledWith('issue_id', 'iss-cur')
+  })
+
+  it('returns an empty set on query error', async () => {
+    mockChainResult = { data: null, error: { message: 'fail' } }
+    const result = await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
+    expect(result).toEqual(new Set())
+  })
+
+  it('selects ticker plus the inner-joined publication_issues columns', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
+    expect(mockChain.select).toHaveBeenCalledWith('ticker, publication_issues!inner(publication_id, date)')
+  })
+
+  it('computes the cutoff date correctly across a month boundary', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-05-03', 7, 'iss-cur')
+    expect(mockChain.gte).toHaveBeenCalledWith('publication_issues.date', '2026-04-26')
+  })
+
+  it('computes the cutoff date correctly across a year boundary', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-01-03', 7, 'iss-cur')
+    expect(mockChain.gte).toHaveBeenCalledWith('publication_issues.date', '2025-12-27')
   })
 })
