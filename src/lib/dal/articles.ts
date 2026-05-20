@@ -14,6 +14,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
+import { fetchAllPaginated } from './paginate'
 import type { ModuleArticle, ManualArticleStatus } from '@/types/database'
 
 const log = createLogger({ module: 'dal:articles' })
@@ -283,33 +284,30 @@ export async function listRecentlyFeaturedTickers(
     cutoff.setUTCDate(cutoff.getUTCDate() - cooldownDays)
     const cutoffDate = cutoff.toISOString().split('T')[0]
 
-    // The publication_issues!inner join is required: the dot-notation filters
-    // below (publication_issues.*) only run as a server-side WHERE clause with
-    // an !inner join. A plain (!left) join would filter client-side and leak
-    // other publications' rows.
-    const { data, error } = await supabaseAdmin
-      .from('module_articles')
-      .select('ticker, publication_issues!inner(publication_id, date)')
-      .eq('is_active', true)
-      .not('ticker', 'is', null)
-      .eq('publication_issues.publication_id', publicationId)
-      .gte('publication_issues.date', cutoffDate)
-      .lte('publication_issues.date', issueDate)
-      .neq('issue_id', excludeIssueId)
-
-    if (error) {
-      log.error({ err: error, publicationId }, 'listRecentlyFeaturedTickers failed')
-      return new Set()
-    }
+    // fetchAllPaginated pages past Supabase's silent 1000-row cap. The
+    // publication_issues!inner join is required: the publication_issues.*
+    // dot-notation filters only run as a server-side WHERE with an !inner
+    // join — a !left join would filter client-side and leak other
+    // publications' rows.
+    const rows = await fetchAllPaginated<{ ticker: string | null }>(() =>
+      supabaseAdmin
+        .from('module_articles')
+        .select('ticker, publication_issues!inner(publication_id, date)')
+        .eq('is_active', true)
+        .not('ticker', 'is', null)
+        .eq('publication_issues.publication_id', publicationId)
+        .gte('publication_issues.date', cutoffDate)
+        .lte('publication_issues.date', issueDate)
+        .neq('issue_id', excludeIssueId) as any
+    )
 
     const tickers = new Set<string>()
-    for (const row of data || []) {
-      const t = (row as any).ticker
-      if (t) tickers.add(String(t).toUpperCase())
+    for (const row of rows) {
+      if (row.ticker) tickers.add(String(row.ticker).toUpperCase())
     }
     return tickers
   } catch (err) {
-    log.error({ err, publicationId }, 'listRecentlyFeaturedTickers exception')
+    log.error({ err, publicationId }, 'listRecentlyFeaturedTickers failed')
     return new Set()
   }
 }

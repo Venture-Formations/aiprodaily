@@ -147,9 +147,13 @@ export class ModuleArticles {
         return scoreB - scoreA
       })
 
-    // Cross-issue ticker cooldown — per-module config; absent/0 = disabled.
+    // Cross-issue ticker cooldown — per-module config. Absent / < 1 = disabled;
+    // floored and capped at 90 days as defense against malformed config.
     const cooldownDaysRaw = (mod.config as Record<string, any>)?.ticker_cooldown_days
-    const cooldownDays = typeof cooldownDaysRaw === 'number' ? cooldownDaysRaw : 0
+    const cooldownDays =
+      typeof cooldownDaysRaw === 'number' && cooldownDaysRaw >= 1
+        ? Math.min(Math.floor(cooldownDaysRaw), 90)
+        : 0
     let cooldownTickers = new Set<string>()
     if (cooldownDays >= 1) {
       // getIssueById logs its own errors and returns null on failure, so a DB
@@ -162,6 +166,8 @@ export class ModuleArticles {
           cooldownDays,
           issueId
         )
+      } else {
+        console.warn(`[Module] Ticker cooldown: could not resolve issue ${issueId} — cooldown skipped this run`)
       }
     }
 

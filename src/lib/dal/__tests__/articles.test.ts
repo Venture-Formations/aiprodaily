@@ -379,4 +379,16 @@ describe('listRecentlyFeaturedTickers', () => {
     await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
     expect(mockChain.select).toHaveBeenCalledWith('ticker, publication_issues!inner(publication_id, date)')
   })
+
+  it('computes the cutoff date correctly across a month boundary', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-05-03', 7, 'iss-cur')
+    expect(mockChain.gte).toHaveBeenCalledWith('publication_issues.date', '2026-04-26')
+  })
+
+  it('computes the cutoff date correctly across a year boundary', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-01-03', 7, 'iss-cur')
+    expect(mockChain.gte).toHaveBeenCalledWith('publication_issues.date', '2025-12-27')
+  })
 })
