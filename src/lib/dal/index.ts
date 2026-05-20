@@ -62,6 +62,7 @@ export {
   insertModuleArticle,
   updateModuleArticleContent,
   updateModuleArticleFactCheck,
+  listRecentlyFeaturedTickers,
   listManualArticlesByPublication,
   findNextAvailableSlug,
   insertManualArticle,

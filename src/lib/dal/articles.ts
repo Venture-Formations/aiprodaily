@@ -262,6 +262,54 @@ export async function updateModuleArticleFactCheck(
   }
 }
 
+/**
+ * Tickers featured as an active article in a publication's recent issues.
+ * Used to enforce a cross-issue ticker cooldown during article selection.
+ *
+ * Returns the distinct set of UPPER-CASED tickers that were `is_active`
+ * module_articles in issues dated within `[issueDate - cooldownDays, issueDate]`,
+ * excluding the issue currently being built. Issue status is intentionally NOT
+ * filtered — sent, in-review, and draft issues all count. On any failure
+ * returns an empty set, degrading safely to "no cooldown".
+ */
+export async function listRecentlyFeaturedTickers(
+  publicationId: string,
+  issueDate: string,
+  cooldownDays: number,
+  excludeIssueId: string
+): Promise<Set<string>> {
+  try {
+    const cutoff = new Date(`${issueDate}T00:00:00Z`)
+    cutoff.setUTCDate(cutoff.getUTCDate() - cooldownDays)
+    const cutoffDate = cutoff.toISOString().split('T')[0]
+
+    const { data, error } = await supabaseAdmin
+      .from('module_articles')
+      .select('ticker, publication_issues!inner(publication_id, date)')
+      .eq('is_active', true)
+      .not('ticker', 'is', null)
+      .eq('publication_issues.publication_id', publicationId)
+      .gte('publication_issues.date', cutoffDate)
+      .lte('publication_issues.date', issueDate)
+      .neq('issue_id', excludeIssueId)
+
+    if (error) {
+      log.error({ err: error, publicationId }, 'listRecentlyFeaturedTickers failed')
+      return new Set()
+    }
+
+    const tickers = new Set<string>()
+    for (const row of data || []) {
+      const t = (row as any).ticker
+      if (t) tickers.add(String(t).toUpperCase())
+    }
+    return tickers
+  } catch (err) {
+    log.error({ err, publicationId }, 'listRecentlyFeaturedTickers exception')
+    return new Set()
+  }
+}
+
 // ==================== manual_articles ====================
 //
 // Note: the `ManualArticle` type in src/types/database.ts is stale; the actual
