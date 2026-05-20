@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../supabase'
 import { AI_CALL, callOpenAI } from '../openai'
 import { normalizeTransactionType } from '../transaction-type'
 import { detectAIRefusal, getNewsletterIdFromIssue } from './shared-context'
+import { selectPostsWithTickerCooldown } from './ticker-cooldown'
 import {
   listPostsForScoring,
   assignPostsToIssue,
@@ -15,6 +16,7 @@ import {
   updateModuleArticleFactCheck,
   listDuplicateGroupIdsByIssue,
   listDuplicatePostIdsByGroups,
+  listRecentlyFeaturedTickers,
 } from '@/lib/dal'
 import type { ArticleGenerator } from './article-generator'
 
@@ -144,24 +146,33 @@ export class ModuleArticles {
         return scoreB - scoreA
       })
 
-    // Select top posts: 1 per ticker (company), then fill remaining slots
-    const selectedPosts: any[] = []
-    const seenTickers = new Set<string>()
-
-    for (const post of sortedPosts) {
-      if (selectedPosts.length >= postsToAssign) break
-
-      const ticker = (post as any).ticker?.toUpperCase()
-      if (ticker && seenTickers.has(ticker)) {
-        continue // Skip: already have a post for this company
+    // Cross-issue ticker cooldown — per-module config; absent/0 = disabled.
+    const cooldownDaysRaw = (mod.config as Record<string, any>)?.ticker_cooldown_days
+    const cooldownDays = typeof cooldownDaysRaw === 'number' ? cooldownDaysRaw : 0
+    let cooldownTickers = new Set<string>()
+    if (cooldownDays >= 1) {
+      const { data: issueRow } = await supabaseAdmin
+        .from('publication_issues')
+        .select('publication_id, date')
+        .eq('id', issueId)
+        .single()
+      if (issueRow?.publication_id && issueRow?.date) {
+        cooldownTickers = await listRecentlyFeaturedTickers(
+          issueRow.publication_id,
+          issueRow.date,
+          cooldownDays,
+          issueId
+        )
       }
-
-      selectedPosts.push(post)
-      if (ticker) seenTickers.add(ticker)
     }
 
-    if (seenTickers.size > 0) {
-      console.log(`[Module] Ticker dedup: ${sortedPosts.length} candidates → ${selectedPosts.length} selected (${seenTickers.size} unique companies)`)
+    // Select top posts: 1 per ticker, skipping tickers on cooldown. Backfill
+    // ensures the module is never short purely because of the cooldown.
+    const { selected: selectedPosts, skippedByCooldown, backfilled } =
+      selectPostsWithTickerCooldown(sortedPosts, cooldownTickers, articlesNeeded, postsToAssign)
+
+    if (cooldownDays >= 1) {
+      console.log(`[Module] Ticker cooldown (${cooldownDays}d): ${sortedPosts.length} candidates → ${selectedPosts.length} selected, ${skippedByCooldown} skipped (cooldown), ${backfilled} backfilled`)
     }
 
     if (selectedPosts.length > 0) {
