@@ -124,6 +124,38 @@ export default function ArticleModuleGeneralTab({ module, onUpdate, disabled = f
               </div>
             )
           })()}
+          {(() => {
+            const cooldownDays = (module.config as Record<string, any>)?.ticker_cooldown_days
+            const isEnabled = typeof cooldownDays === 'number' && cooldownDays >= 1
+            const handleCooldownChange = (value: number | null) => withSaving(async () => {
+              const currentConfig = (module.config as Record<string, any>) || {}
+              if (value === null) {
+                const { ticker_cooldown_days: _, ...rest } = currentConfig
+                await onUpdate({ config: rest } as any)
+              } else {
+                await onUpdate({ config: { ...currentConfig, ticker_cooldown_days: value } } as any)
+              }
+            })
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Ticker Cooldown</label>
+                    <p className="text-xs text-gray-500">{isEnabled ? `Skips any company (ticker) featured in the last ${cooldownDays} days` : 'Off — a company can be selected on consecutive issues. For trades newsletters.'}</p>
+                  </div>
+                  <button type="button" onClick={() => handleCooldownChange(isEnabled ? null : 7)} disabled={isDisabled} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled ? 'bg-emerald-500' : 'bg-gray-300'} ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {isEnabled && (
+                  <div className="flex items-center gap-2 pl-1">
+                    <span className="text-xs text-gray-500">Cooldown days:</span>
+                    <input type="number" min={1} max={30} value={cooldownDays} onChange={(e) => { const val = parseInt(e.target.value); if (!isNaN(val) && val >= 1 && val <= 30) handleCooldownChange(val) }} disabled={isDisabled} className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </div>
 
