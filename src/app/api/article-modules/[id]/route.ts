@@ -46,6 +46,33 @@ export const PATCH = withApiHandler(
     const id = params.id
     const body = await request.json()
 
+    // Resolve the module first so the issue-count adjustment below can be
+    // scoped to its publication — otherwise that query scans every
+    // publication's non-sent issues. Also gives a clean 404 before any writes.
+    const { data: moduleRow, error: moduleLookupError } = await supabaseAdmin
+      .from('article_modules')
+      .select('id, publication_id')
+      .eq('id', id)
+      .single()
+
+    // PGRST116 = no row found; any other error is a genuine DB failure and
+    // should surface as 500 (via withApiHandler) rather than a misleading 404.
+    if (moduleLookupError && moduleLookupError.code !== 'PGRST116') {
+      throw moduleLookupError
+    }
+    if (!moduleRow) {
+      return NextResponse.json(
+        { error: 'Article module not found' },
+        { status: 404 }
+      )
+    }
+    if (!moduleRow.publication_id) {
+      return NextResponse.json(
+        { error: 'Article module has no publication' },
+        { status: 500 }
+      )
+    }
+
     // Build update object with only allowed fields
     const updates: Record<string, any> = {}
     const allowedFields = [
@@ -86,6 +113,7 @@ export const PATCH = withApiHandler(
       const { data: issuesWithExcess } = await supabaseAdmin
         .from('publication_issues')
         .select('id')
+        .eq('publication_id', moduleRow.publication_id)
         .neq('status', 'sent')
 
       if (issuesWithExcess && issuesWithExcess.length > 0) {
