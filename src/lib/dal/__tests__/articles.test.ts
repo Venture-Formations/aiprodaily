@@ -373,4 +373,10 @@ describe('listRecentlyFeaturedTickers', () => {
     const result = await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
     expect(result).toEqual(new Set())
   })
+
+  it('selects ticker plus the inner-joined publication_issues columns', async () => {
+    mockChainResult = { data: [], error: null }
+    await listRecentlyFeaturedTickers('pub-1', '2026-05-20', 7, 'iss-cur')
+    expect(mockChain.select).toHaveBeenCalledWith('ticker, publication_issues!inner(publication_id, date)')
+  })
 })

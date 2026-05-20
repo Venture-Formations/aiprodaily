@@ -283,6 +283,10 @@ export async function listRecentlyFeaturedTickers(
     cutoff.setUTCDate(cutoff.getUTCDate() - cooldownDays)
     const cutoffDate = cutoff.toISOString().split('T')[0]
 
+    // The publication_issues!inner join is required: the dot-notation filters
+    // below (publication_issues.*) only run as a server-side WHERE clause with
+    // an !inner join. A plain (!left) join would filter client-side and leak
+    // other publications' rows.
     const { data, error } = await supabaseAdmin
       .from('module_articles')
       .select('ticker, publication_issues!inner(publication_id, date)')
