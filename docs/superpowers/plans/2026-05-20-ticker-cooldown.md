@@ -66,16 +66,18 @@ describe('selectPostsWithTickerCooldown', () => {
   })
 
   it('skips a ticker that is on cooldown', () => {
+    // articlesNeeded=2 and two non-cooldown posts exist, so no backfill.
     const posts = [post('a', 'COR'), post('b', 'IBM'), post('c', 'MKL')]
-    const r = selectPostsWithTickerCooldown(posts, new Set(['COR']), 3, 12)
+    const r = selectPostsWithTickerCooldown(posts, new Set(['COR']), 2, 12)
     expect(r.selected.map(p => p.id)).toEqual(['b', 'c'])
     expect(r.skippedByCooldown).toBe(1)
     expect(r.backfilled).toBe(0)
   })
 
   it('matches cooldown tickers case-insensitively', () => {
+    // articlesNeeded=1 and one non-cooldown post exists, so no backfill.
     const posts = [post('a', 'cor'), post('b', 'IBM')]
-    const r = selectPostsWithTickerCooldown(posts, new Set(['COR']), 3, 12)
+    const r = selectPostsWithTickerCooldown(posts, new Set(['COR']), 1, 12)
     expect(r.selected.map(p => p.id)).toEqual(['b'])
   })
 
