@@ -4,6 +4,7 @@ import { normalizeTransactionType } from '../transaction-type'
 import { detectAIRefusal, getNewsletterIdFromIssue } from './shared-context'
 import { selectPostsWithTickerCooldown } from './ticker-cooldown'
 import {
+  getIssueById,
   listPostsForScoring,
   assignPostsToIssue,
   listAssignedPostsForModule,
@@ -151,11 +152,9 @@ export class ModuleArticles {
     const cooldownDays = typeof cooldownDaysRaw === 'number' ? cooldownDaysRaw : 0
     let cooldownTickers = new Set<string>()
     if (cooldownDays >= 1) {
-      const { data: issueRow } = await supabaseAdmin
-        .from('publication_issues')
-        .select('publication_id, date')
-        .eq('id', issueId)
-        .single()
+      // getIssueById logs its own errors and returns null on failure, so a DB
+      // problem degrades safely to "no cooldown" instead of silently swallowing.
+      const issueRow = await getIssueById(issueId)
       if (issueRow?.publication_id && issueRow?.date) {
         cooldownTickers = await listRecentlyFeaturedTickers(
           issueRow.publication_id,
