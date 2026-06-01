@@ -253,4 +253,64 @@ describe('send-secondary cron', () => {
     expect(body.results[0].error).toMatch(/SendGrid down/i)
     expect(updateMock).not.toHaveBeenCalled()
   })
+
+  it('does NOT select forbidden columns from manual_articles (regression: rank/is_active)', async () => {
+    // Regression for the silent failure that broke every Thursday secondary
+    // send from 2026-03-31 onward: selecting `rank` triggered PostgREST 42809
+    // (rank ordered-set aggregate), `is_active` triggered 42703 (no such column).
+    // Both got swallowed as "No issue found for today".
+    const selectSpy = vi.fn().mockReturnValue({
+      eq: () => ({
+        in: () => ({
+          eq: () => ({
+            order: () => ({
+              limit: () => ({
+                single: () => Promise.resolve({
+                  data: { id: 'issue-1', date: TODAY_DATE_STR, status: 'in_review', subject_line: 'S', secondary_sent_at: null, publication_id: 'pub-1', created_at: '2026-05-04T05:00:00Z', metrics: {} },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    })
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'publications') {
+        return { select: () => ({ eq: () => Promise.resolve({ data: [{ id: 'pub-1', name: 'AI Pros Daily', slug: 'aiprodaily' }], error: null }) }) }
+      }
+      if (table === 'publication_issues') {
+        return { select: selectSpy, update: vi.fn().mockReturnValue({ eq: () => Promise.resolve({ data: null, error: null }) }) }
+      }
+      if (table === 'module_articles') {
+        return { select: () => ({ eq: () => ({ eq: () => ({ not: () => Promise.resolve({ data: [{ id: 'a-1', headline: 'h', content: 'c', rank: 1, is_active: true, final_position: 1, article_module_id: 'm', post_id: 'p' }], error: null }) }) }) }) }
+      }
+      return {}
+    })
+
+    await GET(buildRequest(), { params: Promise.resolve({}) })
+
+    expect(selectSpy).toHaveBeenCalled()
+    const issueSelect: string = selectSpy.mock.calls[0][0]
+    // The forbidden tokens should not appear inside the manual_articles join
+    const manualArticlesPart = issueSelect.match(/manual_articles:manual_articles\(([^)]*)\)/)?.[1] ?? ''
+    expect(manualArticlesPart).not.toMatch(/\brank\b/)
+    expect(manualArticlesPart).not.toMatch(/\bis_active\b/)
+  })
+
+  it('surfaces PostgREST errors on issue lookup instead of silently skipping', async () => {
+    // Regression: previously `if (error || !issue)` lumped real PostgREST errors
+    // (broken query, RLS, etc.) into the same "No issue found for today" skip
+    // path with success:true, hiding bugs for weeks. Real errors must report
+    // success:false with the underlying code.
+    setupFromMock({ issueError: { code: '42809', message: 'WITHIN GROUP is required for ordered-set aggregate rank' }, issueRow: null })
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(body.success).toBe(false)
+    expect(body.results[0].success).toBe(false)
+    expect(body.results[0].error).toMatch(/42809/)
+    expect(sendGridFinalMock).not.toHaveBeenCalled()
+  })
 })
