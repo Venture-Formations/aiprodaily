@@ -87,11 +87,16 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
       // Get today's issue (can be in_review, changes_made, or sent)
       const localDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
 
+      // Note: do NOT select `rank` from manual_articles — PostgREST emits it
+      // unquoted and PostgreSQL parses it as the `rank()` ordered-set aggregate,
+      // returning 42809 ("WITHIN GROUP is required for ordered-set aggregate rank").
+      // Also, manual_articles has no `is_active` column — selecting one would
+      // cause 42703. Both bugs previously short-circuited every secondary send.
       const { data: issue, error } = await supabaseAdmin
         .from('publication_issues')
         .select(`
           id, date, status, subject_line, secondary_sent_at, publication_id, created_at, metrics,
-          manual_articles:manual_articles(id, title, body, rank, is_active, section_type)
+          manual_articles:manual_articles(id, title, body, section_type)
         `)
         .eq('publication_id', publicationId)
         .in('status', ['in_review', 'changes_made', 'sent'])
@@ -101,6 +106,13 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
         .single()
 
       if (error || !issue) {
+        // Distinguish a real "no row" miss from a PostgREST error so the next
+        // regression of this kind doesn't masquerade as a healthy skip.
+        if (error && (error as any).code && (error as any).code !== 'PGRST116') {
+          log.error({ err: error, slug: pub.slug, date: localDate }, '[CRON] Issue lookup failed')
+          results.push({ pubId: pub.id, slug: pub.slug, success: false, error: `Issue lookup failed: ${(error as any).code} ${(error as any).message || ''}`.trim() })
+          continue
+        }
         results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'No issue found for today' })
         continue
       }

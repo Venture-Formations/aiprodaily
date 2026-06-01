@@ -39,9 +39,7 @@ export const POST = withApiHandler(
         publication_id,
         manual_articles:manual_articles(
           id,
-          title,
-          is_active,
-          rank
+          title
         ),
         issue_events(
           id,
