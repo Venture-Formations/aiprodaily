@@ -275,106 +275,13 @@ async function secondaryFetchPass(params: {
 async function feedWindowImageGeneration(): Promise<void> {
   "use step"
 
-  const { supabaseAdmin } = await import('@/lib/supabase')
-  const { generateAndUploadTradeImage } = await import('@/lib/trade-image-generator')
-  const { invalidateCache } = await import('@/lib/rss-combiner')
+  const { generateMissingFeedTradeImages } = await import('@/lib/rss-combiner')
 
   try {
-    const { data: feedSettings } = await supabaseAdmin
-      .from('combined_feed_settings')
-      .select('feed_article_age_days')
-      .limit(1)
-      .single()
-
-    const feedWindowDays = feedSettings?.feed_article_age_days ?? 14
-    const feedCutoff = new Date()
-    feedCutoff.setDate(feedCutoff.getDate() - feedWindowDays)
-
-    const { data: feedArticles } = await supabaseAdmin
-      .from('congress_feed_articles')
-      .select('ticker')
-      .gte('published_at', feedCutoff.toISOString())
-
-    const feedTickers = Array.from(
-      new Set((feedArticles || []).map((a) => a.ticker).filter(Boolean))
-    )
-    if (feedTickers.length === 0) return
-
-    const { data: tradesWithImages } = await supabaseAdmin
-      .from('congress_trades')
-      .select('ticker')
-      .in('ticker', feedTickers)
-      .not('image_url', 'is', null)
-
-    const tickersWithImages = new Set((tradesWithImages || []).map((t) => t.ticker))
-    const tickersMissingImages = feedTickers.filter((t) => !tickersWithImages.has(t))
-
-    if (tickersMissingImages.length === 0) return
-
-    console.log(
-      `[Combiner Workflow] Generating missing feed images for ${tickersMissingImages.length} tickers`
-    )
-
-    const { data: allRows } = await supabaseAdmin
-      .from('congress_trades')
-      .select('id, ticker, name, chamber, state, transaction, company, trade_size_parsed')
-      .in('ticker', tickersMissingImages)
-      .order('trade_size_parsed', { ascending: false, nullsFirst: false })
-
-    const largestByTicker = new Map<string, any>()
-    for (const row of allRows || []) {
-      if (!largestByTicker.has(row.ticker)) {
-        largestByTicker.set(row.ticker, row)
-      }
-    }
-
-    const { data: nameMappings } = await supabaseAdmin
-      .from('ticker_company_names')
-      .select('ticker, company_name')
-      .in(
-        'ticker',
-        tickersMissingImages.map((t) => t.toUpperCase())
-      )
-
-    const nameMap = new Map(
-      (nameMappings || []).map((n) => [n.ticker.toUpperCase(), n.company_name])
-    )
-
-    const tradesToGenerate = Array.from(largestByTicker.values()).map((row) => ({
-      id: row.id,
-      name: row.name,
-      chamber: row.chamber,
-      state: row.state,
-      transaction: row.transaction,
-      company: nameMap.get(row.ticker.toUpperCase()) || row.company || row.ticker,
-      ticker: row.ticker,
-    }))
-
-    // Smaller batch size + inter-batch delay to avoid overwhelming
-    // Supabase Storage / Tinify with 80+ concurrent uploads (caused 502/504
-    // gateway errors returned as HTML that failed JSON parsing).
-    const BATCH_SIZE = 5
-    const BATCH_DELAY_MS = 500
-    let feedImagesGenerated = 0
-    for (let i = 0; i < tradesToGenerate.length; i += BATCH_SIZE) {
-      if (i > 0) {
-        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
-      }
-      const batch = tradesToGenerate.slice(i, i + BATCH_SIZE)
-      const results = await Promise.allSettled(
-        batch.map((t) => generateAndUploadTradeImage(t))
-      )
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value) feedImagesGenerated++
-      }
-    }
-
-    if (feedImagesGenerated > 0) {
-      console.log(`[Combiner Workflow] Generated ${feedImagesGenerated} feed trade images`)
-      invalidateCache()
-    }
+    const generated = await generateMissingFeedTradeImages()
+    console.log(`[Combiner Workflow] Feed image generation complete: ${generated} generated`)
   } catch (error) {
-    console.error('[Combiner Workflow] Feed image gen failed:', error)
+    console.error('[Combiner Workflow] Feed image gen failed (non-fatal):', error)
   }
 }
 

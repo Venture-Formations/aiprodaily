@@ -653,6 +653,145 @@ export function generateCombinedFeedXml(
 }
 
 /**
+ * Generate any trade card images that the combined feed needs but doesn't have yet.
+ *
+ * An article in the feed is keyed by its specific (ticker, member, transaction)
+ * trade — NOT by ticker alone. Generating one card per ticker (the old behavior)
+ * meant every member who traded a given stock shared a single card, so a GOOGL
+ * article for one member would show another member's photo and buy/sell side.
+ *
+ * This pass looks at the distinct (ticker, member, transaction) tuples actually
+ * present in `congress_feed_articles` within the feed window, and generates a
+ * card for each tuple that has no image yet — picking the largest matching
+ * `congress_trades` row as the representative for that tuple.
+ *
+ * Safe to call repeatedly: tuples that already have an image are skipped, and
+ * `generateAndUploadTradeImage` short-circuits when the PNG already exists.
+ */
+export async function generateMissingFeedTradeImages(): Promise<number> {
+  // Use the feed window to find which (ticker, member, transaction) tuples will
+  // appear in output.
+  const { data: feedSettings } = await supabaseAdmin
+    .from('combined_feed_settings')
+    .select('feed_article_age_days')
+    .limit(1)
+    .single()
+
+  const feedWindowDays = feedSettings?.feed_article_age_days ?? 14
+  const feedCutoff = new Date()
+  feedCutoff.setDate(feedCutoff.getDate() - feedWindowDays)
+
+  // Distinct trades referenced by feed articles within the window. trade_meta
+  // carries the member name (set when the article was ingested). Paginate — a
+  // 14-day window can exceed Supabase's 1000-row default and silently drop
+  // tuples, which would leave their cards ungenerated.
+  const feedArticles = await fetchAllPaginated<{ ticker: string | null; transaction_type: string | null; trade_meta: { member?: string | null } | null }>(
+    () =>
+      supabaseAdmin
+        .from('congress_feed_articles')
+        .select('ticker, transaction_type, trade_meta')
+        .gte('published_at', feedCutoff.toISOString()),
+    { label: 'rss-combiner:feed-image-keys' }
+  )
+
+  // Map each needed composite key to its ticker so we only query relevant rows.
+  const neededKeyToTicker = new Map<string, string>()
+  for (const a of feedArticles) {
+    const member = a.trade_meta?.member ?? null
+    const key = buildTradeImageKey(a.ticker, member, a.transaction_type)
+    if (key && a.ticker) neededKeyToTicker.set(key, a.ticker.toUpperCase())
+  }
+
+  if (neededKeyToTicker.size === 0) return 0
+
+  const neededTickers = Array.from(new Set(neededKeyToTicker.values()))
+
+  // Fetch candidate trades for those tickers. Largest first so the representative
+  // row per tuple is the biggest trade. Include image_url to skip satisfied keys.
+  // Paginate — many tickers' trades can exceed 1000 rows and truncation would
+  // drop entire tickers, leaving some keys with no representative.
+  const allRows = await fetchAllPaginated<any>(
+    () =>
+      supabaseAdmin
+        .from('congress_trades')
+        .select('id, ticker, name, chamber, state, transaction, company, trade_size_parsed, image_url')
+        .in('ticker', neededTickers)
+        .order('trade_size_parsed', { ascending: false, nullsFirst: false }),
+    { label: 'rss-combiner:feed-image-candidates' }
+  )
+
+  const satisfiedKeys = new Set<string>()
+  const representativeByKey = new Map<string, any>()
+  for (const row of allRows) {
+    const key = buildTradeImageKey(row.ticker, row.name, row.transaction)
+    if (!key || !neededKeyToTicker.has(key)) continue
+    if (row.image_url) {
+      satisfiedKeys.add(key)
+      continue
+    }
+    // Rows are ordered largest-first, so the first row per key is the largest.
+    if (!representativeByKey.has(key)) representativeByKey.set(key, row)
+  }
+
+  // Build the generation list: needed keys with no existing image and a matching row.
+  const tradesToGenerate = Array.from(representativeByKey.entries())
+    .filter(([key]) => !satisfiedKeys.has(key))
+    .map(([, row]) => row)
+
+  if (tradesToGenerate.length === 0) return 0
+
+  console.log(`[RSS-Combiner] Generating ${tradesToGenerate.length} missing per-trade feed images`)
+
+  // Resolve company display names in one batched query.
+  const genTickers = Array.from(new Set(tradesToGenerate.map((r) => r.ticker.toUpperCase())))
+  const { data: nameMappings } = await supabaseAdmin
+    .from('ticker_company_names')
+    .select('ticker, company_name')
+    .in('ticker', genTickers)
+
+  const nameMap = new Map((nameMappings || []).map((n) => [n.ticker.toUpperCase(), n.company_name]))
+
+  // Generate in parallel batches with delay to avoid overwhelming storage.
+  const FEED_IMAGE_BATCH_SIZE = 5
+  const FEED_IMAGE_DELAY_MS = 500
+  let generated = 0
+  for (let i = 0; i < tradesToGenerate.length; i += FEED_IMAGE_BATCH_SIZE) {
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, FEED_IMAGE_DELAY_MS))
+    }
+    const batch = tradesToGenerate.slice(i, i + FEED_IMAGE_BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map((row) =>
+        generateAndUploadTradeImage({
+          id: row.id,
+          name: row.name,
+          chamber: row.chamber,
+          state: row.state,
+          transaction: row.transaction,
+          company: nameMap.get(row.ticker.toUpperCase()) || row.company || row.ticker,
+          ticker: row.ticker,
+        })
+      )
+    )
+    results.forEach((result, j) => {
+      if (result.status === 'fulfilled' && result.value) {
+        generated++
+      } else if (result.status === 'rejected') {
+        const row = batch[j]
+        console.error(`[RSS-Combiner] Failed to generate feed image for trade ${row?.id} (${row?.ticker}/${row?.name}):`, result.reason)
+      }
+    })
+  }
+
+  // Log the outcome unconditionally so a zero-result run is distinguishable from
+  // a silent failure at the query stage.
+  console.log(`[RSS-Combiner] Feed trade image generation: ${generated}/${tradesToGenerate.length} generated`)
+  if (generated > 0) invalidateCache()
+
+  return generated
+}
+
+/**
  * Ingest articles from Google News RSS feeds into the congress_feed_articles table.
  * Fetches feeds sequentially, filters by approved sources and excluded keywords,
  * and upserts each article by article_url.
@@ -992,100 +1131,11 @@ export async function runIngestion(): Promise<IngestionResult> {
     }
   }
 
-  // 8. Generate missing trade images for all tickers in congress_feed_articles
-  // within the feed window. Covers tickers whose trades are outside the current
-  // freshness window but whose articles are still served in the combined feed.
+  // 8. Generate any per-(ticker, member, transaction) trade card images the feed
+  // needs but doesn't have yet. Covers trades outside the current freshness
+  // window whose articles are still served in the combined feed.
   try {
-    // Use the feed window to find which tickers will appear in output
-    const { data: feedSettings } = await supabaseAdmin
-      .from('combined_feed_settings')
-      .select('feed_article_age_days')
-      .limit(1)
-      .single()
-
-    const feedWindowDays = feedSettings?.feed_article_age_days ?? 14
-    const feedCutoff = new Date()
-    feedCutoff.setDate(feedCutoff.getDate() - feedWindowDays)
-
-    // Get distinct tickers in congress_feed_articles within the window
-    const { data: feedArticles } = await supabaseAdmin
-      .from('congress_feed_articles')
-      .select('ticker')
-      .gte('published_at', feedCutoff.toISOString())
-
-    const feedTickers = Array.from(new Set((feedArticles || []).map(a => a.ticker).filter(Boolean)))
-
-    if (feedTickers.length > 0) {
-      // Find tickers that already have at least one trade with image_url
-      const { data: tradesWithImages } = await supabaseAdmin
-        .from('congress_trades')
-        .select('ticker')
-        .in('ticker', feedTickers)
-        .not('image_url', 'is', null)
-
-      const tickersWithImages = new Set((tradesWithImages || []).map(t => t.ticker))
-      const tickersMissingImages = feedTickers.filter(t => !tickersWithImages.has(t))
-
-      if (tickersMissingImages.length > 0) {
-        console.log(`[RSS-Combiner] Generating missing trade images for ${tickersMissingImages.length} tickers in feed window`)
-
-        // Fetch the largest trade row for each missing ticker in one batched query
-        const { data: allRows } = await supabaseAdmin
-          .from('congress_trades')
-          .select('id, ticker, name, chamber, state, transaction, company, trade_size_parsed')
-          .in('ticker', tickersMissingImages)
-          .order('trade_size_parsed', { ascending: false, nullsFirst: false })
-
-        // Pick the largest row per ticker
-        const largestByTicker = new Map<string, any>()
-        for (const row of allRows || []) {
-          if (!largestByTicker.has(row.ticker)) {
-            largestByTicker.set(row.ticker, row)
-          }
-        }
-
-        // Batch-resolve company names
-        const { data: nameMappings } = await supabaseAdmin
-          .from('ticker_company_names')
-          .select('ticker, company_name')
-          .in('ticker', tickersMissingImages.map(t => t.toUpperCase()))
-
-        const nameMap = new Map((nameMappings || []).map(n => [n.ticker.toUpperCase(), n.company_name]))
-
-        // Build the list of trades to generate images for
-        const tradesToGenerate = Array.from(largestByTicker.values()).map(row => ({
-          id: row.id,
-          name: row.name,
-          chamber: row.chamber,
-          state: row.state,
-          transaction: row.transaction,
-          company: nameMap.get(row.ticker.toUpperCase()) || row.company || row.ticker,
-          ticker: row.ticker,
-        }))
-
-        // Generate in parallel batches with delay to avoid overwhelming storage
-        const FEED_IMAGE_BATCH_SIZE = 5
-        const FEED_IMAGE_DELAY_MS = 500
-        let feedImagesGenerated = 0
-        for (let i = 0; i < tradesToGenerate.length; i += FEED_IMAGE_BATCH_SIZE) {
-          if (i > 0) {
-            await new Promise((r) => setTimeout(r, FEED_IMAGE_DELAY_MS))
-          }
-          const batch = tradesToGenerate.slice(i, i + FEED_IMAGE_BATCH_SIZE)
-          const results = await Promise.allSettled(batch.map(t => generateAndUploadTradeImage(t)))
-          for (const result of results) {
-            if (result.status === 'fulfilled' && result.value) {
-              feedImagesGenerated++
-            }
-          }
-        }
-
-        if (feedImagesGenerated > 0) {
-          console.log(`[RSS-Combiner] Generated ${feedImagesGenerated} feed trade images`)
-          invalidateCache()
-        }
-      }
-    }
+    await generateMissingFeedTradeImages()
   } catch (error) {
     console.error('[RSS-Combiner] Feed image generation pass failed:', error)
     // Don't fail the whole ingestion
@@ -1188,36 +1238,39 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     windowDays += 5
   }
 
-  // Load trade card images keyed by (ticker, member, transaction).
-  // Ticker-only matching mis-assigned images when multiple members traded
-  // the same stock — every article with that ticker got whichever row
-  // Postgres happened to return last.
+  // Load trade card images keyed strictly by (ticker, member, transaction).
+  // There is intentionally no ticker-only fallback: when multiple members
+  // traded the same stock, a ticker-level image showed the wrong member's
+  // photo and buy/sell side. A missing image is better than a wrong one.
   const articleTickers = Array.from(new Set(articles.map((r: any) => r.ticker).filter(Boolean)))
   const tradeImageMap = new Map<string, string>() // composite key -> image_url
-  const tickerTradeCounts = new Map<string, number>()
-  const tickerFallbackImage = new Map<string, string>() // only retained if exactly one trade per ticker
 
   if (articleTickers.length > 0) {
-    const { data: tradeImages } = await supabaseAdmin
-      .from('congress_trades')
-      .select('ticker, image_url, name, transaction')
-      .in('ticker', articleTickers)
-      .not('image_url', 'is', null)
+    // Paginate — high-activity tickers can have >1000 trade rows, and a
+    // truncated tail would leave composite keys unmapped, regressing the exact
+    // mis-assignment (article → null image) this fix targets.
+    let tradeImages: Array<{ ticker: string | null; image_url: string | null; name: string | null; transaction: string | null }> = []
+    try {
+      tradeImages = await fetchAllPaginated(
+        () =>
+          supabaseAdmin
+            .from('congress_trades')
+            .select('ticker, image_url, name, transaction')
+            .in('ticker', articleTickers)
+            .not('image_url', 'is', null),
+        { label: 'getCombinedFeed:trade-images' }
+      )
+    } catch (err) {
+      // Render the feed without trade images rather than failing the whole feed.
+      console.error('[RSS-Combiner] Failed to load trade images for feed:', err)
+    }
 
-    for (const row of tradeImages || []) {
+    for (const row of tradeImages) {
       if (!row.image_url || !row.ticker) continue
 
       const compositeKey = buildTradeImageKey(row.ticker, row.name, row.transaction)
-      if (compositeKey) tradeImageMap.set(compositeKey, row.image_url)
-
-      const tickerKey = row.ticker.toUpperCase()
-      const nextCount = (tickerTradeCounts.get(tickerKey) || 0) + 1
-      tickerTradeCounts.set(tickerKey, nextCount)
-      if (nextCount === 1) {
-        tickerFallbackImage.set(tickerKey, row.image_url)
-      } else {
-        // Ambiguous — drop the ticker fallback so we don't mix up members.
-        tickerFallbackImage.delete(tickerKey)
+      if (compositeKey && !tradeImageMap.has(compositeKey)) {
+        tradeImageMap.set(compositeKey, row.image_url)
       }
     }
   }
@@ -1229,11 +1282,7 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
       row.trade_meta?.member,
       row.transaction_type
     )
-    const tickerKey = (row.ticker || '').toUpperCase()
-    const tradeImageUrl =
-      (compositeKey ? tradeImageMap.get(compositeKey) : null) ||
-      tickerFallbackImage.get(tickerKey) ||
-      null
+    const tradeImageUrl = (compositeKey ? tradeImageMap.get(compositeKey) : null) || null
 
     return {
     title: row.article_title,
