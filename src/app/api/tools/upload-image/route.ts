@@ -4,7 +4,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'tools/upload-image' },
+  // Public tool submissions (anonymous or Clerk-authenticated) upload images here.
+  // This endpoint must NOT require a NextAuth session — the public Tools Directory
+  // uses Clerk, so 'authenticated' (NextAuth) wrongly 401s every submitter.
+  { authTier: 'public', logContext: 'tools/upload-image' },
   async ({ request, logger }) => {
     const fileName = request.nextUrl.searchParams.get('fileName')
 
