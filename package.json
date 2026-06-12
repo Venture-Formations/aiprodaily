@@ -95,5 +95,8 @@
     "@vitest/coverage-v8": "^4.0.18",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "chokidar": "4.0.3"
   }
 }
