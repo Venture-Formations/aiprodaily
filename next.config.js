@@ -4,7 +4,12 @@ const nextConfig = {
     // Pre-existing lint errors across the codebase; lint separately via `npm run lint`
     ignoreDuringBuilds: true,
   },
-  serverExternalPackages: ['rss-parser'],
+  // xdg-portable/xdg-app-paths (pulled transitively by workflow@4.x via
+  // @vercel/functions -> @vercel/oidc -> @vercel/cli-config) call
+  // path.parse(module.filename) at import; webpack bundling leaves
+  // module.filename undefined, crashing `next build` page-data collection.
+  // Externalizing them so they're require()'d at runtime keeps filename defined.
+  serverExternalPackages: ['rss-parser', 'xdg-portable', 'xdg-app-paths'],
   images: {
     domains: ['images.unsplash.com', 'via.placeholder.com'],
     remotePatterns: [
