@@ -84,7 +84,7 @@
     "tailwindcss": "^4.1.15",
     "typescript": "^5",
     "uuid": "^9.0.1",
-    "workflow": "^4.0.1-beta.27",
+    "workflow": "^4.4.0",
     "xlsx": "^0.18.5",
     "zod": "^4.1.13"
   },
