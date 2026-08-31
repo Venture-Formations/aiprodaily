@@ -67,7 +67,7 @@
 -- find-or-create only reuses 'draft'/'processing'. An unconditional index would
 -- therefore make the retry-after-failure path insert a second row for the date,
 -- hit a 23505, and die -- bricking exactly the recovery scenario this change is
--- about. Terminal rows ('failed', 'archived') must not block a fresh attempt.
+-- about. Terminal rows ('failed', 'sent') must not block a fresh attempt.
 --
 -- 'sent' is excluded from the predicate for the same reason: a sent issue is
 -- history, and must not prevent creating a new issue for that date.
@@ -80,3 +80,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_publication_issues_pub_date_live_unique
 
 COMMENT ON INDEX public.idx_publication_issues_pub_date_live_unique IS
   'At most one live (draft/processing/in_review/changes_made) issue per publication per date. A second one makes send-review refuse to send and silently stops the newsletter.';
+
+-- ============================================================
+-- 4. VERIFY -- do not skip, and do not trust the migration runner
+-- ============================================================
+-- `npm run migrate:prod` CANNOT be trusted to report failure here:
+-- scripts/run-migrations.mjs invokes `psql -f` WITHOUT `-v ON_ERROR_STOP=1`, so
+-- psql exits 0 even when the statement fails, and execSync never throws -- the
+-- file is logged "OK". Worse, if it did throw, Postgres's failure text for this
+-- exact statement is:
+--     DETAIL: Key (publication_id, date)=(...) is duplicated.
+-- and the runner's matcher treats any output containing "duplicate" as
+-- "WARN (already applied)". Both paths end in "Done: N applied" with NO index.
+--
+-- So confirm the index exists yourself after running the migration:
+--
+--   SELECT indexname FROM pg_indexes
+--   WHERE tablename = 'publication_issues'
+--     AND indexname = 'idx_publication_issues_pub_date_live_unique';
+--   -- MUST return exactly 1 row. Zero rows means step 2 was not completed.
+--
+-- Follow-up (separate PR): give run-migrations.mjs `-v ON_ERROR_STOP=1` and a
+-- matcher that does not swallow "is duplicated".

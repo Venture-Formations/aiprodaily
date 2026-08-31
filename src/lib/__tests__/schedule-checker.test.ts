@@ -243,27 +243,72 @@ describe('ScheduleChecker.isTimeToRun once-per-day guard', () => {
   })
 
   it('tolerates late dispatch up to the window width', async () => {
-    at('19:53')
+    at('19:54')
     await expect(ScheduleChecker.shouldRunRSSProcessing('pub-123')).resolves.toBe(true)
   })
 
   it('rejects a tick past the window width', async () => {
-    at('19:54')
+    at('19:55')
     await expect(ScheduleChecker.shouldRunRSSProcessing('pub-123')).resolves.toBe(false)
   })
 
-  it('admits exactly one tick per day across a full 5-minute cron grid', async () => {
-    // The property that actually matters: with ticks every 5 minutes and up to
-    // 1 minute of slip, exactly one may qualify.
-    const accepted: string[] = []
-    for (const tick of ['19:40', '19:41', '19:45', '19:46', '19:50', '19:51', '19:55', '19:56']) {
-      mocks.lastRunValue = null
-      at(tick)
-      if (await ScheduleChecker.shouldRunRSSProcessing('pub-123')) accepted.push(tick)
+  // The property that actually matters. The window must admit EXACTLY ONE of the
+  // */5 cron ticks -- never two (duplicate issues, the original bug) and never
+  // zero (the whole day is silently lost, which is worse).
+  //
+  // A forward window of width W spans W+1 consecutive minutes, and any 5
+  // consecutive integers contain exactly one multiple of 5. W=4 is therefore the
+  // only correct width for a 5-minute cron. W=3 spans 4 minutes, which can contain
+  // no tick at all -- and for an off-grid schedule minute, contains none on every
+  // single day.
+  describe('admits exactly one */5 tick under any uniform dispatch slip', () => {
+    // Cover every residue of the scheduled minute mod 5, not just grid-aligned
+    // times. The settings UI restricts to 5-minute steps but the API's timeRegex
+    // does not, so an off-grid time is reachable.
+    for (const scheduled of ['19:50', '19:51', '19:52', '19:53', '19:54']) {
+      for (const slip of [0, 1, 2, 3, 4]) {
+        it(`schedule ${scheduled}, ${slip}m dispatch slip`, async () => {
+          mockedGetConfig.mockResolvedValue({ ...enabledConfig, rssProcessingTime: scheduled })
+
+          const admitted: number[] = []
+          // Every cron tick in the hour, each observed `slip` minutes late.
+          for (let gridMinute = 0; gridMinute < 60; gridMinute += 5) {
+            mocks.lastRunValue = null // isolate the window from the marker
+            vi.setSystemTime(new Date(Date.UTC(2026, 7, 30, 19 + 5, gridMinute + slip, 0)))
+            if (await ScheduleChecker.shouldRunRSSProcessing('pub-123')) admitted.push(gridMinute)
+          }
+
+          expect(admitted).toHaveLength(1)
+        })
+      }
     }
-    expect(accepted).toEqual(['19:50', '19:51'])
-    // ...and 19:51 only qualifies because the marker was reset; in production the
-    // 19:50 run claims the day. Covered by the marker test below.
+  })
+
+  // Regression: the forward-only window is measured around the clock. A schedule
+  // whose window crosses midnight (23:56-23:59) would otherwise never fire -- the
+  // 23:55 tick reads negative and the 00:00 tick reads -1438, both rejected, every
+  // day, silently. The old Math.abs() window did not have this hole.
+  describe('fires for schedules whose window crosses midnight', () => {
+    for (const scheduled of ['23:56', '23:57', '23:58', '23:59']) {
+      for (const slip of [0, 1, 2, 3, 4]) {
+        it(`schedule ${scheduled}, ${slip}m dispatch slip`, async () => {
+          mockedGetConfig.mockResolvedValue({ ...enabledConfig, rssProcessingTime: scheduled })
+
+          const admitted: string[] = []
+          // Sweep every tick from 23:00 CT through 00:55 CT the next morning.
+          for (let gridMinute = 0; gridMinute < 120; gridMinute += 5) {
+            mocks.lastRunValue = null
+            // 23:00 CT on 2026-08-30 == 04:00 UTC on 2026-08-31 (CDT, UTC-5)
+            vi.setSystemTime(new Date(Date.UTC(2026, 7, 31, 4, gridMinute + slip, 0)))
+            if (await ScheduleChecker.shouldRunRSSProcessing('pub-123')) {
+              admitted.push(ScheduleChecker.getCurrentTimeInCT().timeString)
+            }
+          }
+
+          expect(admitted).toHaveLength(1)
+        })
+      }
+    }
   })
 
   it('marks the run with today CT date so the next tick backs off', async () => {

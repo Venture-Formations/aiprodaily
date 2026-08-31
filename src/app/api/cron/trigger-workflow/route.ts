@@ -3,6 +3,7 @@ import { ScheduleChecker } from '@/lib/schedule-checker'
 import { start } from 'workflow/api'
 import { processRSSWorkflow } from '@/lib/workflows/process-rss-workflow'
 import { supabaseAdmin } from '@/lib/supabase'
+import { SlackNotificationService } from '@/lib/slack'
 import { withApiHandler } from '@/lib/api-handler'
 
 /**
@@ -100,9 +101,28 @@ export const GET = withApiHandler(
           logger.debug({ newsletter: newsletter.name }, 'Not time yet')
         }
       } catch (error) {
-        // The day is already marked as run, so this publication will not retry today.
+        // The day is already marked as run, so this publication will not retry today
+        // and there is no catch-up path for RSS processing. No issue means no draft,
+        // no review and no newsletter -- so this must page someone, not just log.
         logger.error({ err: error, newsletter: newsletter.name, publicationId: newsletter.id }, 'Failed to start workflow - this publication will not run today')
         failedDispatches.push(newsletter.name)
+
+        try {
+          const slack = new SlackNotificationService()
+          await slack.sendScheduledSendFailureAlert(
+            `${newsletter.slug}:no-issue`,
+            new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }),
+            error instanceof Error ? error.message : 'Unknown error',
+            {
+              operation: 'rss_workflow_dispatch',
+              timestamp: new Date().toISOString(),
+              publication_slug: newsletter.slug,
+              impact: 'No issue will be created today - the newsletter will not send'
+            }
+          )
+        } catch (slackError) {
+          logger.error({ err: slackError, newsletter: newsletter.name }, 'Failed to send Slack alert for workflow dispatch failure')
+        }
       }
     }
 

@@ -52,35 +52,14 @@ export class IssueLifecycle {
     publicationId: string,
     issueDate: string
   ): Promise<{ id: string; reused: boolean; status?: string }> {
-    const { data: existing, error: existingError } = await supabaseAdmin
-      .from('publication_issues')
-      .select('id, status')
-      .eq('publication_id', publicationId)
-      .eq('date', issueDate)
-      .in('status', ['draft', 'processing'])
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
+    const { getOrCreateLiveIssue } = await import('../dal')
+    const resolved = await getOrCreateLiveIssue(publicationId, issueDate, 'processing')
 
-    if (existingError) {
-      console.error('Error checking for existing issue:', formatError(existingError))
+    if (!resolved) {
+      throw new Error(`Failed to resolve issue for ${issueDate}`)
     }
 
-    if (existing) {
-      return { id: existing.id, reused: true, status: existing.status }
-    }
-
-    const { data: created, error: createError } = await supabaseAdmin
-      .from('publication_issues')
-      .insert([{ date: issueDate, status: 'processing', publication_id: publicationId }])
-      .select('id')
-      .single()
-
-    if (createError || !created) {
-      throw new Error(`Failed to create issue for ${issueDate}: ${formatError(createError)}`)
-    }
-
-    return { id: created.id, reused: false }
+    return { id: resolved.issue.id, reused: resolved.reused, status: resolved.issue.status }
   }
 
   async processAllFeeds() {
@@ -189,12 +168,27 @@ export class IssueLifecycle {
       console.log(`[Step 8/10] ✓ Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
       // STEP 9: Set issue status to draft
+      // Guarded on 'processing', symmetric with the failure demotion below: only
+      // finalize a row this run still owns. findOrCreateIssueForDate reuses live
+      // rows, so an unguarded write here could resurrect an issue another run had
+      // already demoted to 'failed' -- and a second 'draft' for one date is exactly
+      // what stops the send.
       console.log('[Step 9/10] Setting issue status to draft...')
-      await supabaseAdmin
+      const { data: finalized, error: draftError } = await supabaseAdmin
         .from('publication_issues')
         .update({ status: 'draft' })
         .eq('id', issueId)
-      console.log('[Step 9/10] ✓ Status: draft')
+        .eq('status', 'processing')
+        .select('id')
+
+      if (draftError) {
+        throw new Error(`Failed to finalize issue ${issueId}: ${formatError(draftError)}`)
+      }
+      if (!finalized || finalized.length === 0) {
+        console.warn(`[Step 9/10] Issue ${issueId} was not 'processing' at finalize time - another run may have already handled it`)
+      } else {
+        console.log('[Step 9/10] ✓ Status: draft')
+      }
 
       // STEP 10: Stage 1 Unassignment
       console.log('[Step 10/10] Stage 1 unassignment for unused posts...')
@@ -208,10 +202,19 @@ export class IssueLifecycle {
       console.error('Error:', error)
 
       if (issueId) {
-        await supabaseAdmin
+        // Only demote a row this run still owns. findOrCreateIssueForDate reuses an
+        // existing issue, so without the status guard a second run failing would mark
+        // the FIRST run's finished draft as 'failed' -- send-review would then find no
+        // draft and skip silently, recreating the exact bug this file was fixed for.
+        const { error: demoteError } = await supabaseAdmin
           .from('publication_issues')
           .update({ status: 'failed' })
           .eq('id', issueId)
+          .eq('status', 'processing')
+
+        if (demoteError) {
+          console.error('Failed to mark issue as failed:', formatError(demoteError))
+        }
       }
 
       throw error

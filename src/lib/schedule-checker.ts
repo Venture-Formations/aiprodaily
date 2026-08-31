@@ -43,8 +43,16 @@ export class ScheduleChecker {
     return { hours, minutes }
   }
 
-  /** Minutes after the scheduled time during which a tick still counts as "on time". */
-  private static readonly RUN_WINDOW_MINUTES = 3
+  /**
+   * Minutes after the scheduled time during which a tick still counts as "on time".
+   *
+   * MUST equal the cron tick period (5 min) minus 1. A forward window of width W
+   * spans W+1 consecutive minutes; any 5 consecutive integers contain exactly one
+   * multiple of 5, so W=4 admits exactly one tick under any uniform dispatch slip.
+   * W=3 spans only 4 minutes, which can contain NO grid tick -- that silently loses
+   * the whole day, and for an off-grid schedule minute it loses every day.
+   */
+  private static readonly RUN_WINDOW_MINUTES = 4
 
   /**
    * True when this tick is the day's run for `lastRunKey`.
@@ -57,11 +65,12 @@ export class ScheduleChecker {
    *    dispatch slipped and it observed 19:46. Two ticks passed, two workflows ran,
    *    two issues were created for one date, and the newsletter silently stopped
    *    sending. Cron dispatch slips late, never early, so refusing negative diffs
-   *    makes the early tick structurally impossible. The width must stay under the
-   *    5-minute tick period: [0,3] admits exactly one tick for any scheduled
-   *    minute, while [0,4] can still admit two when the schedule is off-grid.
+   *    makes the early tick structurally impossible, while keeping the width at a
+   *    full tick period guarantees one tick still lands. See RUN_WINDOW_MINUTES.
    *
    * 2. The `last_*_run` marker makes the day idempotent regardless of window math.
+   *    This is the guard that absorbs the residual case the window cannot: slip
+   *    that VARIES between consecutive ticks can still put two of them in range.
    */
   private static async isTimeToRun(currentTime: string, scheduledTime: string, lastRunKey: string, newsletterId: string): Promise<boolean> {
     const current = this.parseTime(currentTime)
@@ -69,9 +78,15 @@ export class ScheduleChecker {
 
     const currentMinutes = current.hours * 60 + current.minutes
     const scheduledMinutes = scheduled.hours * 60 + scheduled.minutes
-    const minutesAfterScheduled = currentMinutes - scheduledMinutes
 
-    if (minutesAfterScheduled < 0 || minutesAfterScheduled > this.RUN_WINDOW_MINUTES) {
+    // Measure "minutes after scheduled" around the clock. Without the wrap, a
+    // schedule at 23:56-23:59 would never fire: its window runs past midnight, the
+    // 23:55 tick reads negative, and the 00:00 tick reads -1438. Both rejected,
+    // every day, silently. A 5-minute-wide window on the circular 1440-minute clock
+    // still contains exactly one */5 tick, so the guarantee is unchanged.
+    const minutesAfterScheduled = (currentMinutes - scheduledMinutes + 1440) % 1440
+
+    if (minutesAfterScheduled > this.RUN_WINDOW_MINUTES) {
       console.log(`Time window not matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, ${minutesAfterScheduled} minutes after`)
       return false
     }
@@ -105,7 +120,12 @@ export class ScheduleChecker {
    * rows from 2025.
    *
    * Fails open (returns false) on a read error so a transient DB blip cannot
-   * silently cancel a day's send.
+   * silently cancel a day's send. This is safe -- do NOT "harden" it to fail
+   * closed. The marker is not what prevents a duplicate send: each stage is
+   * already idempotent via its own status transition (send-final only selects
+   * in_review/changes_made and sets 'sent'; the workflow reuses an existing issue
+   * for the date). Failing closed would trade a duplicate that cannot happen for
+   * a missed send that can.
    */
   private static async hasRunOn(lastRunKey: string, newsletterId: string, today: string): Promise<boolean> {
     const { value, error } = await getPublicationOwnSetting(newsletterId, lastRunKey)
