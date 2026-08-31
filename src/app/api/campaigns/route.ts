@@ -186,7 +186,10 @@ export const POST = withApiHandler(
       }, { status: 404 })
     }
 
-    // Create new issue (duplicate dates are now allowed)
+    // Create new issue. At most one LIVE issue per (publication, date) is allowed --
+    // enforced by idx_publication_issues_pub_date_live_unique. A second live issue
+    // for a date makes send-review refuse to send, so a 23505 here is surfaced
+    // below rather than left as an opaque 500.
     const { data: issue, error } = await supabaseAdmin
       .from('publication_issues')
       .insert([{
@@ -198,6 +201,11 @@ export const POST = withApiHandler(
       .single()
 
     if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json({
+          error: `An active issue already exists for ${date}. Open or delete it before creating another.`
+        }, { status: 409 })
+      }
       throw error
     }
 

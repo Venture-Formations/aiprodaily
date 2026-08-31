@@ -55,6 +55,8 @@ function buildRequest() {
 
 interface IssueCfg {
   issueRow?: any
+  /** Explicit multi-row result; overrides issueRow. Use to simulate duplicates. */
+  issueRows?: any[]
   issueError?: any
   publications?: any[]
 }
@@ -97,8 +99,15 @@ function setupFromMock(cfg: IssueCfg = {}) {
                 return {
                   eq: function captureEq3(c3: string, v3: string): any {
                     issueLookupArgs[c3] = v3
+                    // Route fetches up to 2 rows so it can tell "none" from "duplicates"
                     return {
-                      single: () => Promise.resolve({ data: issueRow, error: cfg.issueError ?? null }),
+                      order: () => ({
+                        limit: () =>
+                          Promise.resolve({
+                            data: cfg.issueRows ?? (issueRow == null ? [] : [issueRow]),
+                            error: cfg.issueError ?? null,
+                          }),
+                      }),
                     }
                   },
                 }
@@ -159,13 +168,46 @@ describe('send-review cron', () => {
   })
 
   it('skips when no draft issue found for tomorrow', async () => {
-    setupFromMock({ issueRow: null, issueError: { code: 'PGRST116', message: 'no rows' } })
+    // A list query returns an empty array, not PGRST116 (that is .single()-only)
+    setupFromMock({ issueRows: [] })
 
     const response = await GET(buildRequest(), { params: Promise.resolve({}) })
     const body = await response.json()
 
     expect(body.results[0].skipped).toBe(true)
     expect(body.results[0].message).toMatch(/No draft issue/i)
+    expect(sendGridReviewMock).not.toHaveBeenCalled()
+  })
+
+  it('REGRESSION: reports failure (not a silent skip) when the date has duplicate drafts', async () => {
+    // Two issues for one date used to make .single() return PGRST116, which this
+    // route reported as success+skipped. 10 sends were lost this way before anyone
+    // noticed. Duplicates must now fail loudly.
+    setupFromMock({
+      issueRows: [
+        { id: 'issue-1', publication_id: 'pub-1', date: '2026-05-05', status: 'draft', subject_line: 'A', module_articles: [{ id: 'a-1', is_active: true }], manual_articles: [] },
+        { id: 'issue-2', publication_id: 'pub-1', date: '2026-05-05', status: 'draft', subject_line: 'B', module_articles: [{ id: 'a-2', is_active: true }], manual_articles: [] },
+      ],
+    })
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(body.success).toBe(false)
+    expect(body.results[0].skipped).toBeUndefined()
+    expect(body.results[0].error).toMatch(/Multiple draft issues/i)
+    expect(sendGridReviewMock).not.toHaveBeenCalled()
+  })
+
+  it('reports failure when the draft issue query errors', async () => {
+    setupFromMock({ issueRows: [], issueError: { code: '57014', message: 'statement timeout' } })
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(body.success).toBe(false)
+    expect(body.results[0].error).toMatch(/statement timeout/i)
     expect(sendGridReviewMock).not.toHaveBeenCalled()
   })
 

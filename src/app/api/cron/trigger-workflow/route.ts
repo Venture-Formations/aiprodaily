@@ -77,21 +77,43 @@ export const GET = withApiHandler(
     // Check each newsletter's schedule and start workflows as needed
     const startedWorkflows: string[] = []
 
+    const failedDispatches: string[] = []
+
     for (const newsletter of newsletters) {
-      const shouldRun = await ScheduleChecker.shouldRunRSSProcessing(newsletter.id)
+      // Per-publication isolation: one publication's dispatch failure must not
+      // skip the rest of the loop. The schedule check has already claimed the day
+      // by this point, so a thrown start() would otherwise cost every remaining
+      // publication its run with no retry.
+      try {
+        const shouldRun = await ScheduleChecker.shouldRunRSSProcessing(newsletter.id)
 
-      if (shouldRun) {
-        logger.info({ newsletter: newsletter.name, publicationId: newsletter.id }, 'Starting workflow')
+        if (shouldRun) {
+          logger.info({ newsletter: newsletter.name, publicationId: newsletter.id }, 'Starting workflow')
 
-        await start(processRSSWorkflow, [{
-          trigger: 'cron',
-          publication_id: newsletter.id
-        }])
+          await start(processRSSWorkflow, [{
+            trigger: 'cron',
+            publication_id: newsletter.id
+          }])
 
-        startedWorkflows.push(newsletter.name)
-      } else {
-        logger.debug({ newsletter: newsletter.name }, 'Not time yet')
+          startedWorkflows.push(newsletter.name)
+        } else {
+          logger.debug({ newsletter: newsletter.name }, 'Not time yet')
+        }
+      } catch (error) {
+        // The day is already marked as run, so this publication will not retry today.
+        logger.error({ err: error, newsletter: newsletter.name, publicationId: newsletter.id }, 'Failed to start workflow - this publication will not run today')
+        failedDispatches.push(newsletter.name)
       }
+    }
+
+    if (failedDispatches.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `Failed to start workflow for: ${failedDispatches.join(', ')}`,
+        newsletters: startedWorkflows,
+        failed: failedDispatches,
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
     }
 
     if (startedWorkflows.length === 0) {

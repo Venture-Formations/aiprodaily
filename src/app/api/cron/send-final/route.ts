@@ -180,7 +180,17 @@ async function processFinalSendForPub(pub: { id: string; slug: string }, log: Lo
     .limit(1)
     .single()
 
-  if (error || !issue) {
+  // Distinguish "nothing to send" from "the query failed". Collapsing both into a
+  // successful skip is what hid three weeks of missed sends in send-review; this is
+  // the last send in the chain, so a swallowed error here is an unsent newsletter
+  // with a green cron. PGRST116 from .single() here means zero rows (.limit(1) caps
+  // it), which is the legitimate skip.
+  if (error && error.code !== 'PGRST116') {
+    log.error({ err: error, slug: pub.slug }, 'Failed to query issue for final send')
+    throw new Error(`Final send issue query failed: ${error.message}`)
+  }
+
+  if (!issue) {
     log.info({ slug: pub.slug }, 'No issue with in_review or changes_made status found')
     return { success: true, skipped: true, message: 'No issue with in_review or changes_made status' }
   }

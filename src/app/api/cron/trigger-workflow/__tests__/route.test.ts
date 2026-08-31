@@ -168,12 +168,37 @@ describe('trigger-workflow cron', () => {
     expect(updateMock).not.toHaveBeenCalled()
   })
 
-  it('propagates workflow start failure (no silent swallow)', async () => {
+  it('surfaces workflow start failure as a 500 (no silent swallow)', async () => {
     shouldRunRSSProcessingMock.mockResolvedValue(true)
     startMock.mockRejectedValueOnce(new Error('workflow infra down'))
 
-    await expect(GET(buildRequest(), { params: Promise.resolve({}) })).rejects.toThrow(
-      'workflow infra down'
-    )
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(body.success).toBe(false)
+    expect(body.failed).toEqual(['AI Pros Daily'])
+  })
+
+  it('one publication failing to dispatch does not skip the others', async () => {
+    // The schedule check marks the day as run BEFORE dispatch, so a publication
+    // skipped here loses its run entirely with no retry. Isolate per publication.
+    setupFromMock({
+      publications: [
+        { id: 'pub-1', name: 'AI Pros Daily', slug: 'aiprodaily' },
+        { id: 'pub-2', name: 'Trader Leak', slug: 'trader-leak' },
+      ],
+    })
+    shouldRunRSSProcessingMock.mockResolvedValue(true)
+    startMock.mockRejectedValueOnce(new Error('workflow infra down'))
+    startMock.mockResolvedValueOnce(undefined)
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(startMock).toHaveBeenCalledTimes(2)
+    expect(body.failed).toEqual(['AI Pros Daily'])
+    expect(body.newsletters).toEqual(['Trader Leak'])
+    expect(response.status).toBe(500)
   })
 })
