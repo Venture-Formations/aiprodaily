@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { ISSUE_COLUMNS } from '@/lib/dal/issues'
 import { withApiHandler } from '@/lib/api-handler'
 import { AppModuleSelector } from '@/lib/ai-app-modules'
 import { ArticleModuleSelector } from '@/lib/article-modules'
@@ -197,7 +198,7 @@ export const POST = withApiHandler(
         status: 'draft',
         publication_id: newsletter.id
       }])
-      .select('*')
+      .select(ISSUE_COLUMNS)
       .single()
 
     if (error) {
