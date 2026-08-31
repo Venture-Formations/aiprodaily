@@ -37,6 +37,31 @@ export class IssueLifecycle {
     this.articleSelector = articleSelector
   }
 
+  /**
+   * Resolve the live issue for a publication/date, creating one only if absent.
+   *
+   * A duplicate row here is not a harmless extra draft: send-review looks up the
+   * day's draft and refuses to send when it finds more than one, so a second row
+   * means the newsletter does not go out. Backed by
+   * idx_publication_issues_pub_date_live_unique.
+   *
+   * Only 'draft' and 'processing' count as live -- a 'failed' row from an earlier
+   * attempt must not block a retry, which is why the DB index is partial too.
+   */
+  private async findOrCreateIssueForDate(
+    publicationId: string,
+    issueDate: string
+  ): Promise<{ id: string; reused: boolean; status?: string }> {
+    const { getOrCreateLiveIssue } = await import('../dal')
+    const resolved = await getOrCreateLiveIssue(publicationId, issueDate, 'processing')
+
+    if (!resolved) {
+      throw new Error(`Failed to resolve issue for ${issueDate}`)
+    }
+
+    return { id: resolved.issue.id, reused: resolved.reused, status: resolved.issue.status }
+  }
+
   async processAllFeeds() {
     try {
       await this.processAllFeedsHybrid()
@@ -72,23 +97,18 @@ export class IssueLifecycle {
         throw new Error('No active publication found')
       }
 
-      // STEP 1: Create NEW issue
-      console.log('[Step 1/10] Creating new issue...')
+      // STEP 1: Resolve the issue for tomorrow (reuse if one is already in flight)
+      console.log('[Step 1/10] Resolving issue for tomorrow...')
 
       const issueDate = getTomorrowStr('CST')
+      const resolved = await this.findOrCreateIssueForDate(newsletter.id, issueDate)
+      issueId = resolved.id
 
-      const { data: newissue, error: createError } = await supabaseAdmin
-        .from('publication_issues')
-        .insert([{ date: issueDate, status: 'processing', publication_id: newsletter.id }])
-        .select('id')
-        .single()
-
-      if (createError || !newissue) {
-        throw new Error('Failed to create issue')
-      }
-
-      issueId = newissue.id
-      console.log(`[Step 1/10] ✓ issue created: ${issueId} for ${issueDate} (pub: ${newsletter.slug})`)
+      console.log(
+        resolved.reused
+          ? `[Step 1/10] ✓ Reusing existing issue: ${issueId} for ${issueDate} (status: ${resolved.status}, pub: ${newsletter.slug})`
+          : `[Step 1/10] ✓ issue created: ${issueId} for ${issueDate} (pub: ${newsletter.slug})`
+      )
 
       // STEP 2: Select AI applications and prompts
       console.log('[Step 2/10] Selecting AI apps and prompts...')
@@ -148,12 +168,27 @@ export class IssueLifecycle {
       console.log(`[Step 8/10] ✓ Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
       // STEP 9: Set issue status to draft
+      // Guarded on 'processing', symmetric with the failure demotion below: only
+      // finalize a row this run still owns. findOrCreateIssueForDate reuses live
+      // rows, so an unguarded write here could resurrect an issue another run had
+      // already demoted to 'failed' -- and a second 'draft' for one date is exactly
+      // what stops the send.
       console.log('[Step 9/10] Setting issue status to draft...')
-      await supabaseAdmin
+      const { data: finalized, error: draftError } = await supabaseAdmin
         .from('publication_issues')
         .update({ status: 'draft' })
         .eq('id', issueId)
-      console.log('[Step 9/10] ✓ Status: draft')
+        .eq('status', 'processing')
+        .select('id')
+
+      if (draftError) {
+        throw new Error(`Failed to finalize issue ${issueId}: ${formatError(draftError)}`)
+      }
+      if (!finalized || finalized.length === 0) {
+        console.warn(`[Step 9/10] Issue ${issueId} was not 'processing' at finalize time - another run may have already handled it`)
+      } else {
+        console.log('[Step 9/10] ✓ Status: draft')
+      }
 
       // STEP 10: Stage 1 Unassignment
       console.log('[Step 10/10] Stage 1 unassignment for unused posts...')
@@ -167,10 +202,19 @@ export class IssueLifecycle {
       console.error('Error:', error)
 
       if (issueId) {
-        await supabaseAdmin
+        // Only demote a row this run still owns. findOrCreateIssueForDate reuses an
+        // existing issue, so without the status guard a second run failing would mark
+        // the FIRST run's finished draft as 'failed' -- send-review would then find no
+        // draft and skip silently, recreating the exact bug this file was fixed for.
+        const { error: demoteError } = await supabaseAdmin
           .from('publication_issues')
           .update({ status: 'failed' })
           .eq('id', issueId)
+          .eq('status', 'processing')
+
+        if (demoteError) {
+          console.error('Failed to mark issue as failed:', formatError(demoteError))
+        }
       }
 
       throw error
@@ -194,47 +238,16 @@ export class IssueLifecycle {
       throw new Error('No active publication found')
     }
 
-    const ctParts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Chicago',
-      year: 'numeric', month: '2-digit', day: '2-digit'
-    }).format(new Date())
-    const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
-    const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
-    const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
+    const issueDate = getTomorrowStr('CST')
 
-    const { data: existing, error: existingError } = await supabaseAdmin
-      .from('publication_issues')
-      .select('id, status')
-      .eq('date', issueDate)
-      .eq('publication_id', newsletter.id)
-      .in('status', ['draft', 'processing'])
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
+    const resolved = await this.findOrCreateIssueForDate(newsletter.id, issueDate)
+    const issueId = resolved.id
 
-    if (existingError) {
-      console.error('Error checking for existing issue:', formatError(existingError))
-    }
-
-    let issueId: string
-
-    if (existing) {
-      issueId = existing.id
-      console.log(`Using existing issue ${issueId} (status: ${existing.status})`)
-    } else {
-      const { data: newissue, error } = await supabaseAdmin
-        .from('publication_issues')
-        .insert([{ date: issueDate, status: 'processing', publication_id: newsletter.id }])
-        .select('id')
-        .single()
-
-      if (error || !newissue) {
-        throw new Error('Failed to create issue')
-      }
-
-      issueId = newissue.id
-      console.log(`Created new issue ${issueId} for date ${issueDate}`)
-    }
+    console.log(
+      resolved.reused
+        ? `Using existing issue ${issueId} (status: ${resolved.status})`
+        : `Created new issue ${issueId} for date ${issueDate}`
+    )
 
     // Initialize AI Applications and Prompt Ideas if not already done
     try {

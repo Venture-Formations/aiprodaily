@@ -120,16 +120,26 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
       // Always target tomorrow in Central Time (matches send-review logic)
       const issueDate = getTomorrowStr('CST')
 
-      // Create new issue via DAL (dynamic import: pino uses Node.js modules not available in workflow context)
-      const { createIssue } = await import('@/lib/dal')
-      const newIssue = await createIssue(newsletter.id, issueDate, 'processing')
+      // Resolve the issue via DAL (dynamic import: pino uses Node.js modules not
+      // available in workflow context).
+      //
+      // Find-or-create, NOT a plain insert. Two reasons: this whole function body
+      // sits inside a retry loop, so an unconditional insert adds a row on every
+      // retry; and a second live issue for one date makes send-review refuse to
+      // send, which is what silently stopped the newsletter for 10 of 21 days.
+      const { getOrCreateLiveIssue } = await import('@/lib/dal')
+      const resolved = await getOrCreateLiveIssue(newsletter.id, issueDate, 'processing')
 
-      if (!newIssue) {
-        throw new Error('Failed to create issue')
+      if (!resolved) {
+        throw new Error(`Failed to resolve issue for ${issueDate}`)
       }
 
-      const issueId = newIssue.id
-      console.log(`[Workflow Step 1] Issue created: ${issueId} for ${issueDate}`)
+      const issueId = resolved.issue.id
+      console.log(
+        resolved.reused
+          ? `[Workflow Step 1] Reusing existing issue: ${issueId} for ${issueDate} (status: ${resolved.issue.status})`
+          : `[Workflow Step 1] Issue created: ${issueId} for ${issueDate}`
+      )
 
       // Select AI apps and prompts (non-article modules)
       try {

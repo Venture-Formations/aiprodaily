@@ -35,6 +35,13 @@ export const ISSUE_COLUMNS_BRIEF = `
   created_at, updated_at
 ` as const
 
+/**
+ * Statuses that count as a live issue for a date. Must match the predicate of
+ * idx_publication_issues_pub_date_live_unique. Terminal rows ('failed', 'sent')
+ * are excluded so they never block a fresh attempt for the same date.
+ */
+export const LIVE_ISSUE_STATUSES: IssueStatus[] = ['draft', 'processing', 'in_review', 'changes_made'] as IssueStatus[]
+
 // ==================== READ OPERATIONS ====================
 
 /**
@@ -258,6 +265,82 @@ export async function createIssue(
     return data as PublicationIssue
   } catch (err) {
     log.error({ err, publicationId, date }, 'createIssue exception')
+    return null
+  }
+}
+
+/**
+ * Resolve the live issue for a publication/date, creating one only if absent.
+ *
+ * THIS is the function every issue-creation path should use. A plain insert is
+ * not safe here: two issues for one date make send-review refuse to send, which
+ * silently stopped the newsletter for 10 of 21 days in Aug 2026. The workflow's
+ * setupIssue() also retries its whole body, so an unconditional insert would add
+ * a row on every retry.
+ *
+ * Handles the insert race explicitly: 23505 from
+ * idx_publication_issues_pub_date_live_unique means a concurrent caller won, so
+ * re-read and reuse rather than failing. The index cooperates with this function
+ * instead of turning a benign race into a hard workflow failure.
+ *
+ * Returns null only when the issue genuinely could not be resolved.
+ */
+export async function getOrCreateLiveIssue(
+  publicationId: string,
+  date: string,
+  status: IssueStatus = 'processing' as IssueStatus
+): Promise<{ issue: PublicationIssue; reused: boolean } | null> {
+  const findLive = async () => {
+    const { data, error } = await supabaseAdmin
+      .from('publication_issues')
+      .select(ISSUE_COLUMNS)
+      .eq('publication_id', publicationId)
+      .eq('date', date)
+      .in('status', LIVE_ISSUE_STATUSES)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      log.error({ err: error, publicationId, date }, 'getOrCreateLiveIssue lookup failed')
+      return { row: null, failed: true }
+    }
+    return { row: (data as PublicationIssue) ?? null, failed: false }
+  }
+
+  try {
+    const existing = await findLive()
+
+    // A failed lookup must not fall through to an insert: that turns a transient
+    // read blip into a duplicate row (or, post-index, a 23505 abort).
+    if (existing.failed) return null
+    if (existing.row) {
+      log.info({ issueId: existing.row.id, publicationId, date, status: existing.row.status }, 'Reusing live issue')
+      return { issue: existing.row, reused: true }
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('publication_issues')
+      .insert([{ date, status, publication_id: publicationId }])
+      .select(ISSUE_COLUMNS)
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        const raced = await findLive()
+        if (raced.row) {
+          log.info({ issueId: raced.row.id, publicationId, date }, 'Lost create race, reusing live issue')
+          return { issue: raced.row, reused: true }
+        }
+      }
+      log.error({ err: error, publicationId, date }, 'getOrCreateLiveIssue insert failed')
+      return null
+    }
+
+    log.info({ issueId: data.id, publicationId, date }, 'Issue created')
+    return { issue: data as PublicationIssue, reused: false }
+  } catch (err) {
+    log.error({ err, publicationId, date }, 'getOrCreateLiveIssue exception')
     return null
   }
 }

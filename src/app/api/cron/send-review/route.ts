@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { ScheduleChecker } from '@/lib/schedule-checker'
+import { SlackNotificationService } from '@/lib/slack'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
 import { getEnvironment, isProduction, shouldSkipScheduleCheck } from '@/lib/env-guard'
@@ -68,7 +69,9 @@ async function handleReviewSend(log: Logger): Promise<NextResponse> {
 
       // Find tomorrow's issue with module articles and related data
       // Uses broad select because generateEmailHTML needs many issue fields for template rendering
-      const { data: issue, error: issueError } = await supabaseAdmin
+      // Fetch up to 2 so "no draft" and "more than one draft" stay distinguishable
+      // (see db/migrations/20260831_unique_publication_issue_per_date.sql).
+      const { data: issues, error: issueError } = await supabaseAdmin
         .from('publication_issues')
         .select(`
           *,
@@ -85,12 +88,26 @@ async function handleReviewSend(log: Logger): Promise<NextResponse> {
         .eq('publication_id', pub.id)
         .eq('date', issueDate)
         .eq('status', 'draft')
-        .single()
+        .order('created_at', { ascending: true })
+        .limit(2)
 
-      if (issueError || !issue) {
+      // Both hard failures throw so they reach the Slack alert in the catch below.
+      if (issueError) {
+        throw new Error(`Draft issue query failed for ${issueDate}: ${issueError.message}`)
+      }
+
+      if (issues && issues.length > 1) {
+        // A data problem, not a quiet skip: the day cannot send until it is resolved.
+        // Guarded by idx_publication_issues_pub_date_live_unique, so this should be unreachable.
+        throw new Error(`Multiple draft issues found for ${issueDate} (${issues.map((i: any) => i.id).join(', ')}) - resolve duplicates before sending`)
+      }
+
+      if (!issues || issues.length === 0) {
         results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'No draft issue found for tomorrow' })
         continue
       }
+
+      const issue = issues[0]
 
       log.info({ issueId: issue.id, status: issue.status, slug: pub.slug }, 'Found issue')
 
@@ -149,15 +166,38 @@ async function handleReviewSend(log: Logger): Promise<NextResponse> {
       results.push({ pubId: pub.id, slug: pub.slug, success: true, message: `Review sent, campaign ${result.campaignId}` })
     } catch (error) {
       log.error({ err: error, slug: pub.slug }, '[send-review] Error processing publication')
+
+      // Mirror send-final: a failed review send must surface, not just sit in logs.
+      try {
+        const slack = new SlackNotificationService()
+        const currentCentralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })
+
+        await slack.sendScheduledSendFailureAlert(
+          `${pub.slug}:unknown`,
+          currentCentralTime,
+          error instanceof Error ? error.message : 'Unknown error',
+          {
+            operation: 'review_send',
+            timestamp: new Date().toISOString(),
+            publication_slug: pub.slug
+          }
+        )
+      } catch (slackError) {
+        log.error({ err: slackError, slug: pub.slug }, 'Failed to send Slack notification for review send failure')
+      }
+
       results.push({ pubId: pub.id, slug: pub.slug, success: false, error: String(error) })
     }
   }
 
+  // Non-200 on real failures so cron monitoring sees them (skips stay successful).
+  const hasFailures = results.some(r => !r.success && !r.skipped)
+
   return NextResponse.json({
-    success: results.every(r => r.success),
+    success: !hasFailures,
     results,
     timestamp: new Date().toISOString()
-  })
+  }, hasFailures ? { status: 500 } : undefined)
 }
 
 export const POST = withApiHandler(

@@ -51,6 +51,7 @@ import {
   listIssues,
   getIssuePublicationId,
   createIssue,
+  getOrCreateLiveIssue,
   updateIssueStatus,
 } from '../issues'
 
@@ -257,5 +258,80 @@ describe('updateIssueStatus', () => {
       expectedCurrentStatus: 'in_review',
     })
     expect(result).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getOrCreateLiveIssue
+//
+// This is the guard on the REAL production issue-creation path
+// (trigger-workflow -> processRSSWorkflow -> setupIssue). A plain insert here
+// produced two issues for one date, which made send-review refuse to send and
+// silently stopped the newsletter for 10 of 21 days in Aug 2026. setupIssue also
+// retries its whole body, so the insert must be idempotent.
+// ---------------------------------------------------------------------------
+describe('getOrCreateLiveIssue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reuses an existing live issue instead of inserting', async () => {
+    const existing = { id: 'issue-1', publication_id: 'pub-1', date: '2026-09-01', status: 'processing' }
+    mockMaybeSingle.mockResolvedValueOnce({ data: existing, error: null })
+
+    const result = await getOrCreateLiveIssue('pub-1', '2026-09-01')
+
+    expect(result).toEqual({ issue: existing, reused: true })
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  it('REGRESSION: a retry of setupIssue does not create a second issue', async () => {
+    const created = { id: 'issue-1', publication_id: 'pub-1', date: '2026-09-01', status: 'processing' }
+
+    // First attempt: nothing live -> insert
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    mockSingle.mockResolvedValueOnce({ data: created, error: null })
+    const first = await getOrCreateLiveIssue('pub-1', '2026-09-01')
+    expect(first?.reused).toBe(false)
+
+    // Retry of the same step: the row now exists and must be reused, not re-inserted
+    vi.clearAllMocks()
+    mockMaybeSingle.mockResolvedValueOnce({ data: created, error: null })
+    const second = await getOrCreateLiveIssue('pub-1', '2026-09-01')
+
+    expect(second).toEqual({ issue: created, reused: true })
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  it('recovers from a lost insert race (23505) by re-reading', async () => {
+    const winner = { id: 'issue-winner', publication_id: 'pub-1', date: '2026-09-01', status: 'processing' }
+
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })      // nothing live yet
+    mockSingle.mockResolvedValueOnce({ data: null, error: { code: '23505', message: 'duplicate key' } })
+    mockMaybeSingle.mockResolvedValueOnce({ data: winner, error: null })    // re-read finds the winner
+
+    const result = await getOrCreateLiveIssue('pub-1', '2026-09-01')
+
+    expect(result).toEqual({ issue: winner, reused: true })
+  })
+
+  it('returns null on a lookup error rather than inserting a duplicate', async () => {
+    // A transient read failure must not fall through to an insert — that would
+    // turn a blip into a second live issue (or a 23505 abort once indexed).
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: { code: '57014', message: 'statement timeout' } })
+
+    const result = await getOrCreateLiveIssue('pub-1', '2026-09-01')
+
+    expect(result).toBeNull()
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  it('returns null when the insert fails for a non-conflict reason', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    mockSingle.mockResolvedValueOnce({ data: null, error: { code: '23503', message: 'fk violation' } })
+
+    const result = await getOrCreateLiveIssue('pub-1', '2026-09-01')
+
+    expect(result).toBeNull()
   })
 })

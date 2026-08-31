@@ -13,6 +13,8 @@ export {
   getIssueWithArticles,
   getIssuePublicationId,
   createIssue,
+  getOrCreateLiveIssue,
+  LIVE_ISSUE_STATUSES,
   updateIssueStatus,
   updateWorkflowState,
   failWorkflowState,

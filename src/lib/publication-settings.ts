@@ -705,6 +705,36 @@ export async function getFacebookSettings(publicationId: string): Promise<{
   }
 }
 
+/**
+ * Read a setting from publication_settings ONLY — never falls back to app_settings.
+ *
+ * Use this for per-publication state where a global value would be wrong.
+ * `getPublicationSetting` falls back to `app_settings` by bare key, and that table
+ * still holds legacy tenant-agnostic rows (last_rss_processing_run,
+ * last_review_send_run, last_final_send_run, ... all frozen in 2025), so a
+ * publication with no row of its own would silently read another era's global value.
+ *
+ * Returns null when the publication has no row for the key.
+ */
+export async function getPublicationOwnSetting(
+  publicationId: string,
+  key: string
+): Promise<{ value: string | null; error?: string }> {
+  const { data, error } = await supabaseAdmin
+    .from('publication_settings')
+    .select('value')
+    .eq('publication_id', publicationId)
+    .eq('key', key)
+    .maybeSingle()
+
+  if (error) {
+    console.error(`[SETTINGS] Error reading ${key} for publication ${publicationId}:`, error)
+    return { value: null, error: error.message }
+  }
+
+  return { value: data?.value ?? null }
+}
+
 // ==================== MIGRATION HELPER ====================
 
 /**

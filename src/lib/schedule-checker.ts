@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase'
 import { getScheduleConfig } from './settings/schedule-settings'
+import { getPublicationOwnSetting, updatePublicationSetting } from './publication-settings'
 import { getTodayStr, getTomorrowStr } from './date-utils'
 
 interface ScheduleSettings {
@@ -42,51 +43,99 @@ export class ScheduleChecker {
     return { hours, minutes }
   }
 
-  private static isTimeToRun(currentTime: string, scheduledTime: string, lastRunKey: string, newsletterId: string): Promise<boolean> {
-    return new Promise(async (resolve) => {
-      const current = this.parseTime(currentTime)
-      const scheduled = this.parseTime(scheduledTime)
+  /**
+   * Minutes after the scheduled time during which a tick still counts as "on time".
+   *
+   * MUST equal the cron tick period (5 min) minus 1. A forward window of width W
+   * spans W+1 consecutive minutes; any 5 consecutive integers contain exactly one
+   * multiple of 5, so W=4 admits exactly one tick under any uniform dispatch slip.
+   * W=3 spans only 4 minutes, which can contain NO grid tick -- that silently loses
+   * the whole day, and for an off-grid schedule minute it loses every day.
+   */
+  private static readonly RUN_WINDOW_MINUTES = 4
 
-      // Check if current time matches scheduled time (within 4-minute window)
-      // This prevents duplicate runs at scheduled time + 5 minutes
-      const currentMinutes = current.hours * 60 + current.minutes
-      const scheduledMinutes = scheduled.hours * 60 + scheduled.minutes
-      const timeDiff = Math.abs(currentMinutes - scheduledMinutes)
+  /**
+   * True when this tick is the day's run for `lastRunKey`.
+   *
+   * Two independent guards, because either alone has failed in production:
+   *
+   * 1. The window is FORWARD-ONLY. It used to be `Math.abs(diff) > 4`, i.e.
+   *    +/-4 minutes, which on a 5-minute cron leaves 60s of margin: with a 19:50
+   *    schedule the tick nominally at 19:45 also qualified whenever platform
+   *    dispatch slipped and it observed 19:46. Two ticks passed, two workflows ran,
+   *    two issues were created for one date, and the newsletter silently stopped
+   *    sending. Cron dispatch slips late, never early, so refusing negative diffs
+   *    makes the early tick structurally impossible, while keeping the width at a
+   *    full tick period guarantees one tick still lands. See RUN_WINDOW_MINUTES.
+   *
+   * 2. The `last_*_run` marker makes the day idempotent regardless of window math.
+   *    This is the guard that absorbs the residual case the window cannot: slip
+   *    that VARIES between consecutive ticks can still put two of them in range.
+   */
+  private static async isTimeToRun(currentTime: string, scheduledTime: string, lastRunKey: string, newsletterId: string): Promise<boolean> {
+    const current = this.parseTime(currentTime)
+    const scheduled = this.parseTime(scheduledTime)
 
-      if (timeDiff > 4) {
-        console.log(`Time window not matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, diff ${timeDiff} minutes`)
-        resolve(false)
-        return
-      }
+    const currentMinutes = current.hours * 60 + current.minutes
+    const scheduledMinutes = scheduled.hours * 60 + scheduled.minutes
 
-      console.log(`Time window matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, diff ${timeDiff} minutes`)
+    // Measure "minutes after scheduled" around the clock. Without the wrap, a
+    // schedule at 23:56-23:59 would never fire: its window runs past midnight, the
+    // 23:55 tick reads negative, and the 00:00 tick reads -1438. Both rejected,
+    // every day, silently. A 5-minute-wide window on the circular 1440-minute clock
+    // still contains exactly one */5 tick, so the guarantee is unchanged.
+    const minutesAfterScheduled = (currentMinutes - scheduledMinutes + 1440) % 1440
 
-      // Allow running multiple times per day for testing purposes
-      // Only check if time window matches, don't prevent multiple runs per day
-      try {
-        const today = getTodayStr('CST')
+    if (minutesAfterScheduled > this.RUN_WINDOW_MINUTES) {
+      console.log(`Time window not matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, ${minutesAfterScheduled} minutes after`)
+      return false
+    }
 
-        // Update the last run date to today (for logging/tracking purposes only)
-        await supabaseAdmin
-          .from('publication_settings')
-          .upsert({
-            publication_id: newsletterId,
-            key: lastRunKey,
-            value: today,
-            description: `Last run date for ${lastRunKey}`,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'publication_id,key'
-          })
+    console.log(`Time window matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, ${minutesAfterScheduled} minutes after`)
 
-        console.log(`${lastRunKey} running at ${currentTime} (last run tracking updated to ${today})`)
-        resolve(true)
-      } catch (error) {
-        console.error(`Error updating last run for ${lastRunKey}:`, error)
-        // Still allow the run even if tracking update fails
-        resolve(true)
-      }
-    })
+    const today = getTodayStr('CST')
+
+    if (await this.hasRunOn(lastRunKey, newsletterId, today)) {
+      console.log(`${lastRunKey} already ran today (${today}) - skipping duplicate run`)
+      return false
+    }
+
+    // Claim today's slot before returning true, so any later tick backs off.
+    const { success, error } = await updatePublicationSetting(newsletterId, lastRunKey, today)
+    if (!success) {
+      // Fail open: a write blip should not cancel the day's send.
+      console.error(`Error updating last run for ${lastRunKey}:`, error)
+    } else {
+      console.log(`${lastRunKey} running at ${currentTime} (last run marked ${today})`)
+    }
+
+    return true
+  }
+
+  /**
+   * Reads the `last_*_run` marker for this publication.
+   *
+   * Uses the no-fallback reader deliberately: `getPublicationSetting` would fall
+   * back to `app_settings`, which still holds legacy tenant-agnostic `last_*_run`
+   * rows from 2025.
+   *
+   * Fails open (returns false) on a read error so a transient DB blip cannot
+   * silently cancel a day's send. This is safe -- do NOT "harden" it to fail
+   * closed. The marker is not what prevents a duplicate send: each stage is
+   * already idempotent via its own status transition (send-final only selects
+   * in_review/changes_made and sets 'sent'; the workflow reuses an existing issue
+   * for the date). Failing closed would trade a duplicate that cannot happen for
+   * a missed send that can.
+   */
+  private static async hasRunOn(lastRunKey: string, newsletterId: string, today: string): Promise<boolean> {
+    const { value, error } = await getPublicationOwnSetting(newsletterId, lastRunKey)
+
+    if (error) {
+      console.error(`Error reading last run for ${lastRunKey}:`, error)
+      return false
+    }
+
+    return value === today
   }
 
   static async shouldRunRSSProcessing(newsletterId: string): Promise<boolean> {
@@ -159,21 +208,34 @@ export class ScheduleChecker {
       // Check if there's a draft issue for tomorrow with no review_sent_at
       const issueDate = getTomorrowStr('CST')
 
-      const { data: draftIssue } = await supabaseAdmin
+      // Fetch up to 2. This used to be .maybeSingle(), which returns PGRST116 on
+      // multiple rows -- the same collapse that broke send-review. With two drafts
+      // for a date it discarded the error and returned false, so the catch-up path
+      // was itself disabled by the very duplicates it existed to rescue.
+      const { data: draftIssues, error } = await supabaseAdmin
         .from('publication_issues')
         .select('id, status, review_sent_at')
         .eq('publication_id', newsletterId)
         .eq('date', issueDate)
         .eq('status', 'draft')
         .is('review_sent_at', null)
-        .maybeSingle()
+        .order('created_at', { ascending: true })
+        .limit(2)
 
-      if (draftIssue) {
-        console.log(`[ScheduleChecker] Catch-up: Found unsent draft issue ${draftIssue.id} for ${issueDate}, ${minutesAfter} min after scheduled time`)
-        return true
+      if (error) {
+        console.error(`[ScheduleChecker] Catch-up: failed to query draft issue for ${issueDate}:`, error)
+        return false
       }
 
-      return false
+      if (!draftIssues || draftIssues.length === 0) return false
+
+      if (draftIssues.length > 1) {
+        console.error(`[ScheduleChecker] Catch-up: ${draftIssues.length} unsent drafts for ${issueDate} (${draftIssues.map(i => i.id).join(', ')}) - refusing to catch up until duplicates are resolved`)
+        return false
+      }
+
+      console.log(`[ScheduleChecker] Catch-up: Found unsent draft issue ${draftIssues[0].id} for ${issueDate}, ${minutesAfter} min after scheduled time`)
+      return true
     } catch (error) {
       console.error('Error in catch-up review send check:', error)
       return false
