@@ -6,9 +6,28 @@ import { generateFullNewsletterHtml } from '../newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
 import { getEnvironment, isProduction } from '../env-guard'
 import { isCircuitOpen, recordRateLimitHit } from '../remediation/circuit-breaker'
-import { getTodayStr } from '../date-utils'
+import { getTodayStr, chicagoWallClockToUtc } from '../date-utils'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
+
+/**
+ * MailerLite's timezone id for Central Time. Hardcoded as the default in every
+ * schedule builder below, and the only value any publication currently uses.
+ */
+const MAILERLITE_CENTRAL_TIMEZONE_ID = 157
+
+/**
+ * Minimum lead time we will ever ask MailerLite to schedule for.
+ *
+ * MailerLite 422s any schedule at or before "now". The secondary send is
+ * created at 05:20 CT and configured to send at 05:25 CT, but building the
+ * campaign and pushing content takes ~5 minutes, so the schedule POST asked for
+ * a time that had just passed -- every week, silently, leaving the campaign as
+ * an unsent draft. Configured times are a target, not a guarantee: when the
+ * campaign simply isn't ready in time, going out a few minutes late beats not
+ * going out at all.
+ */
+const SCHEDULE_MIN_LEAD_MINUTES = 5
 
 /** MailerLite global limit ~120 requests/min. This app shares the account with Make.com (e.g. link-click → CreateUpdateSubscriber). */
 const MAILERLITE_RATE_LIMIT_RETRY_ATTEMPTS = 2
@@ -477,6 +496,71 @@ United States
   }
 
 
+  /**
+   * Guarantees the schedule payload points at least SCHEDULE_MIN_LEAD_MINUTES
+   * into the future, so MailerLite cannot reject it as being in the past.
+   *
+   * Applied to every schedule builder, not just the secondary one: the primary
+   * final send has the same shape with only 5 minutes of configured margin and
+   * fails the same way on any slow run.
+   *
+   * Only Central Time can be checked -- the timezone is a MailerLite numeric id
+   * with no mapping on our side. For any other id the payload is passed through
+   * untouched, because silently moving a send in a timezone we cannot interpret
+   * would be worse than the rejection it is meant to prevent.
+   */
+  private applyScheduleLeadGuard(scheduleData: any, label: string): any {
+    const schedule = scheduleData?.schedule
+    if (!schedule) return scheduleData
+
+    if (schedule.timezone_id !== MAILERLITE_CENTRAL_TIMEZONE_ID) {
+      console.warn(
+        `[MailerLite] ${label}: timezone_id ${schedule.timezone_id} is not Central - skipping lead-time guard`
+      )
+      return scheduleData
+    }
+
+    const target = chicagoWallClockToUtc(
+      schedule.date,
+      parseInt(schedule.hours, 10),
+      parseInt(schedule.minutes, 10)
+    )
+    const earliest = new Date(Date.now() + SCHEDULE_MIN_LEAD_MINUTES * 60_000)
+    if (target.getTime() >= earliest.getTime()) return scheduleData
+
+    // Round up to the next whole minute: MailerLite's schedule granularity is
+    // minutes, so truncating could land us back on "now".
+    const substitute = new Date(Math.ceil(earliest.getTime() / 60_000) * 60_000)
+    // hourCycle 'h23' rather than hour12:false: the latter renders midnight as
+    // "24:00" on some ICU builds, and that hour belongs to the *previous*
+    // calendar date, so pairing it with the formatted date would land the send a
+    // full day early.
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Chicago',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(substitute)
+    const get = (type: string) => parts.find(p => p.type === type)!.value
+
+    const guarded = {
+      ...scheduleData,
+      schedule: {
+        ...schedule,
+        date: `${get('year')}-${get('month')}-${get('day')}`,
+        hours: get('hour'),
+        minutes: get('minute'),
+      },
+    }
+
+    console.warn(
+      `[MailerLite] ${label}: configured send time ${schedule.date} ${schedule.hours}:${schedule.minutes} CT ` +
+      `is within ${SCHEDULE_MIN_LEAD_MINUTES} minutes of now - sending at ` +
+      `${guarded.schedule.date} ${guarded.schedule.hours}:${guarded.schedule.minutes} CT instead`
+    )
+
+    return guarded
+  }
+
   private async getReviewScheduleData(date: string, publicationId: string): Promise<any> {
     try {
       // Get scheduled send time from publication_settings (with fallback to app_settings)
@@ -501,20 +585,20 @@ United States
       }
 
       console.log('MailerLite schedule data:', JSON.stringify(scheduleData, null, 2))
-      return scheduleData
+      return this.applyScheduleLeadGuard(scheduleData, 'review send')
 
     } catch (error) {
       console.error('Error getting review schedule data, using default:', error)
       // Fallback to 9:00 PM CT
-      return {
+      return this.applyScheduleLeadGuard({
         delivery: 'scheduled',
         schedule: {
           date: date,
           hours: '21',
           minutes: '00',
-          timezone_id: 157
+          timezone_id: MAILERLITE_CENTRAL_TIMEZONE_ID
         }
-      }
+      }, 'review send (fallback)')
     }
   }
 
@@ -542,20 +626,20 @@ United States
       }
 
       console.log('Final issue schedule data:', JSON.stringify(scheduleData, null, 2))
-      return scheduleData
+      return this.applyScheduleLeadGuard(scheduleData, 'final send')
 
     } catch (error) {
       console.error('Error getting final schedule data, using default:', error)
       // Fallback to 4:55 AM CT on the newsletter date
-      return {
+      return this.applyScheduleLeadGuard({
         delivery: 'scheduled',
         schedule: {
           date: date,
           hours: '04',
           minutes: '55',
-          timezone_id: 157
+          timezone_id: MAILERLITE_CENTRAL_TIMEZONE_ID
         }
-      }
+      }, 'final send (fallback)')
     }
   }
 
@@ -564,7 +648,7 @@ United States
       // Get secondary send time from publication_settings
       const secondaryTime = await getPublicationSetting(publicationId, 'email_secondaryScheduledSendTime')
       const timezoneIdStr = await getPublicationSetting(publicationId, 'email_timezone_id')
-      const timezoneId = timezoneIdStr ? parseInt(timezoneIdStr, 10) : 157 // Default to Central Time
+      const timezoneId = timezoneIdStr ? parseInt(timezoneIdStr, 10) : MAILERLITE_CENTRAL_TIMEZONE_ID // Default to Central Time
 
       const finalTime = secondaryTime || '04:55' // Default if not set
 
@@ -585,20 +669,20 @@ United States
       }
 
       console.log('Secondary issue schedule data:', JSON.stringify(scheduleData, null, 2))
-      return scheduleData
+      return this.applyScheduleLeadGuard(scheduleData, 'secondary send')
 
     } catch (error) {
       console.error('Error getting secondary schedule data, using default:', error)
       // Fallback to 4:55 AM CT on the newsletter date
-      return {
+      return this.applyScheduleLeadGuard({
         delivery: 'scheduled',
         schedule: {
           date: date,
           hours: '04',
           minutes: '55',
-          timezone_id: 157
+          timezone_id: MAILERLITE_CENTRAL_TIMEZONE_ID
         }
-      }
+      }, 'secondary send (fallback)')
     }
   }
 
@@ -656,7 +740,7 @@ United States
 
         // Schedule for now + 2 minutes
         const timezoneIdStr = await getPublicationSetting(issue.publication_id, 'email_timezone_id')
-        const timezoneId = timezoneIdStr ? parseInt(timezoneIdStr, 10) : 157
+        const timezoneId = timezoneIdStr ? parseInt(timezoneIdStr, 10) : MAILERLITE_CENTRAL_TIMEZONE_ID
 
         const nowCentral = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
         const centralDate = new Date(nowCentral)
@@ -778,9 +862,19 @@ United States
 
         // Schedule the final issue for TODAY at scheduled send time
         // issue is created at issue Creation Time and scheduled to send same day at Scheduled Send Time
+        // Whether MailerLite accepted the schedule. A created-but-unscheduled
+        // campaign never sends, so callers must surface this.
+        let scheduled = true
+        let scheduleError: string | undefined
+
+        // Hoisted so the catch below reports the payload that was actually sent.
+        // It used to recompute with getFinalScheduleData(issue.date), which for a
+        // secondary send is a different builder and a different time -- every
+        // logged failure named a payload that had never been near the wire.
+        let finalScheduleData: any
         try {
           const today = getTodayStr('CST')
-          const finalScheduleData = isSecondary
+          finalScheduleData = isSecondary
             ? await this.getSecondaryScheduleData(today, issue.publication_id)
             : await this.getFinalScheduleData(today, issue.publication_id)
           console.log(`Scheduling ${isSecondary ? 'secondary' : 'final'} issue for today with data:`, finalScheduleData)
@@ -796,14 +890,26 @@ United States
           if (scheduleResponse.status === 200 || scheduleResponse.status === 201) {
             console.log('Final issue scheduled successfully')
           } else {
+            scheduled = false
+            scheduleError = `MailerLite returned ${scheduleResponse.status}`
             console.error('Failed to schedule final issue:', scheduleResponse.status, scheduleResponse.data)
+            await this.logError('Failed to schedule final issue', {
+              issueId: issue.id,
+              mailerliteissueId: issueId,
+              scheduleData: finalScheduleData,
+              errorStatus: scheduleResponse.status,
+              errorData: scheduleResponse.data
+            })
           }
-        } catch (scheduleError) {
-          console.error('Error scheduling final issue:', scheduleError)
+        } catch (err) {
+          scheduled = false
+          console.error('Error scheduling final issue:', err)
 
           // Log detailed error information for debugging
-          if (scheduleError && typeof scheduleError === 'object' && 'response' in scheduleError) {
-            const axiosError = scheduleError as any
+          if (err && typeof err === 'object' && 'response' in err) {
+            const axiosError = err as any
+            scheduleError = axiosError.response?.data?.message
+              ?? (err instanceof Error ? err.message : String(err))
             console.error('MailerLite final schedule API error response:', {
               status: axiosError.response?.status,
               statusText: axiosError.response?.statusText,
@@ -816,7 +922,6 @@ United States
             })
 
             // Log to database for persistent tracking
-            const finalScheduleData = await this.getFinalScheduleData(issue.date, issue.publication_id)
             await this.logError('Failed to schedule final issue', {
               issueId: issue.id,
               mailerliteissueId: issueId,
@@ -824,9 +929,20 @@ United States
               errorStatus: axiosError.response?.status,
               errorData: axiosError.response?.data
             })
+          } else {
+            scheduleError = err instanceof Error ? err.message : String(err)
+            await this.logError('Failed to schedule final issue', {
+              issueId: issue.id,
+              mailerliteissueId: issueId,
+              scheduleData: finalScheduleData,
+              errorData: scheduleError
+            })
           }
 
-          // Don't fail the whole process if scheduling fails - issue is still created
+          // Don't fail the whole process if scheduling fails - the campaign exists
+          // and can be scheduled by hand. The caller is told via `scheduled: false`
+          // and must alert on it: an unscheduled campaign never sends, and this
+          // went unnoticed for months while it returned a bare `success: true`.
         }
 
         // Store MailerLite issue ID in email_metrics table ONLY for primary final send (not secondary)
@@ -870,12 +986,13 @@ United States
         await this.logInfo('Final issue created successfully', {
           issueId: issue.id,
           mailerliteissueId: issueId,
-          mainGroupId: mainGroupId
+          mainGroupId: mainGroupId,
+          scheduled
         })
 
         await this.slack.sendEmailIssueAlert('final', true, issue.id)
 
-        return { success: true, issueId }
+        return { success: true, issueId, scheduled, scheduleError, scheduleData: finalScheduleData }
       }
 
       throw new Error('Failed to create final issue')

@@ -516,7 +516,7 @@ describe('MailerLiteService.createFinalissue', () => {
 
     const result = await new MailerLiteService().createFinalissue(makeIssue(), 'main-group-1', false)
 
-    expect(result).toEqual({ success: true, issueId: 'ml-campaign-99' })
+    expect(result).toMatchObject({ success: true, issueId: 'ml-campaign-99', scheduled: true })
     const metricsInsert = supabase.insertCalls.find(c => 'mailerlite_issue_id' in c)
     expect(metricsInsert?.mailerlite_issue_id).toBe('ml-campaign-99')
     expect(metricsInsert?.issue_id).toBe('issue-uuid-1')
@@ -734,5 +734,194 @@ describe('MailerLiteService.updateSubscriberField', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('server boom')
+  })
+})
+
+// ===========================================================================
+// Schedule lead-time guard
+//
+// Production regression (25 occurrences, 2026-06 .. 2026-09): the secondary
+// send is created at 05:20 CT and configured to send at 05:25 CT. Building the
+// campaign and pushing content takes ~5 minutes, so the schedule POST landed at
+// 05:25:11-05:25:54 asking for 05:25:00. MailerLite 422s any schedule at or
+// before "now", the failure was swallowed, and the campaign sat as an unsent
+// draft every single week.
+// ===========================================================================
+describe('MailerLiteService schedule lead-time guard', () => {
+  function scheduleCallPayload() {
+    const call = mockClient.post.mock.calls.find((c: any[]) => String(c[0]).includes('/schedule'))
+    return call?.[1]?.schedule
+  }
+
+  function secondaryAt(sendTime: string, timezoneId = '157') {
+    mockedGetPublicationSetting.mockImplementation(async (_pubId: string, key: string) => {
+      if (key === 'email_timezone_id') return timezoneId
+      if (key === 'email_secondaryScheduledSendTime') return sendTime
+      return null
+    })
+  }
+
+  it('pushes a schedule time that has already passed forward to now + 5 minutes', async () => {
+    vi.useFakeTimers()
+    // 2026-09-10 10:25:54 UTC === 05:25:54 CDT - the exact production failure.
+    vi.setSystemTime(new Date('2026-09-10T10:25:54Z'))
+    setupCampaignHappyPath()
+    secondaryAt('05:25')
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule).toBeDefined()
+    expect(schedule.date).toBe('2026-09-10')
+    // now + 5 min = 05:30:54 CDT, rounded up to the next whole minute.
+    expect(schedule.hours + ':' + schedule.minutes).toBe('05:31')
+  })
+
+  it('rolls the date forward when now + 5 minutes crosses midnight', async () => {
+    vi.useFakeTimers()
+    // 2026-09-11 04:57:00 UTC === 2026-09-10 23:57 CDT
+    vi.setSystemTime(new Date('2026-09-11T04:57:00Z'))
+    setupCampaignHappyPath()
+    secondaryAt('05:25')
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.date).toBe('2026-09-11')
+    expect(schedule.hours + ':' + schedule.minutes).toBe('00:02')
+  })
+
+  it('leaves a schedule time that is comfortably in the future untouched', async () => {
+    vi.useFakeTimers()
+    // 2026-09-10 06:00 UTC === 01:00 CDT - 05:25 CDT is 4h25m away.
+    vi.setSystemTime(new Date('2026-09-10T06:00:00Z'))
+    setupCampaignHappyPath()
+    secondaryAt('05:25')
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.date).toBe('2026-09-10')
+    expect(schedule.hours + ':' + schedule.minutes).toBe('05:25')
+  })
+
+  it('passes the payload through unchanged for a non-Central timezone_id', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-10T10:25:54Z'))
+    setupCampaignHappyPath()
+    secondaryAt('05:25', '42') // not Central - we cannot interpret it
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.hours + ':' + schedule.minutes).toBe('05:25')
+    expect(schedule.timezone_id).toBe(42)
+  })
+
+  it('also guards the primary final send, which has only 5 minutes of margin', async () => {
+    vi.useFakeTimers()
+    // 05:26 CDT, primary configured for 05:30, so only 4 minutes of lead.
+    vi.setSystemTime(new Date('2026-09-10T10:26:00Z'))
+    setupCampaignHappyPath()
+    mockedGetScheduleSettings.mockResolvedValue({
+      review_send_time: '21:00',
+      final_send_time: '05:30',
+      timezone_id: 157,
+    })
+    supabase.responseQueue.push({ data: null, error: null }) // email_metrics lookup
+    supabase.responseQueue.push({ data: null, error: null }) // email_metrics insert
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'main-group-1', false
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.hours + ':' + schedule.minutes).toBe('05:31')
+  })
+})
+
+// ===========================================================================
+// Schedule failure reporting
+// ===========================================================================
+describe('MailerLiteService schedule failure reporting', () => {
+  function scheduleRejects() {
+    mockClient.post.mockImplementation(async (url: string) => {
+      if (url === '/campaigns') {
+        return { status: 201, statusText: 'Created', data: { data: { id: 'ml-campaign-99' } }, headers: {} }
+      }
+      if (url.includes('/schedule')) {
+        const err: any = new Error('Request failed with status code 422')
+        err.response = {
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          data: { message: 'The schedule date must be a date after or equal to 2026-09-10 05:25.' },
+        }
+        err.config = { url, method: 'post' }
+        throw err
+      }
+      return { status: 200, data: {} }
+    })
+  }
+
+  it('reports scheduled:false and surfaces the MailerLite message when the schedule POST 422s', async () => {
+    setupCampaignHappyPath()
+    scheduleRejects()
+
+    const result = await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    expect(result.success).toBe(true) // campaign exists; the send flow must not abort
+    expect(result.scheduled).toBe(false)
+    expect(result.scheduleError).toMatch(/after or equal to/)
+  })
+
+  it('logs the schedule payload that was actually sent, not a recomputed one', async () => {
+    vi.useFakeTimers()
+    // 01:00 CDT, so the configured 05:25 is comfortably ahead and the lead-time
+    // guard leaves it alone -- this test is about which builder was used.
+    vi.setSystemTime(new Date('2026-09-10T06:00:00Z'))
+    setupCampaignHappyPath()
+    mockedGetPublicationSetting.mockImplementation(async (_pubId: string, key: string) => {
+      if (key === 'email_timezone_id') return '157'
+      if (key === 'email_secondaryScheduledSendTime') return '05:25'
+      return null
+    })
+    // Primary builds 04:55; secondary builds 05:25. The old catch block
+    // recomputed with the primary builder, so every log row reported a payload
+    // that was never sent.
+    mockedGetScheduleSettings.mockResolvedValue({
+      review_send_time: '21:00', final_send_time: '04:55', timezone_id: 157,
+    })
+    scheduleRejects()
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    const logRow = supabase.insertCalls
+      .flat()
+      .find((c: any) => c?.message === 'Failed to schedule final issue')
+    expect(logRow).toBeDefined()
+    const logged = logRow.context.scheduleData.schedule
+    expect(logged.hours + ':' + logged.minutes).toBe('05:25')
+  })
+
+  it('reports scheduled:true on the happy path', async () => {
+    setupCampaignHappyPath()
+
+    const result = await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    expect(result.scheduled).toBe(true)
   })
 })

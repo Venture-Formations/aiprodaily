@@ -314,3 +314,131 @@ describe('send-secondary cron', () => {
     expect(sendGridFinalMock).not.toHaveBeenCalled()
   })
 })
+
+const slackAlertMock = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/slack', () => ({
+  SlackNotificationService: class MockSlackService {
+    sendScheduledSendFailureAlert = slackAlertMock
+  },
+}))
+
+// ===========================================================================
+// Weekday timezone regression
+//
+// Production bug: the send-day check read the weekday off `new Date().getDay()`,
+// which is UTC on Vercel, while the issue was resolved by CT date. Between
+// 19:00 CT and midnight CT the two disagree, so AI Accounting Daily's
+// Thursday-only secondary fired every Wednesday evening against Wednesday's
+// already-sent issue and scheduled it for a time 13 hours in the past.
+// ===========================================================================
+describe('send-secondary cron - send day is evaluated in Central Time', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    setupFromMock()
+    getEmailProviderSettingsMock.mockResolvedValue({ provider: 'sendgrid' })
+    sendGridFinalMock.mockResolvedValue({ success: true, campaignId: 'sg-1', issueId: 'issue-1' })
+    mailerliteFinalMock.mockResolvedValue({ success: true, issueId: 'ml-1', scheduled: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('does not fire Wednesday evening CT even though the UTC clock says Thursday', async () => {
+    // 2026-09-10 00:30 UTC === 2026-09-09 19:30 CDT (Wednesday)
+    vi.setSystemTime(new Date('2026-09-10T00:30:00Z'))
+    setupSettings({ secondary_send_days: '[4]' }) // Thursday only
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(body.results[0].skipped).toBe(true)
+    expect(body.results[0].message).toMatch(/Not a configured send day \(3\)/)
+    expect(sendGridFinalMock).not.toHaveBeenCalled()
+  })
+
+  it('fires on Thursday morning CT', async () => {
+    // 2026-09-10 10:30 UTC === 2026-09-10 05:30 CDT (Thursday)
+    vi.setSystemTime(new Date('2026-09-10T10:30:00Z'))
+    setupSettings({ secondary_send_days: '[4]' })
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(body.success).toBe(true)
+    expect(sendGridFinalMock).toHaveBeenCalled()
+  })
+
+  it('still fires Wednesday evening CT when Wednesday is a configured send day', async () => {
+    vi.setSystemTime(new Date('2026-09-10T00:30:00Z')) // Wed 19:30 CDT
+    setupSettings({ secondary_send_days: '[3]' })
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(body.success).toBe(true)
+    expect(sendGridFinalMock).toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// Unscheduled-campaign reporting
+//
+// createFinalissue deliberately does not throw when MailerLite rejects the
+// schedule, so this path returned a bare success for months while the campaign
+// sat in MailerLite as an unsent draft.
+// ===========================================================================
+describe('send-secondary cron - unscheduled campaign is surfaced', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(TODAY_LOCAL)
+    vi.clearAllMocks()
+    setupFromMock()
+    setupSettings()
+    getEmailProviderSettingsMock.mockResolvedValue({ provider: 'mailerlite', secondaryGroupId: 'g-1' })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('alerts Slack when the campaign was created but not scheduled', async () => {
+    const { updateMock } = setupFromMock()
+    setupSettings()
+    mailerliteFinalMock.mockResolvedValue({
+      success: true,
+      issueId: 'ml-1',
+      scheduled: false,
+      scheduleError: 'The schedule date must be a date after or equal to 2026-09-10 05:25.',
+      scheduleData: { schedule: { date: '2026-09-10', hours: '05', minutes: '25' } },
+    })
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(slackAlertMock).toHaveBeenCalledWith(
+      'issue-1',
+      expect.stringContaining('05:25'),
+      expect.stringMatching(/after or equal to/),
+      expect.anything()
+    )
+    // The campaign exists in MailerLite, so the send is still recorded: retrying
+    // would create a duplicate campaign rather than fix the unscheduled one.
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ secondary_sent_at: expect.any(String) })
+    )
+    expect(body.results[0].success).toBe(true)
+    expect(body.results[0].message).toMatch(/not scheduled/i)
+  })
+
+  it('does not alert when the campaign scheduled cleanly', async () => {
+    mailerliteFinalMock.mockResolvedValue({ success: true, issueId: 'ml-1', scheduled: true })
+
+    const response = await GET(buildRequest(), { params: Promise.resolve({}) })
+    const body = await response.json()
+
+    expect(slackAlertMock).not.toHaveBeenCalled()
+    expect(body.results[0].success).toBe(true)
+  })
+})

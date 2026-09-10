@@ -86,6 +86,36 @@ export function getTodayStr(tz: SupportedTz): string {
 }
 
 /**
+ * Get the day of the week (0 = Sunday .. 6 = Saturday) in the given timezone.
+ *
+ * Derived from `getTodayStr(tz)` on purpose, rather than from a second,
+ * independent clock read. `send-secondary` used to take the weekday from
+ * `new Date().getDay()` (UTC on Vercel) while resolving the issue by CT date;
+ * between 19:00 CT and midnight CT those disagree, so a Thursday-only send
+ * fired on Wednesday evening against Wednesday's already-sent issue. Sharing
+ * the single date string makes that class of skew structurally impossible.
+ *
+ * The noon-UTC probe keeps the weekday stable across DST transitions.
+ */
+export function getDayOfWeek(tz: SupportedTz): number {
+  const [y, m, d] = getTodayStr(tz).split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()
+}
+
+/**
+ * Convert a Chicago wall-clock time (calendar date + hours/minutes, as stored in
+ * `publication_settings`) to the UTC instant it refers to. DST-aware.
+ *
+ * Used to check a MailerLite schedule target against "now" before POSTing it:
+ * MailerLite rejects any schedule at or before the current time, and the
+ * settings only carry a local wall clock.
+ */
+export function chicagoWallClockToUtc(dateStr: string, hours: number, minutes: number): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, hours, minutes) + getChicagoOffsetMs(dateStr))
+}
+
+/**
  * Get a date string N days ago in the given timezone.
  */
 export function getDaysAgoStr(days: number, tz: SupportedTz): string {

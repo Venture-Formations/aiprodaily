@@ -6,6 +6,8 @@ import {
   getTodayStr,
   getDaysAgoStr,
   getTomorrowStr,
+  getDayOfWeek,
+  chicagoWallClockToUtc,
 } from '../date-utils'
 
 // vitest.config.ts pins TZ=UTC, so server-local time === UTC in tests.
@@ -150,5 +152,62 @@ describe('buildDateRangeBoundaries', () => {
     const { startDate, endDate } = buildDateRangeBoundaries('2025-11-02', '2025-11-03', 'CST')
     expect(startDate.toISOString()).toBe('2025-11-02T06:00:00.000Z')
     expect(endDate.toISOString()).toBe('2025-11-04T05:59:59.999Z')
+  })
+})
+
+describe('getDayOfWeek — fake-time', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // The production regression this guards: send-secondary read the weekday off a
+  // UTC clock while resolving the issue by CT date. Between 19:00 CT and midnight
+  // CT the two disagree, so a Thursday-only send fired on Wednesday evening
+  // against Wednesday's already-sent issue.
+  it('returns the CT weekday, not the UTC weekday, during the evening skew window', () => {
+    // 2026-09-10 00:30 UTC === 2026-09-09 19:30 CDT (Wednesday)
+    vi.setSystemTime(new Date('2026-09-10T00:30:00Z'))
+    expect(getDayOfWeek('CST')).toBe(3) // Wednesday
+    expect(getDayOfWeek('UTC')).toBe(4) // Thursday
+  })
+
+  it('agrees with UTC outside the skew window', () => {
+    vi.setSystemTime(new Date('2026-09-10T18:00:00Z'))
+    expect(getDayOfWeek('CST')).toBe(4)
+    expect(getDayOfWeek('UTC')).toBe(4)
+  })
+
+  it('is derived from the same string getTodayStr returns', () => {
+    vi.setSystemTime(new Date('2026-01-01T05:30:00Z')) // 2025-12-31 23:30 CST
+    expect(getTodayStr('CST')).toBe('2025-12-31')
+    expect(getDayOfWeek('CST')).toBe(3) // 2025-12-31 was a Wednesday
+  })
+
+  it('is stable across a spring-forward day', () => {
+    vi.setSystemTime(new Date('2026-03-08T18:00:00Z'))
+    expect(getTodayStr('CST')).toBe('2026-03-08')
+    expect(getDayOfWeek('CST')).toBe(0) // Sunday
+  })
+})
+
+describe('chicagoWallClockToUtc', () => {
+  it('maps a CDT wall clock to the correct UTC instant (UTC-5)', () => {
+    expect(chicagoWallClockToUtc('2026-09-10', 5, 25).toISOString())
+      .toBe('2026-09-10T10:25:00.000Z')
+  })
+
+  it('maps a CST wall clock to the correct UTC instant (UTC-6)', () => {
+    expect(chicagoWallClockToUtc('2026-01-15', 5, 25).toISOString())
+      .toBe('2026-01-15T11:25:00.000Z')
+  })
+
+  it('handles midnight and end-of-day wall clocks', () => {
+    expect(chicagoWallClockToUtc('2026-09-10', 0, 0).toISOString())
+      .toBe('2026-09-10T05:00:00.000Z')
+    expect(chicagoWallClockToUtc('2026-09-10', 23, 59).toISOString())
+      .toBe('2026-09-11T04:59:00.000Z')
   })
 })

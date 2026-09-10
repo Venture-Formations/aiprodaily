@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
+import { SlackNotificationService } from '@/lib/slack'
 import { getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
 import { getEnvironment, isProduction, shouldSkipScheduleCheck } from '@/lib/env-guard'
+import { getDayOfWeek } from '@/lib/date-utils'
 import type { Logger } from '@/lib/logger'
 
 export const maxDuration = 600 // 10 minutes
@@ -59,9 +61,16 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
         secondarySendDays = [1, 2, 3, 4, 5] // Default to Mon-Fri
       }
 
-      // Check if today is a send day (0 = Sunday, 6 = Saturday)
-      const today = new Date()
-      const dayOfWeek = today.getDay()
+      // Check if today is a send day (0 = Sunday, 6 = Saturday).
+      //
+      // MUST be Central Time, not the server clock. Vercel runs UTC, so
+      // `new Date().getDay()` rolls over to tomorrow at 19:00 CT while the issue
+      // lookup below still resolves today's CT date. That skew fired AI
+      // Accounting Daily's Thursday-only secondary every Wednesday evening
+      // against Wednesday's already-sent issue, scheduling it for a time that
+      // had passed 13 hours earlier. `getDayOfWeek('CST')` is derived from the
+      // same date string used for `localDate`, so the two cannot disagree.
+      const dayOfWeek = getDayOfWeek('CST')
       const skipSchedule = shouldSkipScheduleCheck()
 
       if (skipSchedule) {
@@ -140,6 +149,14 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
 
       // Attach for downstream compatibility
       ;(issue as any).articles = activeArticles
+
+      // This is also what sequences the secondary send AFTER the primary one:
+      // `final_position` is written by `logFinalArticlePositions` during
+      // send-final, so on every earlier tick of the day this skip fires and the
+      // secondary waits. Deliberately a skip and not a claimed schedule slot —
+      // gating on `email_secondaryissueCreationTime` via ScheduleChecker would
+      // run before positions exist, burn the day's `last_*_run` marker, and the
+      // secondary would never go out at all.
       if (activeArticles.length === 0) {
         results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'No active articles with final positions' })
         continue
@@ -149,7 +166,18 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
       const providerSettings = await getEmailProviderSettings(publicationId)
       log.info({ provider: providerSettings.provider, slug: pub.slug }, '[CRON] Using email provider')
 
-      let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
+      // `scheduled` is false when the provider created the campaign but rejected
+      // the schedule. That campaign will never send on its own, so it must be
+      // alerted rather than counted as a clean send.
+      let result: {
+        success: boolean
+        campaignId?: string
+        issueId?: string
+        error?: string
+        scheduled?: boolean
+        scheduleError?: string
+        scheduleData?: any
+      }
 
       if (providerSettings.provider === 'sendgrid') {
         const sendGridService = new SendGridService()
@@ -165,7 +193,10 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
         result = {
           success: mlResult.success,
           campaignId: mlResult.issueId,
-          error: mlResult.success ? undefined : 'Failed to create secondary MailerLite campaign'
+          error: mlResult.success ? undefined : 'Failed to create secondary MailerLite campaign',
+          scheduled: mlResult.scheduled,
+          scheduleError: mlResult.scheduleError,
+          scheduleData: mlResult.scheduleData
         }
 
         if (!result.success) {
@@ -190,6 +221,34 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
         log.error({ err: updateError, slug: pub.slug }, '[CRON] Failed to update issue with secondary send info')
       } else {
         log.info({ slug: pub.slug }, '[CRON] Issue updated with secondary send timestamp')
+      }
+
+      // The campaign exists but the provider refused the schedule: it will sit
+      // as an unsent draft until someone acts. `secondary_sent_at` is still
+      // stamped above on purpose — the campaign is already created, so a retry
+      // would produce a duplicate rather than rescue this one.
+      if (result.scheduled === false) {
+        const requested = result.scheduleData?.schedule
+        const requestedTime = requested
+          ? `${requested.date} ${requested.hours}:${requested.minutes} CT`
+          : 'unknown'
+        log.error(
+          { slug: pub.slug, campaignId: result.campaignId, requestedTime, scheduleError: result.scheduleError },
+          '[CRON] Secondary campaign created but NOT scheduled — it will not send'
+        )
+        await new SlackNotificationService().sendScheduledSendFailureAlert(
+          issue.id,
+          requestedTime,
+          result.scheduleError ?? 'Provider rejected the schedule',
+          { campaignId: result.campaignId, publication: pub.slug, sendType: 'secondary' }
+        )
+        results.push({
+          pubId: pub.id,
+          slug: pub.slug,
+          success: true,
+          message: `Secondary campaign ${result.campaignId} created but not scheduled — needs manual scheduling`
+        })
+        continue
       }
 
       log.info({ slug: pub.slug }, '[CRON] === SECONDARY SEND COMPLETED ===')
