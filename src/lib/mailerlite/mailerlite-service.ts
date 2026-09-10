@@ -4,6 +4,7 @@ import { ErrorHandler, SlackNotificationService } from '../slack'
 import type { issueWithArticles, issueWithEvents, Article } from '@/types/database'
 import { generateFullNewsletterHtml } from '../newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
+import { TIME_REGEX } from '../settings/schedule-settings'
 import { getEnvironment, isProduction } from '../env-guard'
 import { isCircuitOpen, recordRateLimitHit } from '../remediation/circuit-breaker'
 import { getTodayStr, chicagoWallClockToUtc, utcToChicagoWallClock } from '../date-utils'
@@ -542,6 +543,17 @@ United States
       parseInt(schedule.minutes, 10)
     ).getTime()
 
+    // An unparseable setting yields NaN, and every comparison against NaN is
+    // false -- so without this the payload would fall past both guards below and
+    // get clamped to now+5, silently sending at a time nobody configured.
+    if (!Number.isFinite(targetMs)) {
+      console.error(
+        `[MailerLite] ${label}: schedule ${schedule.date} ${schedule.hours}:${schedule.minutes} is unparseable - ` +
+        `leaving the payload untouched so the provider rejects it`
+      )
+      return scheduleData
+    }
+
     const nowMs = Date.now()
     const earliestMs = nowMs + SCHEDULE_MIN_LEAD_MINUTES * 60_000
     if (targetMs >= earliestMs) return scheduleData
@@ -596,8 +608,11 @@ United States
         }
       }
 
-      console.log('MailerLite schedule data:', JSON.stringify(scheduleData, null, 2))
-      return this.applyScheduleLeadGuard(scheduleData, 'review send')
+      // Log AFTER the guard: on a rescue these two differ, and the log must name
+      // the payload that actually goes on the wire.
+      const guarded = this.applyScheduleLeadGuard(scheduleData, 'review send')
+      console.log('MailerLite schedule data:', JSON.stringify(guarded, null, 2))
+      return guarded
 
     } catch (error) {
       console.error('Error getting review schedule data, using default:', error)
@@ -637,8 +652,11 @@ United States
         }
       }
 
-      console.log('Final issue schedule data:', JSON.stringify(scheduleData, null, 2))
-      return this.applyScheduleLeadGuard(scheduleData, 'final send')
+      // Log AFTER the guard: on a rescue these two differ, and the log must name
+      // the payload that actually goes on the wire.
+      const guarded = this.applyScheduleLeadGuard(scheduleData, 'final send')
+      console.log('Final issue schedule data:', JSON.stringify(guarded, null, 2))
+      return guarded
 
     } catch (error) {
       console.error('Error getting final schedule data, using default:', error)
@@ -662,7 +680,21 @@ United States
       const timezoneIdStr = await getPublicationSetting(publicationId, 'email_timezone_id')
       const timezoneId = timezoneIdStr ? parseInt(timezoneIdStr, 10) : MAILERLITE_CENTRAL_TIMEZONE_ID // Default to Central Time
 
-      const finalTime = secondaryTime || '04:55' // Default if not set
+      // Validate at the source. This is the one schedule time read through the raw
+      // settings API rather than the Zod-validated getScheduleConfig, so a
+      // hand-edited `publication_settings` row (`0525`, `5`) would otherwise reach
+      // the schedule builder as garbage -- most likely during an incident, which
+      // is exactly when a silent wrong-time send is least affordable.
+      const DEFAULT_SECONDARY_SEND_TIME = '04:55'
+      let finalTime = DEFAULT_SECONDARY_SEND_TIME
+      if (secondaryTime && TIME_REGEX.test(secondaryTime)) {
+        finalTime = secondaryTime
+      } else if (secondaryTime) {
+        console.error(
+          `[MailerLite] secondary send: email_secondaryScheduledSendTime is "${secondaryTime}", ` +
+          `expected HH:MM - falling back to ${DEFAULT_SECONDARY_SEND_TIME} CT`
+        )
+      }
 
       console.log('Using secondary scheduled send time from publication settings:', finalTime)
 
@@ -680,8 +712,11 @@ United States
         }
       }
 
-      console.log('Secondary issue schedule data:', JSON.stringify(scheduleData, null, 2))
-      return this.applyScheduleLeadGuard(scheduleData, 'secondary send')
+      // Log AFTER the guard: on a rescue these two differ, and the log must name
+      // the payload that actually goes on the wire.
+      const guarded = this.applyScheduleLeadGuard(scheduleData, 'secondary send')
+      console.log('Secondary issue schedule data:', JSON.stringify(guarded, null, 2))
+      return guarded
 
     } catch (error) {
       console.error('Error getting secondary schedule data, using default:', error)

@@ -8,7 +8,10 @@ import {
 // Schema
 // ---------------------------------------------------------------------------
 
-const timeRegex = /^\d{2}:\d{2}$/
+/** HH:MM, zero-padded. Exported so raw settings reads can validate against the
+ *  same shape this schema enforces, instead of trusting the stored string. */
+export const TIME_REGEX = /^\d{2}:\d{2}$/
+const timeRegex = TIME_REGEX
 
 export const ScheduleConfigSchema = z.object({
   reviewScheduleEnabled: z.boolean().default(false),

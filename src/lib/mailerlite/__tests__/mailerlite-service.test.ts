@@ -818,6 +818,50 @@ describe('MailerLiteService schedule lead-time guard', () => {
     expect(schedule.hours + ':' + schedule.minutes).toBe('05:25')
   })
 
+  // Every comparison against NaN is false, so an unparseable setting would slip
+  // past both the lead check and the staleness bound and get clamped to now+5 --
+  // sending at a time nobody configured.
+  // Backstop for the case where upstream validation is bypassed or regressed.
+  // Injected via the final-send path, whose time comes from the Zod-validated
+  // getScheduleSettings -- so in production this should be unreachable, which is
+  // exactly why the guard must not silently invent a send time if it ever is.
+  it('leaves an unparseable time untouched rather than clamping it to now+5', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-10T10:25:54Z'))
+    setupCampaignHappyPath()
+    mockedGetScheduleSettings.mockResolvedValue({
+      review_send_time: '21:00',
+      final_send_time: 'not-a-time',
+      timezone_id: 157,
+    })
+    supabase.responseQueue.push({ data: null, error: null }) // email_metrics lookup
+    supabase.responseQueue.push({ data: null, error: null }) // email_metrics insert
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'main-group-1', false
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.hours).toBe('not-a-time')
+    expect(schedule.minutes).toBeUndefined()
+  })
+
+  // Closing the same hole at the source: this is the one schedule time read
+  // through the raw settings API rather than the Zod-validated config.
+  it('falls back to the default when the configured secondary time is not HH:MM', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-10T06:00:00Z')) // 01:00 CDT, well clear of 04:55
+    setupCampaignHappyPath()
+    secondaryAt('0525') // hand-edited settings row, missing the colon
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.hours + ':' + schedule.minutes).toBe('04:55')
+  })
+
   it('still rescues a target just past the 5-minute lead but inside the rescue window', async () => {
     vi.useFakeTimers()
     // 05:45 CDT against an 05:25 CT target: 20 minutes gone, inside the 30-minute bound.
