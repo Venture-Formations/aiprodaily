@@ -516,7 +516,8 @@ describe('MailerLiteService.createFinalissue', () => {
 
     const result = await new MailerLiteService().createFinalissue(makeIssue(), 'main-group-1', false)
 
-    expect(result).toMatchObject({ success: true, issueId: 'ml-campaign-99', scheduled: true })
+    expect(result).toMatchObject({ success: true, issueId: 'ml-campaign-99' })
+    expect(result.scheduleFailure).toBeUndefined()
     const metricsInsert = supabase.insertCalls.find(c => 'mailerlite_issue_id' in c)
     expect(metricsInsert?.mailerlite_issue_id).toBe('ml-campaign-99')
     expect(metricsInsert?.issue_id).toBe('issue-uuid-1')
@@ -781,10 +782,11 @@ describe('MailerLiteService schedule lead-time guard', () => {
 
   it('rolls the date forward when now + 5 minutes crosses midnight', async () => {
     vi.useFakeTimers()
-    // 2026-09-11 04:57:00 UTC === 2026-09-10 23:57 CDT
+    // 2026-09-11 04:57:00 UTC === 2026-09-10 23:57 CDT; target 23:58 CT is one
+    // minute out, so it is rescued forward and has to cross midnight to do it.
     vi.setSystemTime(new Date('2026-09-11T04:57:00Z'))
     setupCampaignHappyPath()
-    secondaryAt('05:25')
+    secondaryAt('23:58')
 
     await new MailerLiteService().createFinalissue(
       makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
@@ -793,6 +795,42 @@ describe('MailerLiteService schedule lead-time guard', () => {
     const schedule = scheduleCallPayload()
     expect(schedule.date).toBe('2026-09-11')
     expect(schedule.hours + ':' + schedule.minutes).toBe('00:02')
+  })
+
+  // The guard rescues a send that missed its start by seconds. Rescuing one that
+  // missed by hours would mail the wrong day's issue to real subscribers -- the
+  // provider's 422 is the only thing standing in the way, so it must be allowed
+  // to happen. This is the exact shape of the Wednesday-evening misfire.
+  it('refuses to move a target that is hours in the past, letting the provider reject it', async () => {
+    vi.useFakeTimers()
+    // 2026-09-10 00:01 UTC === 2026-09-09 19:01 CDT; target 05:25 CT that day is
+    // ~13.5h gone.
+    vi.setSystemTime(new Date('2026-09-10T00:01:00Z'))
+    setupCampaignHappyPath()
+    secondaryAt('05:25')
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-09' }), 'secondary-group-1', true
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.date).toBe('2026-09-09')
+    expect(schedule.hours + ':' + schedule.minutes).toBe('05:25')
+  })
+
+  it('still rescues a target just past the 5-minute lead but inside the rescue window', async () => {
+    vi.useFakeTimers()
+    // 05:45 CDT against an 05:25 CT target: 20 minutes gone, inside the 30-minute bound.
+    vi.setSystemTime(new Date('2026-09-10T10:45:00Z'))
+    setupCampaignHappyPath()
+    secondaryAt('05:25')
+
+    await new MailerLiteService().createFinalissue(
+      makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
+    )
+
+    const schedule = scheduleCallPayload()
+    expect(schedule.hours + ':' + schedule.minutes).toBe('05:50')
   })
 
   it('leaves a schedule time that is comfortably in the future untouched', async () => {
@@ -880,8 +918,9 @@ describe('MailerLiteService schedule failure reporting', () => {
     )
 
     expect(result.success).toBe(true) // campaign exists; the send flow must not abort
-    expect(result.scheduled).toBe(false)
-    expect(result.scheduleError).toMatch(/after or equal to/)
+    expect(result.scheduleFailure).toBeDefined()
+    expect(result.scheduleFailure!.reason).toMatch(/after or equal to/)
+    expect(result.scheduleFailure!.requestedTime).toMatch(/CT$/)
   })
 
   it('logs the schedule payload that was actually sent, not a recomputed one', async () => {
@@ -922,6 +961,6 @@ describe('MailerLiteService schedule failure reporting', () => {
       makeIssue({ date: '2026-09-10' }), 'secondary-group-1', true
     )
 
-    expect(result.scheduled).toBe(true)
+    expect(result.scheduleFailure).toBeUndefined()
   })
 })

@@ -6,7 +6,7 @@ import { generateFullNewsletterHtml } from '../newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
 import { getEnvironment, isProduction } from '../env-guard'
 import { isCircuitOpen, recordRateLimitHit } from '../remediation/circuit-breaker'
-import { getTodayStr, chicagoWallClockToUtc } from '../date-utils'
+import { getTodayStr, chicagoWallClockToUtc, utcToChicagoWallClock } from '../date-utils'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -28,6 +28,19 @@ const MAILERLITE_CENTRAL_TIMEZONE_ID = 157
  * going out at all.
  */
 const SCHEDULE_MIN_LEAD_MINUTES = 5
+
+/**
+ * How far into the past a target may sit and still be treated as a slow run
+ * worth rescuing.
+ *
+ * The guard exists to rescue a send that missed its own start by seconds. It
+ * must NOT rescue one that missed by hours: a target that stale means the run
+ * is on the wrong day or working from a stale issue, and the provider's
+ * rejection is the last thing standing between that and mailing the wrong
+ * issue to real subscribers. Beyond this bound, let the 422 happen and let the
+ * unscheduled-campaign alert fire.
+ */
+const SCHEDULE_MAX_RESCUE_MINUTES = 30
 
 /** MailerLite global limit ~120 requests/min. This app shares the account with Make.com (e.g. link-click → CreateUpdateSubscriber). */
 const MAILERLITE_RATE_LIMIT_RETRY_ATTEMPTS = 2
@@ -504,6 +517,9 @@ United States
    * final send has the same shape with only 5 minutes of configured margin and
    * fails the same way on any slow run.
    *
+   * Rescues forward only within a bounded window (see SCHEDULE_MAX_RESCUE_MINUTES):
+   * a target hours in the past is a wrong-day run, not a slow one.
+   *
    * Only Central Time can be checked -- the timezone is a MailerLite numeric id
    * with no mapping on our side. For any other id the payload is passed through
    * untouched, because silently moving a send in a timezone we cannot interpret
@@ -520,45 +536,41 @@ United States
       return scheduleData
     }
 
-    const target = chicagoWallClockToUtc(
+    const targetMs = chicagoWallClockToUtc(
       schedule.date,
       parseInt(schedule.hours, 10),
       parseInt(schedule.minutes, 10)
-    )
-    const earliest = new Date(Date.now() + SCHEDULE_MIN_LEAD_MINUTES * 60_000)
-    if (target.getTime() >= earliest.getTime()) return scheduleData
+    ).getTime()
+
+    const nowMs = Date.now()
+    const earliestMs = nowMs + SCHEDULE_MIN_LEAD_MINUTES * 60_000
+    if (targetMs >= earliestMs) return scheduleData
+
+    if (targetMs < nowMs - SCHEDULE_MAX_RESCUE_MINUTES * 60_000) {
+      console.error(
+        `[MailerLite] ${label}: target ${schedule.date} ${schedule.hours}:${schedule.minutes} CT is more than ` +
+        `${SCHEDULE_MAX_RESCUE_MINUTES} minutes in the past - refusing to move it. This run is on a stale or ` +
+        `wrong day; letting the provider reject it rather than mailing the wrong issue.`
+      )
+      return scheduleData
+    }
 
     // Round up to the next whole minute: MailerLite's schedule granularity is
     // minutes, so truncating could land us back on "now".
-    const substitute = new Date(Math.ceil(earliest.getTime() / 60_000) * 60_000)
-    // hourCycle 'h23' rather than hour12:false: the latter renders midnight as
-    // "24:00" on some ICU builds, and that hour belongs to the *previous*
-    // calendar date, so pairing it with the formatted date would land the send a
-    // full day early.
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Chicago',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-    }).formatToParts(substitute)
-    const get = (type: string) => parts.find(p => p.type === type)!.value
-
-    const guarded = {
-      ...scheduleData,
-      schedule: {
-        ...schedule,
-        date: `${get('year')}-${get('month')}-${get('day')}`,
-        hours: get('hour'),
-        minutes: get('minute'),
-      },
-    }
-
+    const next = utcToChicagoWallClock(new Date(Math.ceil(earliestMs / 60_000) * 60_000))
     console.warn(
       `[MailerLite] ${label}: configured send time ${schedule.date} ${schedule.hours}:${schedule.minutes} CT ` +
       `is within ${SCHEDULE_MIN_LEAD_MINUTES} minutes of now - sending at ` +
-      `${guarded.schedule.date} ${guarded.schedule.hours}:${guarded.schedule.minutes} CT instead`
+      `${next.date} ${next.hours}:${next.minutes} CT instead`
     )
 
-    return guarded
+    return { ...scheduleData, schedule: { ...schedule, ...next } }
+  }
+
+  /** Render a schedule payload as a human-readable Central-Time string. */
+  private static formatScheduleTime(scheduleData: any): string {
+    const s = scheduleData?.schedule
+    return s ? `${s.date} ${s.hours}:${s.minutes} CT` : 'unknown'
   }
 
   private async getReviewScheduleData(date: string, publicationId: string): Promise<any> {
@@ -864,13 +876,16 @@ United States
         // issue is created at issue Creation Time and scheduled to send same day at Scheduled Send Time
         // Whether MailerLite accepted the schedule. A created-but-unscheduled
         // campaign never sends, so callers must surface this.
-        let scheduled = true
-        let scheduleError: string | undefined
+        // One optional field says everything the callers need: absent means the
+        // campaign is scheduled. A created-but-unscheduled campaign never sends,
+        // so callers MUST alert on it -- this returned a bare `success: true`
+        // for ten months while the secondary silently never went out.
+        let scheduleFailure: { reason: string; requestedTime: string; status?: number; data?: any } | undefined
 
-        // Hoisted so the catch below reports the payload that was actually sent.
-        // It used to recompute with getFinalScheduleData(issue.date), which for a
-        // secondary send is a different builder and a different time -- every
-        // logged failure named a payload that had never been near the wire.
+        // Hoisted so the failure report below names the payload that was actually
+        // sent. It used to recompute with getFinalScheduleData(issue.date), which
+        // for a secondary send is a different builder and a different time -- so
+        // every logged failure named a payload never near the wire.
         let finalScheduleData: any
         try {
           const today = getTodayStr('CST')
@@ -890,59 +905,52 @@ United States
           if (scheduleResponse.status === 200 || scheduleResponse.status === 201) {
             console.log('Final issue scheduled successfully')
           } else {
-            scheduled = false
-            scheduleError = `MailerLite returned ${scheduleResponse.status}`
             console.error('Failed to schedule final issue:', scheduleResponse.status, scheduleResponse.data)
-            await this.logError('Failed to schedule final issue', {
-              issueId: issue.id,
-              mailerliteissueId: issueId,
-              scheduleData: finalScheduleData,
-              errorStatus: scheduleResponse.status,
-              errorData: scheduleResponse.data
-            })
+            scheduleFailure = {
+              reason: `MailerLite returned ${scheduleResponse.status}`,
+              requestedTime: MailerLiteService.formatScheduleTime(finalScheduleData),
+              status: scheduleResponse.status,
+              data: scheduleResponse.data
+            }
           }
         } catch (err) {
-          scheduled = false
           console.error('Error scheduling final issue:', err)
+          const axiosError = err as any
+          const apiMessage = axiosError?.response?.data?.message
 
-          // Log detailed error information for debugging
-          if (err && typeof err === 'object' && 'response' in err) {
-            const axiosError = err as any
-            scheduleError = axiosError.response?.data?.message
-              ?? (err instanceof Error ? err.message : String(err))
+          if (axiosError?.response) {
             console.error('MailerLite final schedule API error response:', {
-              status: axiosError.response?.status,
-              statusText: axiosError.response?.statusText,
-              data: axiosError.response?.data,
+              status: axiosError.response.status,
+              statusText: axiosError.response.statusText,
+              data: axiosError.response.data,
               config: {
                 url: axiosError.config?.url,
                 method: axiosError.config?.method,
                 data: axiosError.config?.data
               }
             })
-
-            // Log to database for persistent tracking
-            await this.logError('Failed to schedule final issue', {
-              issueId: issue.id,
-              mailerliteissueId: issueId,
-              scheduleData: finalScheduleData,
-              errorStatus: axiosError.response?.status,
-              errorData: axiosError.response?.data
-            })
-          } else {
-            scheduleError = err instanceof Error ? err.message : String(err)
-            await this.logError('Failed to schedule final issue', {
-              issueId: issue.id,
-              mailerliteissueId: issueId,
-              scheduleData: finalScheduleData,
-              errorData: scheduleError
-            })
           }
 
-          // Don't fail the whole process if scheduling fails - the campaign exists
-          // and can be scheduled by hand. The caller is told via `scheduled: false`
-          // and must alert on it: an unscheduled campaign never sends, and this
-          // went unnoticed for months while it returned a bare `success: true`.
+          scheduleFailure = {
+            reason: apiMessage ?? (err instanceof Error ? err.message : String(err)),
+            requestedTime: MailerLiteService.formatScheduleTime(finalScheduleData),
+            status: axiosError?.response?.status,
+            data: axiosError?.response?.data
+          }
+        }
+
+        // Single persistent record for every way the schedule can fail. Not
+        // fatal: the campaign exists and can be scheduled by hand, and aborting
+        // here would skip the metrics bookkeeping below.
+        if (scheduleFailure) {
+          await this.logError('Failed to schedule final issue', {
+            issueId: issue.id,
+            mailerliteissueId: issueId,
+            scheduleData: finalScheduleData,
+            requestedTime: scheduleFailure.requestedTime,
+            errorStatus: scheduleFailure.status,
+            errorData: scheduleFailure.data ?? scheduleFailure.reason
+          })
         }
 
         // Store MailerLite issue ID in email_metrics table ONLY for primary final send (not secondary)
@@ -987,12 +995,12 @@ United States
           issueId: issue.id,
           mailerliteissueId: issueId,
           mainGroupId: mainGroupId,
-          scheduled
+          scheduled: !scheduleFailure
         })
 
         await this.slack.sendEmailIssueAlert('final', true, issue.id)
 
-        return { success: true, issueId, scheduled, scheduleError, scheduleData: finalScheduleData }
+        return { success: true, issueId, scheduleFailure }
       }
 
       throw new Error('Failed to create final issue')

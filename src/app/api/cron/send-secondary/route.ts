@@ -174,9 +174,7 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
         campaignId?: string
         issueId?: string
         error?: string
-        scheduled?: boolean
-        scheduleError?: string
-        scheduleData?: any
+        scheduleFailure?: { reason: string; requestedTime: string }
       }
 
       if (providerSettings.provider === 'sendgrid') {
@@ -194,9 +192,7 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
           success: mlResult.success,
           campaignId: mlResult.issueId,
           error: mlResult.success ? undefined : 'Failed to create secondary MailerLite campaign',
-          scheduled: mlResult.scheduled,
-          scheduleError: mlResult.scheduleError,
-          scheduleData: mlResult.scheduleData
+          scheduleFailure: mlResult.scheduleFailure
         }
 
         if (!result.success) {
@@ -225,28 +221,23 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
 
       // The campaign exists but the provider refused the schedule: it will sit
       // as an unsent draft until someone acts. `secondary_sent_at` is still
-      // stamped above on purpose — the campaign is already created, so a retry
+      // stamped above on purpose -- the campaign is already created, so a retry
       // would produce a duplicate rather than rescue this one.
-      if (result.scheduled === false) {
-        const requested = result.scheduleData?.schedule
-        const requestedTime = requested
-          ? `${requested.date} ${requested.hours}:${requested.minutes} CT`
-          : 'unknown'
+      if (result.scheduleFailure) {
         log.error(
-          { slug: pub.slug, campaignId: result.campaignId, requestedTime, scheduleError: result.scheduleError },
-          '[CRON] Secondary campaign created but NOT scheduled — it will not send'
+          { slug: pub.slug, campaignId: result.campaignId, ...result.scheduleFailure },
+          '[CRON] Secondary campaign created but NOT scheduled - it will not send'
         )
-        await new SlackNotificationService().sendScheduledSendFailureAlert(
+        await new SlackNotificationService().alertUnscheduledCampaign(
           issue.id,
-          requestedTime,
-          result.scheduleError ?? 'Provider rejected the schedule',
-          { campaignId: result.campaignId, publication: pub.slug, sendType: 'secondary' }
+          result.scheduleFailure,
+          { campaignId: result.campaignId, publicationSlug: pub.slug, sendType: 'secondary' }
         )
         results.push({
           pubId: pub.id,
           slug: pub.slug,
           success: true,
-          message: `Secondary campaign ${result.campaignId} created but not scheduled — needs manual scheduling`
+          message: `Secondary campaign ${result.campaignId} created but not scheduled - needs manual scheduling`
         })
         continue
       }

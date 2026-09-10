@@ -249,6 +249,33 @@ export class SlackNotificationService {
   /**
    * Alert when scheduled send fires but nothing was sent to MailerLite
    */
+  /**
+   * Alert when a campaign was created at the provider but its schedule was
+   * rejected. Such a campaign never sends, so this must never be silent — it
+   * went unnoticed for ten months on the secondary send.
+   *
+   * Never throws: a Slack outage must not fail a send that otherwise succeeded.
+   */
+  async alertUnscheduledCampaign(
+    issueId: string,
+    failure: { reason: string; requestedTime: string },
+    context: { campaignId?: string; publicationSlug: string; sendType: 'final' | 'secondary' }
+  ) {
+    try {
+      await this.sendScheduledSendFailureAlert(issueId, failure.requestedTime, failure.reason, {
+        operation: `${context.sendType}_send`,
+        campaignId: context.campaignId,
+        publication_slug: context.publicationSlug,
+        impact: 'Campaign exists at the provider but is not scheduled — it will not send until scheduled by hand',
+      })
+    } catch (error) {
+      console.error('[Slack] Failed to send unscheduled-campaign alert:', error)
+    }
+  }
+
+  /**
+   * Alert when scheduled send fires but nothing was sent to MailerLite
+   */
   async sendScheduledSendFailureAlert(issueId: string, scheduledTime: string, reason?: string, details?: any) {
     const message = [
       `📅 Scheduled Send Failed`,

@@ -318,7 +318,7 @@ describe('send-secondary cron', () => {
 const slackAlertMock = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/slack', () => ({
   SlackNotificationService: class MockSlackService {
-    sendScheduledSendFailureAlert = slackAlertMock
+    alertUnscheduledCampaign = slackAlertMock
   },
 }))
 
@@ -338,7 +338,7 @@ describe('send-secondary cron - send day is evaluated in Central Time', () => {
     setupFromMock()
     getEmailProviderSettingsMock.mockResolvedValue({ provider: 'sendgrid' })
     sendGridFinalMock.mockResolvedValue({ success: true, campaignId: 'sg-1', issueId: 'issue-1' })
-    mailerliteFinalMock.mockResolvedValue({ success: true, issueId: 'ml-1', scheduled: true })
+    mailerliteFinalMock.mockResolvedValue({ success: true, issueId: 'ml-1' })
   })
 
   afterEach(() => {
@@ -409,9 +409,10 @@ describe('send-secondary cron - unscheduled campaign is surfaced', () => {
     mailerliteFinalMock.mockResolvedValue({
       success: true,
       issueId: 'ml-1',
-      scheduled: false,
-      scheduleError: 'The schedule date must be a date after or equal to 2026-09-10 05:25.',
-      scheduleData: { schedule: { date: '2026-09-10', hours: '05', minutes: '25' } },
+      scheduleFailure: {
+        reason: 'The schedule date must be a date after or equal to 2026-09-10 05:25.',
+        requestedTime: '2026-09-10 05:25 CT',
+      },
     })
 
     const response = await GET(buildRequest(), { params: Promise.resolve({}) })
@@ -419,9 +420,11 @@ describe('send-secondary cron - unscheduled campaign is surfaced', () => {
 
     expect(slackAlertMock).toHaveBeenCalledWith(
       'issue-1',
-      expect.stringContaining('05:25'),
-      expect.stringMatching(/after or equal to/),
-      expect.anything()
+      expect.objectContaining({
+        reason: expect.stringMatching(/after or equal to/),
+        requestedTime: expect.stringContaining('05:25'),
+      }),
+      expect.objectContaining({ sendType: 'secondary', publicationSlug: 'aiprodaily' })
     )
     // The campaign exists in MailerLite, so the send is still recorded: retrying
     // would create a duplicate campaign rather than fix the unscheduled one.
@@ -433,7 +436,7 @@ describe('send-secondary cron - unscheduled campaign is surfaced', () => {
   })
 
   it('does not alert when the campaign scheduled cleanly', async () => {
-    mailerliteFinalMock.mockResolvedValue({ success: true, issueId: 'ml-1', scheduled: true })
+    mailerliteFinalMock.mockResolvedValue({ success: true, issueId: 'ml-1' })
 
     const response = await GET(buildRequest(), { params: Promise.resolve({}) })
     const body = await response.json()

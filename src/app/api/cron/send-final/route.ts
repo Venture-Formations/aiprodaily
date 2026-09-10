@@ -243,25 +243,16 @@ async function processFinalSendForPub(pub: { id: string; slug: string }, log: Lo
     // campaign is recoverable by hand and the rest of the send bookkeeping
     // should still run), which is exactly how the same failure on the secondary
     // path stayed invisible for months. Alert, don't abort.
-    if (mlResult.scheduled === false) {
-      const requested = mlResult.scheduleData?.schedule
-      const requestedTime = requested
-        ? `${requested.date} ${requested.hours}:${requested.minutes} CT`
-        : 'unknown'
+    if (mlResult.scheduleFailure) {
       log.error(
-        { slug: pub.slug, campaignId: result.campaignId, requestedTime, scheduleError: mlResult.scheduleError },
-        'MailerLite campaign created but NOT scheduled — it will not send'
+        { slug: pub.slug, campaignId: result.campaignId, ...mlResult.scheduleFailure },
+        'MailerLite campaign created but NOT scheduled - it will not send'
       )
-      try {
-        await new SlackNotificationService().sendScheduledSendFailureAlert(
-          issue.id,
-          requestedTime,
-          mlResult.scheduleError ?? 'MailerLite rejected the schedule',
-          { campaignId: result.campaignId, publication_slug: pub.slug, operation: 'final_send' }
-        )
-      } catch (slackError) {
-        log.error({ err: slackError, slug: pub.slug }, 'Failed to send Slack notification for unscheduled campaign')
-      }
+      await new SlackNotificationService().alertUnscheduledCampaign(
+        issue.id,
+        mlResult.scheduleFailure,
+        { campaignId: result.campaignId, publicationSlug: pub.slug, sendType: 'final' }
+      )
     }
   }
 

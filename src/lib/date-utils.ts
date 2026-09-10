@@ -12,6 +12,31 @@ const PROJECT_TIMEZONE = 'America/Chicago'
 /** Reusable formatter: converts a UTC timestamp to YYYY-MM-DD in the project timezone */
 const tzDateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: PROJECT_TIMEZONE })
 
+/**
+ * Reusable formatter for deriving the project timezone's UTC offset. Invariant,
+ * so it is built once: Intl.DateTimeFormat construction is the expensive part,
+ * and `getChicagoOffsetMs` runs several times per request on the analytics
+ * date-range paths.
+ */
+const tzOffsetProbeFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: PROJECT_TIMEZONE,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hourCycle: 'h23',
+})
+
+/**
+ * Reusable formatter for splitting an instant into project-timezone wall-clock
+ * parts. `hourCycle: 'h23'` rather than `hour12: false`: the latter renders
+ * midnight as "24:00" on some ICU builds, and that hour belongs to the PREVIOUS
+ * calendar date, so pairing it with the formatted date lands a day early.
+ */
+const tzWallClockFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: PROJECT_TIMEZONE,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+
 /** Convert a UTC timestamp string to a YYYY-MM-DD date in the project timezone */
 export function toProjectDateStr(utcTimestamp: string): string {
   return tzDateFormatter.format(new Date(utcTimestamp))
@@ -31,12 +56,7 @@ function getChicagoOffsetMs(dateStr: string): number {
   const probe = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
 
   // Get the local time string in Chicago and compare to UTC to derive offset
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: PROJECT_TIMEZONE,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false,
-  }).formatToParts(probe)
+  const parts = tzOffsetProbeFormatter.formatToParts(probe)
 
   const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0')
   const localAtProbe = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
@@ -69,7 +89,7 @@ export function buildDateRangeBoundaries(
   const [sy, sm, sd] = startStr.split('-').map(Number)
   const [ey, em, ed] = endStr.split('-').map(Number)
 
-  const startDate = new Date(Date.UTC(sy, sm - 1, sd) + startOffsetMs)
+  const startDate = new Date(Date.UTC(sy, sm - 1, sd) + startOffsetMs)  // === chicagoWallClockToUtc(startStr, 0, 0)
   const endDate = new Date(Date.UTC(ey, em - 1, ed, 23, 59, 59, 999) + endOffsetMs)
 
   return { startDate, endDate }
@@ -95,11 +115,10 @@ export function getTodayStr(tz: SupportedTz): string {
  * fired on Wednesday evening against Wednesday's already-sent issue. Sharing
  * the single date string makes that class of skew structurally impossible.
  *
- * The noon-UTC probe keeps the weekday stable across DST transitions.
  */
 export function getDayOfWeek(tz: SupportedTz): number {
   const [y, m, d] = getTodayStr(tz).split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
 }
 
 /**
@@ -113,6 +132,21 @@ export function getDayOfWeek(tz: SupportedTz): number {
 export function chicagoWallClockToUtc(dateStr: string, hours: number, minutes: number): Date {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d, hours, minutes) + getChicagoOffsetMs(dateStr))
+}
+
+/**
+ * Split a UTC instant into Chicago wall-clock parts, zero-padded, in the shape
+ * email providers want for a schedule payload. The exact inverse of
+ * `chicagoWallClockToUtc`.
+ */
+export function utcToChicagoWallClock(d: Date): { date: string; hours: string; minutes: string } {
+  const parts = tzWallClockFormatter.formatToParts(d)
+  const get = (type: string) => parts.find(p => p.type === type)!.value
+  return {
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+    hours: get('hour'),
+    minutes: get('minute'),
+  }
 }
 
 /**
